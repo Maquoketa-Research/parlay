@@ -156,15 +156,45 @@
     },
     "viewsContainers": {
       "secondarySidebar": [
-        { "id": "drydock-aqua", "title": "Aqua", "icon": "media/aqua.svg" },
-        { "id": "drydock-meshy", "title": "Meshy", "icon": "media/meshy.svg" },
-        { "id": "drydock-sonar", "title": "Sonar", "icon": "media/sonar.svg" }
+        {
+          "id": "drydock-aqua",
+          "title": "Aqua",
+          "icon": "media/aqua.svg"
+        },
+        {
+          "id": "drydock-meshy",
+          "title": "Meshy",
+          "icon": "media/meshy.svg"
+        },
+        {
+          "id": "drydock-sonar",
+          "title": "Sonar",
+          "icon": "media/sonar.svg"
+        }
       ]
     },
     "views": {
-      "drydock-aqua": [ { "type": "webview", "id": "drydock.aqua", "name": "Aqua" } ],
-      "drydock-meshy": [ { "type": "webview", "id": "drydock.meshy", "name": "Meshy" } ],
-      "drydock-sonar": [ { "type": "webview", "id": "drydock.sonar", "name": "Sonar" } ]
+      "drydock-aqua": [
+        {
+          "type": "webview",
+          "id": "drydock.aqua",
+          "name": "Aqua"
+        }
+      ],
+      "drydock-meshy": [
+        {
+          "type": "webview",
+          "id": "drydock.meshy",
+          "name": "Meshy"
+        }
+      ],
+      "drydock-sonar": [
+        {
+          "type": "webview",
+          "id": "drydock.sonar",
+          "name": "Sonar"
+        }
+      ]
     },
     "themes": [
       {
@@ -285,15 +315,12 @@
     }
   },
   "scripts": {
-    "compile": "node tools/vendor-three.mjs && tsc -p .",
-    "check": "node tools/check.mjs",
-    "package": "vsce package --no-dependencies"
+    "compile": "gulp compile-extension:drydock-ide",
+    "watch": "gulp watch-extension:drydock-ide",
+    "check": "node tools/check.mjs"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/vscode": "^1.90.0",
-    "@vscode/vsce": "^3.0.0",
-    "three": "^0.186.0",
-    "typescript": "^5.5.0"
+    "@types/node": "24.x",
+    "three": "0.186.0"
   }
 }
