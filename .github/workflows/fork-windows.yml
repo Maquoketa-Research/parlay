@@ -106,8 +106,9 @@ jobs:
           done
           # our source patches ride behind VSCodium's (prepare_vscode.sh applies patches/user last)
           mkdir -p patches/user && cp ../ide/fork/patches/*.patch patches/user/
-          # brand assets: same file names upstream's installer and manifest already reference
-          cp ../ide/fork/icons/* vscode/resources/win32/
+          # brand assets: same file names upstream's installer and manifest already reference. They go into the
+          # harness's src/stable overlay, which prepare_vscode.sh copies over the tree (its own icons live there).
+          cp ../ide/fork/icons/*.ico ../ide/fork/icons/*.png ../ide/fork/icons/*.bmp src/stable/resources/win32/
           echo "MS_TAG=$MS_TAG MS_COMMIT=$MS_COMMIT RELEASE_VERSION=$RELEASE_VERSION"
           jq '{nameShort, nameLong, applicationName, dataFolderName, builtIns: (.builtInExtensions | map(.name))}' product.json
 
