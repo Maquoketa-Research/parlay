@@ -17,9 +17,9 @@ export function activate(ctx: vscode.ExtensionContext) {
 	}
 	ctx.subscriptions.push(vscode.commands.registerCommand("drydock.ask", () => ask(ctx)));
 	ctx.subscriptions.push(vscode.commands.registerCommand("drydock.installSkills", () => installSkills(ctx, true)));
-	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.aqua", new UrlView("drydock.aquaUrl")));
-	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.sonar", new UrlView("drydock.sonarUrl")));
-	ctx.subscriptions.push(vscode.window.onDidCloseTerminal(t => { if (t === claudeTerminal) claudeTerminal = undefined; }));
+	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.aqua", new UrlView("aquaUrl")));
+	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.sonar", new UrlView("sonarUrl")));
+	ctx.subscriptions.push(vscode.window.onDidCloseTerminal((t) => { if (t === claudeTerminal) claudeTerminal = undefined; }));
 
 	const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
 	status.command = "drydock.installSkills";
@@ -29,12 +29,12 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push({ dispose: () => clearInterval(timer) });
 }
 
-// ── the actions ──────────────────────────────────────────────────────────────────────────────────
+// ---- the actions --------------------------------------------------------------------------------
 
 function target(): string | undefined {
 	const ed = vscode.window.activeTextEditor;
 	if (!ed) { void vscode.window.showInformationMessage("Open a script first."); return; }
-	const rel = vscode.workspace.asRelativePath(ed.document.uri, false).replace(/\/g, "/");
+	const rel = vscode.workspace.asRelativePath(ed.document.uri, false).replace(/\\/g, "/");
 	const a = ed.selection.start.line + 1, b = ed.selection.end.line + 1;
 	return `${rel}:${a}-${b}`;
 }
@@ -78,26 +78,27 @@ async function installSkills(ctx: vscode.ExtensionContext, announce: boolean) {
 	if (announce) void vscode.window.showInformationMessage(`Drydock: Claude skills installed to ${dst}`);
 }
 
-// ── the panel views (Aqua, Sonar) ─────────────────────────────────────────────────────────────────
+// ---- the panel views (Aqua, Sonar) --------------------------------------------------------------
 
 class UrlView implements vscode.WebviewViewProvider {
 	constructor(private setting: string) {}
 	resolveWebviewView(view: vscode.WebviewView) {
 		view.webview.options = { enableScripts: true };
 		const render = () => {
-			const url = vscode.workspace.getConfiguration("drydock").get<string>(this.setting.split(".")[1], "");
-			const origin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
+			const url = vscode.workspace.getConfiguration("drydock").get<string>(this.setting, "");
+			let origin = "";
+			try { origin = new URL(url).origin; } catch { /* leave the frame blank */ }
 			view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; style-src 'unsafe-inline'">
 <style>html,body,iframe{margin:0;width:100%;height:100vh;border:0;background:transparent}</style>
 <iframe src="${url}" allow="clipboard-write"></iframe>`;
 		};
 		render();
-		const sub = vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration(this.setting)) render(); });
+		const sub = vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration(`drydock.${this.setting}`)) render(); });
 		view.onDidDispose(() => sub.dispose());
 	}
 }
 
-// ── Script Sync status ────────────────────────────────────────────────────────────────────────────
+// ---- Script Sync status -------------------------------------------------------------------------
 
 // Studio keeps its Script Sync mappings in HKCU\Software\Roblox\RobloxStudio as
 // File_Sync_Persistence_Record_V1:<placeId>:<guid> values (JSON with the folder path). Nothing on disk
@@ -108,13 +109,16 @@ async function refreshStatus(status: vscode.StatusBarItem) {
 	if (!folder) { status.hide(); return; }
 	let on = false;
 	if (process.platform === "win32") {
-		const text = await new Promise<string>(res => execFile("reg", ["query", "HKCU\Software\Roblox\RobloxStudio"], { windowsHide: true, maxBuffer: 4 << 20 }, (_e, out) => res(String(out ?? ""))));
-		const plain = folder.toLowerCase(), escaped = plain.replace(/\/g, "\\\\"), fwd = plain.replace(/\/g, "/");
+		const text = await new Promise<string>((res) =>
+			execFile("reg", ["query", "HKCU\\Software\\Roblox\\RobloxStudio"], { windowsHide: true, maxBuffer: 4 << 20 }, (_e, out) => res(String(out ?? ""))));
+		const plain = folder.toLowerCase(), escaped = plain.replace(/\\/g, "\\\\"), fwd = plain.replace(/\\/g, "/");
 		const hay = text.toLowerCase();
 		on = hay.includes(plain) || hay.includes(escaped) || hay.includes(fwd);
 	}
 	status.text = on ? "$(sync) Script Sync on" : "$(sync-ignored) Script Sync off";
-	status.tooltip = on ? "Roblox Studio syncs this folder. Claude's edits land in Studio on save." : "Studio is not syncing this folder. In Studio: right-click a Folder → Sync to… → pick this folder.";
+	status.tooltip = on
+		? "Roblox Studio syncs this folder. Claude's edits land in Studio on save."
+		: "Studio is not syncing this folder. In Studio: right-click a Folder, Sync to..., pick this folder.";
 	status.show();
 }
 
