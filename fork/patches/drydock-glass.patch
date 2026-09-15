@@ -1,0 +1,53 @@
+diff --git a/src/vs/platform/windows/electron-main/windows.ts b/src/vs/platform/windows/electron-main/windows.ts
+index 7c4f02ef..0b9a7c9a 100644
+--- a/src/vs/platform/windows/electron-main/windows.ts
++++ b/src/vs/platform/windows/electron-main/windows.ts
+@@ -166,6 +166,13 @@ export function defaultBrowserWindowOptions(accessor: ServicesAccessor, windowSt
+ 		experimentalDarkMode: true
+ 	};
+ 
++	// Drydock: glass chrome. Windows 11 draws acrylic behind the window; the window itself is transparent
++	// so the alpha-coloured parts of the Drydock Glass theme let it through. Gated on drydock.glass.
++	if (isWindows && configurationService.getValue<boolean>('drydock.glass') === true) {
++		options.backgroundMaterial = 'acrylic';
++		options.backgroundColor = '#00000000';
++	}
++
+ 	if (isWindows) {
+ 		let borderSetting = windowSettings?.border || 'default';
+ 		if (borderSetting === 'system') {
+diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
+index 8c7a7a5f..1a58955c 100644
+--- a/src/vs/workbench/browser/media/style.css
++++ b/src/vs/workbench/browser/media/style.css
+@@ -394,4 +394,11 @@ body {
+ .monaco-workbench .part.sidebar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled), .monaco-workbench .part.auxiliarybar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled) {
+     outline: calc(var(--vscode-workbench-sidebar-font-size) * 0.076923) dashed var(--vscode-toolbar-hoverOutline);
+     outline-offset: calc(var(--vscode-workbench-sidebar-font-size) * -0.076923)
+-}
+\ No newline at end of file
++}
++
++/* Drydock: glass chrome (setting drydock.glass). The root is transparent so the window's acrylic
++   shows through the theme's alpha-coloured chrome; the editor keeps its own opaque background. */
++body.drydock-glass,
++.monaco-workbench.drydock-glass {
++	background-color: transparent !important;
++}
+diff --git a/src/vs/workbench/browser/workbench.ts b/src/vs/workbench/browser/workbench.ts
+index 47f28faa..9b3360f2 100644
+--- a/src/vs/workbench/browser/workbench.ts
++++ b/src/vs/workbench/browser/workbench.ts
+@@ -374,6 +374,12 @@ export class Workbench extends Layout {
+ 
+ 		this.mainContainer.classList.add(...workbenchClasses);
+ 
++		// Drydock: glass chrome marks the root so style.css can make it transparent
++		if (configurationService.getValue<boolean>('drydock.glass') === true) {
++			this.mainContainer.classList.add('drydock-glass');
++			this.mainContainer.ownerDocument.body.classList.add('drydock-glass');
++		}
++
+ 		// Apply font aliasing
+ 		this.updateFontAliasing(configurationService);
+ 

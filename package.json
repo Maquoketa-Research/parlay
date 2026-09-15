@@ -2,60 +2,187 @@
   "name": "drydock-ide",
   "displayName": "Drydock IDE",
   "description": "Roblox game development with Claude inside the editor: right-click actions on your code, Script Sync awareness, Aqua and Sonar on the right, three looks (Dark, Paper, Glass).",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "maquoketa",
   "private": true,
   "license": "MIT",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Themes", "Other"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Themes",
+    "Other"
+  ],
   "main": "./out/extension.js",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
-      { "command": "drydock.claude.explain",  "title": "Explain this",                 "category": "Claude" },
-      { "command": "drydock.claude.fix",      "title": "Fix this",                     "category": "Claude" },
-      { "command": "drydock.claude.validate", "title": "Add server-side validation",   "category": "Claude" },
-      { "command": "drydock.claude.pcall",    "title": "Wrap DataStore calls in pcall","category": "Claude" },
-      { "command": "drydock.claude.extract",  "title": "Extract to ModuleScript",      "category": "Claude" },
-      { "command": "drydock.claude.test",     "title": "Write a test",                 "category": "Claude" },
-      { "command": "drydock.claude.ab",       "title": "Make an A/B variant",          "category": "Claude" },
-      { "command": "drydock.ask",             "title": "Ask about the selection…",     "category": "Claude" },
-      { "command": "drydock.installSkills",   "title": "Install Claude skills",        "category": "Drydock" }
+      {
+        "command": "drydock.claude.explain",
+        "title": "Explain this",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.claude.fix",
+        "title": "Fix this",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.claude.validate",
+        "title": "Add server-side validation",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.claude.pcall",
+        "title": "Wrap DataStore calls in pcall",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.claude.extract",
+        "title": "Extract to ModuleScript",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.claude.test",
+        "title": "Write a test",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.claude.ab",
+        "title": "Make an A/B variant",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.ask",
+        "title": "Ask about the selection\u2026",
+        "category": "Claude"
+      },
+      {
+        "command": "drydock.installSkills",
+        "title": "Install Claude skills",
+        "category": "Drydock"
+      }
     ],
-    "submenus": [ { "id": "drydock.claudeMenu", "label": "Claude" } ],
+    "submenus": [
+      {
+        "id": "drydock.claudeMenu",
+        "label": "Claude"
+      }
+    ],
     "menus": {
-      "editor/context": [ { "submenu": "drydock.claudeMenu", "group": "0_drydock", "when": "editorTextFocus" } ],
+      "editor/context": [
+        {
+          "submenu": "drydock.claudeMenu",
+          "group": "0_drydock",
+          "when": "editorTextFocus"
+        }
+      ],
       "drydock.claudeMenu": [
-        { "command": "drydock.claude.explain",  "group": "1_understand@1" },
-        { "command": "drydock.ask",             "group": "1_understand@2" },
-        { "command": "drydock.claude.fix",      "group": "2_change@1", "when": "editorHasSelection" },
-        { "command": "drydock.claude.validate", "group": "2_change@2", "when": "editorHasSelection" },
-        { "command": "drydock.claude.pcall",    "group": "2_change@3", "when": "editorHasSelection" },
-        { "command": "drydock.claude.extract",  "group": "2_change@4", "when": "editorHasSelection" },
-        { "command": "drydock.claude.test",     "group": "3_verify@1" },
-        { "command": "drydock.claude.ab",       "group": "3_verify@2", "when": "editorHasSelection" }
+        {
+          "command": "drydock.claude.explain",
+          "group": "1_understand@1"
+        },
+        {
+          "command": "drydock.ask",
+          "group": "1_understand@2"
+        },
+        {
+          "command": "drydock.claude.fix",
+          "group": "2_change@1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "drydock.claude.validate",
+          "group": "2_change@2",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "drydock.claude.pcall",
+          "group": "2_change@3",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "drydock.claude.extract",
+          "group": "2_change@4",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "drydock.claude.test",
+          "group": "3_verify@1"
+        },
+        {
+          "command": "drydock.claude.ab",
+          "group": "3_verify@2",
+          "when": "editorHasSelection"
+        }
       ]
     },
     "viewsContainers": {
-      "panel": [ { "id": "drydock", "title": "Drydock", "icon": "media/drydock.svg" } ]
+      "panel": [
+        {
+          "id": "drydock",
+          "title": "Drydock",
+          "icon": "media/drydock.svg"
+        }
+      ]
     },
     "views": {
       "drydock": [
-        { "type": "webview", "id": "drydock.aqua",  "name": "Aqua" },
-        { "type": "webview", "id": "drydock.sonar", "name": "Sonar" }
+        {
+          "type": "webview",
+          "id": "drydock.aqua",
+          "name": "Aqua"
+        },
+        {
+          "type": "webview",
+          "id": "drydock.sonar",
+          "name": "Sonar"
+        }
       ]
     },
     "themes": [
-      { "label": "Drydock Dark",  "uiTheme": "vs-dark", "path": "./themes/drydock-dark.json" },
-      { "label": "Drydock Paper", "uiTheme": "vs",      "path": "./themes/drydock-paper.json" },
-      { "label": "Drydock Glass", "uiTheme": "vs-dark", "path": "./themes/drydock-glass.json" }
+      {
+        "label": "Drydock Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/drydock-dark.json"
+      },
+      {
+        "label": "Drydock Paper",
+        "uiTheme": "vs",
+        "path": "./themes/drydock-paper.json"
+      },
+      {
+        "label": "Drydock Glass",
+        "uiTheme": "vs-dark",
+        "path": "./themes/drydock-glass.json"
+      }
     ],
     "configuration": {
       "title": "Drydock",
       "properties": {
-        "drydock.aquaUrl":  { "type": "string", "default": "http://localhost:8787",      "description": "Aqua dashboard shown in the Drydock panel." },
-        "drydock.sonarUrl": { "type": "string", "default": "http://127.0.0.1:8801/sonar", "description": "Sonar page shown in the Drydock panel." },
-        "drydock.claudeCommand": { "type": "string", "default": "claude", "description": "Command used to start Claude Code in the terminal." }
+        "drydock.aquaUrl": {
+          "type": "string",
+          "default": "http://localhost:8787",
+          "description": "Aqua dashboard shown in the Drydock panel."
+        },
+        "drydock.sonarUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8801/sonar",
+          "description": "Sonar page shown in the Drydock panel."
+        },
+        "drydock.claudeCommand": {
+          "type": "string",
+          "default": "claude",
+          "description": "Command used to start Claude Code in the terminal."
+        },
+        "drydock.glass": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Draw the window over Windows 11 acrylic so the Drydock Glass theme is real glass. Set automatically when that theme is chosen; applies to windows opened afterwards. Needs the Drydock IDE build."
+        }
       }
     },
     "configurationDefaults": {
@@ -65,7 +192,10 @@
       "editor.fontFamily": "'JetBrains Mono', Consolas, 'Courier New', monospace",
       "editor.fontSize": 13,
       "editor.lineHeight": 1.65,
-      "files.associations": { "*.luau": "luau" }
+      "files.associations": {
+        "*.luau": "luau"
+      },
+      "drydock.glass": false
     }
   },
   "scripts": {

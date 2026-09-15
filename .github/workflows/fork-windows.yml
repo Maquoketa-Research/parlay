@@ -94,11 +94,17 @@ jobs:
           jq -s '.[0] * .[1]' product.json ../ide/fork/product.json > product.tmp && mv product.tmp product.json
           # keep upstream's own built-ins (js-debug) ahead of ours; the overlay replaces the array wholesale
           jq --slurpfile up vscode/product.json '.builtInExtensions = ($up[0].builtInExtensions // []) + .builtInExtensions' product.json > product.tmp && mv product.tmp product.json
-          # the extension we just built, as a local .vsix built-in, with its real hash
+          # bundled extensions as local .vsix built-ins: ours, plus luau-lsp and StyLua from Open VSX
           mkdir -p vscode/build/builtin
           cp ../ide/drydock-ide.vsix vscode/build/builtin/drydock-ide.vsix
-          SHA=$(sha256sum vscode/build/builtin/drydock-ide.vsix | cut -d' ' -f1)
-          jq --arg sha "$SHA" '(.builtInExtensions[] | select(.name == "maquoketa.drydock-ide") | .sha256) = $sha' product.json > product.tmp && mv product.tmp product.json
+          curl -sSL -o vscode/build/builtin/luau-lsp.vsix "https://open-vsx.org/api/JohnnyMorganz/luau-lsp/win32-x64/1.69.0/file/JohnnyMorganz.luau-lsp-1.69.0@win32-x64.vsix"
+          curl -sSL -o vscode/build/builtin/stylua.vsix "https://open-vsx.org/api/JohnnyMorganz/stylua/1.7.2/file/JohnnyMorganz.stylua-1.7.2.vsix"
+          for f in $(jq -r '.builtInExtensions[] | select(.vsix) | .vsix' product.json); do
+            SHA=$(sha256sum "vscode/$f" | cut -d' ' -f1)
+            jq --arg f "$f" --arg sha "$SHA" '(.builtInExtensions[] | select(.vsix == $f) | .sha256) = $sha' product.json > product.tmp && mv product.tmp product.json
+          done
+          # our source patches ride behind VSCodium's (prepare_vscode.sh applies patches/user last)
+          mkdir -p patches/user && cp ../ide/fork/patches/*.patch patches/user/
           # brand assets: same file names upstream's installer and manifest already reference
           cp ../ide/fork/icons/* vscode/resources/win32/
           echo "MS_TAG=$MS_TAG MS_COMMIT=$MS_COMMIT RELEASE_VERSION=$RELEASE_VERSION"

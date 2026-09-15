@@ -53,11 +53,22 @@ echo "== 3/6 product.json overlay"
 jq -s '.[0] * .[1]' product.base.json "$IDE/fork/product.json" > product.json
 # keep upstream's own built-ins (js-debug) ahead of ours; the overlay replaced the array wholesale
 jq --slurpfile up vscode/product.json '.builtInExtensions = ($up[0].builtInExtensions // []) + .builtInExtensions' product.json > product.tmp && mv product.tmp product.json
-mkdir -p vscode/build/builtin
+CACHE="${BUILTIN_CACHE:-$HARNESS/../builtin-cache}"          # Open VSX downloads, kept between runs
+mkdir -p vscode/build/builtin "$CACHE"
 cp "$IDE/drydock-ide.vsix" vscode/build/builtin/drydock-ide.vsix
-SHA="$(sha256sum vscode/build/builtin/drydock-ide.vsix | cut -d' ' -f1)"
-jq --arg sha "$SHA" '(.builtInExtensions[] | select(.name == "maquoketa.drydock-ide") | .sha256) = $sha' product.json > product.tmp && mv product.tmp product.json
+fetch() { [[ -f "$2" ]] || curl -sSL -o "$2" "$1"; }
+fetch "https://open-vsx.org/api/JohnnyMorganz/luau-lsp/win32-x64/1.69.0/file/JohnnyMorganz.luau-lsp-1.69.0@win32-x64.vsix" "$CACHE/luau-lsp-1.69.0-win32-x64.vsix"
+fetch "https://open-vsx.org/api/JohnnyMorganz/stylua/1.7.2/file/JohnnyMorganz.stylua-1.7.2.vsix" "$CACHE/stylua-1.7.2.vsix"
+cp "$CACHE/luau-lsp-1.69.0-win32-x64.vsix" vscode/build/builtin/luau-lsp.vsix
+cp "$CACHE/stylua-1.7.2.vsix" vscode/build/builtin/stylua.vsix
+# every vsix built-in carries the hash of the file it points at
+for f in $(jq -r '.builtInExtensions[] | select(.vsix) | .vsix' product.json); do
+  SHA="$(sha256sum "vscode/$f" | cut -d' ' -f1)"
+  jq --arg f "$f" --arg sha "$SHA" '(.builtInExtensions[] | select(.vsix == $f) | .sha256) = $sha' product.json > product.tmp && mv product.tmp product.json
+done
 jq '{nameShort, nameLong, applicationName, dataFolderName, builtIns: (.builtInExtensions | map(.name))}' product.json
+# our source patches ride behind VSCodium's (prepare_vscode.sh applies patches/user last)
+mkdir -p patches/user && cp "$IDE"/fork/patches/*.patch patches/user/ && ls patches/user
 
 echo "== 4/6 icons"
 cp "$IDE"/fork/icons/* vscode/resources/win32/

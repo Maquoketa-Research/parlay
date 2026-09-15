@@ -1,6 +1,7 @@
 // Drydock IDE: Claude actions on the code under your cursor, Aqua and Sonar in the right-hand panel,
-// and a Script Sync status light. Every action is a Claude Code skill (skills/*/SKILL.md) run in a
-// terminal, so the code Claude writes lands in the Script Sync folder and shows up in the editor live.
+// a Script Sync status light, and the switch that turns the Glass theme into real glass.
+// Every action is a Claude Code skill (skills/*/SKILL.md) run in a terminal, so the code Claude writes
+// lands in the Script Sync folder and shows up in the editor live.
 import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as fs from "fs";
@@ -8,6 +9,7 @@ import * as os from "os";
 import * as path from "path";
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
+const GLASS_THEME = "Drydock Glass";
 
 let claudeTerminal: vscode.Terminal | undefined; // the one terminal Claude Code runs in
 
@@ -20,6 +22,10 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.aqua", new UrlView("aquaUrl")));
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.sonar", new UrlView("sonarUrl")));
 	ctx.subscriptions.push(vscode.window.onDidCloseTerminal((t) => { if (t === claudeTerminal) claudeTerminal = undefined; }));
+
+	// Glass: the theme is a look, the window material is a main-process option (fork patch). Keep them in step.
+	void syncGlass();
+	ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration("workbench.colorTheme")) void syncGlass(); }));
 
 	const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
 	status.command = "drydock.installSkills";
@@ -76,6 +82,23 @@ async function installSkills(ctx: vscode.ExtensionContext, announce: boolean) {
 	for (const name of fs.readdirSync(src)) fs.cpSync(path.join(src, name), path.join(dst, name), { recursive: true });
 	await ctx.globalState.update(stampKey, version);
 	if (announce) void vscode.window.showInformationMessage(`Drydock: Claude skills installed to ${dst}`);
+}
+
+// ---- glass --------------------------------------------------------------------------------------
+
+// drydock.glass is read by the main process when a window is created (fork/patches/drydock-glass.patch),
+// so a change shows in the next window, not this one.
+async function syncGlass() {
+	const cfg = vscode.workspace.getConfiguration();
+	const want = cfg.get<string>("workbench.colorTheme") === GLASS_THEME;
+	const has = cfg.get<boolean>("drydock.glass") === true;
+	if (want === has) return;
+	await cfg.update("drydock.glass", want, vscode.ConfigurationTarget.Global);
+	if (process.platform !== "win32") return;
+	const pick = await vscode.window.showInformationMessage(
+		want ? "Glass is on for windows opened from now on." : "Glass is off for windows opened from now on.",
+		"New Window");
+	if (pick) void vscode.commands.executeCommand("workbench.action.newWindow");
 }
 
 // ---- the panel views (Aqua, Sonar) --------------------------------------------------------------

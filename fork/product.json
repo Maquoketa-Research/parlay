@@ -24,8 +24,42 @@
   "extensionRecommendations": {},
   "builtInExtensions": [
     {
+      "name": "JohnnyMorganz.luau-lsp",
+      "version": "1.69.0",
+      "sha256": "FILLED_IN_BY_CI",
+      "repo": "https://github.com/JohnnyMorganz/luau-lsp",
+      "vsix": "build/builtin/luau-lsp.vsix",
+      "metadata": {
+        "id": "2b1b13cd-8a8d-4794-b5a7-e4aabee93265",
+        "publisherId": {
+          "publisherId": "b4eb9195-5460-4d8f-b9a5-5f40f913f3a8",
+          "publisherName": "JohnnyMorganz",
+          "displayName": "JohnnyMorganz",
+          "flags": "verified"
+        },
+        "publisherDisplayName": "JohnnyMorganz"
+      }
+    },
+    {
+      "name": "JohnnyMorganz.stylua",
+      "version": "1.7.2",
+      "sha256": "FILLED_IN_BY_CI",
+      "repo": "https://github.com/JohnnyMorganz/StyLua",
+      "vsix": "build/builtin/stylua.vsix",
+      "metadata": {
+        "id": "0120af40-938b-49a3-b5f3-26d63eaa599e",
+        "publisherId": {
+          "publisherId": "20566eaa-3b49-41e5-86aa-2f01d072c53f",
+          "publisherName": "JohnnyMorganz",
+          "displayName": "JohnnyMorganz",
+          "flags": "verified"
+        },
+        "publisherDisplayName": "JohnnyMorganz"
+      }
+    },
+    {
       "name": "maquoketa.drydock-ide",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "sha256": "FILLED_IN_BY_CI",
       "repo": "https://github.com/Maquoketa-Research/drydock-ide",
       "vsix": "build/builtin/drydock-ide.vsix",
@@ -48,7 +82,8 @@
     "window.title": "M | Drydock IDE${separator}${dirty}${activeEditorShort}${separator}${rootName}",
     "telemetry.telemetryLevel": "off",
     "update.mode": "manual",
-    "extensions.autoUpdate": true
+    "extensions.autoUpdate": true,
+    "drydock.glass": false
   },
   "win32AppId": "{{6B0D8AF5-20AB-4A2A-837A-EBEE29B9CF40}",
   "win32x64AppId": "{{2BBF55EA-42CD-4AA5-9245-C9DACA8DA3C2}",
