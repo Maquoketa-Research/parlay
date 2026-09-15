@@ -9,7 +9,7 @@ set -euo pipefail
 
 IDE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HARNESS="${1:-$HOME/dd/harness}"
-LOG="$HARNESS/../build-$(date +%Y%m%d-%H%M%S).log"
+LOG="$HARNESS/../build-local.log"          # one file, appended, so a watcher can follow across runs
 
 # names the harness substitutes into its patches; the human name lives in fork/product.json
 export APP_NAME=Drydock BINARY_NAME=drydock ORG_NAME=Maquoketa-Research
@@ -37,7 +37,9 @@ cd "$HARNESS"
 if [[ ! -d vscode/.git ]]; then
   echo "== 2/6 upstream source (get_repo.sh)"
   rm -rf vscode
-  ./get_repo.sh
+  # sourced, not executed: it exports MS_TAG, MS_COMMIT and RELEASE_VERSION, which build.sh needs.
+  # It reads variables that may be unset, so nounset is off for the duration.
+  set +u; . ./get_repo.sh; set -u
 else
   echo "== 2/6 upstream source already present, reusing vscode/ (delete it for a fresh fetch)"
   # get_repo.sh exports these; recompute the same way it does when the checkout is reused
