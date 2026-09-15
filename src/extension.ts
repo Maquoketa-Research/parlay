@@ -44,6 +44,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 		void ctx.globalState.update("firstRunDone", true);
 		void firstRun();
 	}
+	void ensureSeleneConfig();
 
 	// The lens over the selection: Explain · Fix · Validate, without a right-click.
 	const lens = new SelectionLens();
@@ -82,6 +83,20 @@ async function firstRun() {
 	await vscode.commands.executeCommand("workbench.action.positionPanelRight");
 	await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
 	await vscode.commands.executeCommand("drydock.aqua.focus");
+}
+
+// Selene only parses Luau syntax (type annotations, `::`, string interpolation) when the project's selene.toml
+// selects the Roblox standard. Script Sync folders have no such file, so every typed script lit up as a parse
+// error. Add the one-line config once for workspaces that look like a Roblox place.
+async function ensureSeleneConfig() {
+	const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+	if (!ws) return;
+	const toml = path.join(ws, "selene.toml");
+	if (fs.existsSync(toml)) return;
+	const roblox = ["ServerScriptService", "ReplicatedStorage", "StarterPlayer", "default.project.json"].some((n) => fs.existsSync(path.join(ws, n)));
+	if (!roblox) return;
+	fs.writeFileSync(toml, 'std = "roblox"\n');
+	void vscode.window.showInformationMessage("Drydock: added selene.toml (std = roblox) so Selene reads Luau. Delete it if you keep lint config elsewhere.");
 }
 
 // ---- the actions --------------------------------------------------------------------------------
