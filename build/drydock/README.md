@@ -1,43 +1,13 @@
-# The fork
+# build/drydock
 
-Drydock IDE is a branded build of VS Code. The product is the extension in this repo (right-click
-Claude actions, the Drydock panel, the three themes); the fork exists for the name in the title bar,
-the icon, the installer, the Open VSX gallery, the bundled Luau tooling, and the glass window.
+The fork's own build, on top of VS Code's gulp tasks (VSCodium's patches, committed in this tree, add the
+prepack/packing split and the vsix built-ins).
 
-Follow `Documents/ide-designs-2026-09-14/research/01-vscode-fork.md` for the sourced details. Summary:
-
-1. Fork the **VSCodium build harness** (github.com/VSCodium/vscodium), not microsoft/vscode. Branding is a
-   `jq` edit of `product.json` in `prepare_vscode.sh`; the values are `fork/product.json` here. Icons are
-   binary swaps under `resources/win32/`. No source patches for v1.
-2. Build on a Windows runner: Node from upstream `.nvmrc` (24.x), Python 3.11, VS Build Tools, Git Bash, jq,
-   7-Zip. Gulp chain `vscode-min-prepack`, `vscode-win32-x64-min-packing`, `vscode-win32-x64-inno-updater`,
-   `vscode-win32-x64-user-setup`. About 125 minutes on a hosted runner.
-3. Built-ins: `builtInExtensions` in `product.json` pulls luau-lsp, StyLua and Claude Code from Open VSX at
-   build time. **Selene is not on Open VSX**: build its `.vsix` from source and add it with the `vsix` field,
-   and never list the absent marketplace ID (squat risk). This repo's own extension is bundled the same way.
-4. Updates: ride VSCodium's static `latest.json` patch and publish installers to GitHub Releases. Rebase on
-   upstream monthly; skip the weekly builds.
-5. **Glass window:** `patches/drydock-glass.patch`, applied by the harness after VSCodium's own patches
-   (`patches/user/`). Gated on the setting `drydock.glass`, which the extension turns on when the Drydock Glass
-   theme is chosen. Three hunks: `windows.ts` gives the BrowserWindow `backgroundMaterial: "acrylic"` and a
-   transparent background (Windows 11 22H2+), `workbench.ts` adds a `drydock-glass` class to the root and body,
-   `style.css` makes that root transparent so the theme's alpha chrome shows the acrylic. The editor keeps its
-   opaque background. Regenerate with `python tools/glass-patch.py <vscode-checkout>` when upstream moves an
-   anchor; the script fails loudly rather than guessing.
-6. **Bundled tooling:** luau-lsp (win32-x64) and StyLua are downloaded from Open VSX at build time, Selene is
-   built from its repo by `tools/selene-vsix.sh` (it is not on Open VSX), and all three ship as `vsix` built-ins
-   beside our own extension, so a fresh install opens `.luau` with language support, formatting and linting.
-7. **The look:** `fork/drydock.css` is appended to the workbench stylesheet by the glass patch (regenerate the
-   patch after editing it). Rounded floating surfaces (a 6px clip-path inset, so layout is untouched), thin
-   edges, pill tabs and buttons, small-caps headers. Settings VS Code lets an extension default are in the
-   extension manifest; the application-scoped ones (compact menu, custom menus and title bar) plus the panel
-   position are written once on first run by the extension, because VS Code refuses extension defaults for
-   application scope and the panel position is layout state, not a setting. `product.json` has no say in
-   defaults in Code OSS; the `configurationDefaults` block there is inert and kept only as documentation.
-
-CI: `.github/workflows/fork-windows.yml`, one windows-2022 job. `tools/build-local.sh` runs the same steps on a
-developer machine (first local build 2026-09-15: about 10 minutes to the app bundle on a 64-core box, then the
-installer). Local prerequisites beyond Node, Python and jq: Visual Studio C++ tools **with the Spectre-mitigated
-libraries** (`Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre` and the ATL/MFC Spectre components),
-or node-gyp fails on `@vscode/deviceid` with MSB8040. Inno Setup AppIds are written `{{GUID}`; a single brace is
-read as an Inno constant and the installer step fails.
+| File | What |
+| --- | --- |
+| `build-win32.sh` | app folder and user installer for Windows x64; stamps the version into the build tree only |
+| `fetch-builtins.sh` | luau-lsp and StyLua from Open VSX, Selene via `selene-vsix.sh`, into `build/builtin/`; stamps their sha256 into `product.json` for the build |
+| `selene-vsix.sh` | builds the Selene extension from source (it is not on Open VSX) |
+| `license-rtf.sh` | `LICENSE.rtf` for the Inno installer |
+| `icons.py`, `logo.png`, `icons/` | the Maquoketa mark as `.ico`, tiles and installer bitmaps; the outputs live in `resources/win32` and `src/vs/workbench/browser/media/code-icon.svg` |
+| `shots.ps1` | launches the built app once per theme on the sample workspace and captures it |

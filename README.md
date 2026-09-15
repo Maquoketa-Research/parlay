@@ -1,76 +1,45 @@
-# Visual Studio Code - Open Source ("Code - OSS")
-[![Feature Requests](https://img.shields.io/github/issues/microsoft/vscode/feature-request.svg)](https://github.com/microsoft/vscode/issues?q=is%3Aopen+is%3Aissue+label%3Afeature-request+sort%3Areactions-%2B1-desc)
-[![Bugs](https://img.shields.io/github/issues/microsoft/vscode/bug.svg)](https://github.com/microsoft/vscode/issues?utf8=✓&q=is%3Aissue+is%3Aopen+label%3Abug)
+# Drydock IDE
 
-## The Repository
+A fork of [Visual Studio Code](https://github.com/microsoft/vscode) for Roblox game development with Claude in
+the editor: you write the game's structure, Claude writes the hard parts. See the code, see the code Claude
+writes, right-click to act on a selection, and keep Aqua, Meshy and Sonar in the right sidebar. Roblox Studio
+stays the editor for the world; Drydock works on the Script Sync folder.
 
-This repository ("`Code - OSS`") is where we (Microsoft) develop the [Visual Studio Code](https://code.visualstudio.com) product together with the community. Not only do we work on code and issues here, but we also publish our [roadmap](https://github.com/microsoft/vscode/wiki/Roadmap), [monthly iteration plans](https://github.com/microsoft/vscode/wiki/Iteration-Plans), and our [endgame plans](https://github.com/microsoft/vscode/wiki/Running-the-Endgame). This source code is available to everyone under the standard [MIT license](https://github.com/microsoft/vscode/blob/main/LICENSE.txt).
+Three looks, one setting: **Drydock Dark** (default), **Drydock Glass** (real Windows acrylic), **Drydock Paper**.
 
-## Visual Studio Code
+## What is in the tree
 
-<p align="center">
-  <img alt="VS Code in action" src="https://github.com/user-attachments/assets/56af271c-949d-454c-a3ea-16188c063414">
-</p>
+| Path | What |
+| --- | --- |
+| everything else | Visual Studio Code at the upstream tag in `package.json`, with [VSCodium](https://github.com/VSCodium/vscodium)'s build patches applied (telemetry out, Open VSX as the gallery, update feed off, the app renamed) and Drydock's own changes on top: glass chrome, the two-row header, the look (`src/vs/workbench/browser/media/style.css`), `product.json`, the icons under `resources/win32` |
+| `extensions/drydock-ide/` | the Drydock extension, built in like `git` or `emmet`: the Claude right-click actions and skills, the Aqua, Meshy and Sonar sidebars, the themes, the Script Sync helpers ([its README](extensions/drydock-ide/README.md)) |
+| `build/drydock/` | the fork's build: `build-win32.sh` (app and installer), `fetch-builtins.sh` (luau-lsp and StyLua from Open VSX, Selene built from source), `icons.py` and `logo.png` (the mark), `shots.ps1` (theme captures) |
+| `.github/workflows/drydock-windows.yml` | the same build on a hosted Windows runner; the installer is the artifact |
 
-[Visual Studio Code](https://code.visualstudio.com) is a distribution of the `Code - OSS` repository with Microsoft-specific customizations released under a traditional [Microsoft product license](https://code.visualstudio.com/License/).
+Bundled Roblox tooling: luau-lsp, StyLua, Selene.
 
-[Visual Studio Code](https://code.visualstudio.com) combines the simplicity of a code editor with what developers need for their core edit-build-debug cycle. It provides comprehensive code editing, navigation, and understanding support along with lightweight debugging, a rich extensibility model, and lightweight integration with existing tools.
+## Build it (Windows x64)
 
-Visual Studio Code is updated monthly with new features and bug fixes. You can download it for Windows, macOS, and Linux on the [Visual Studio Code website](https://code.visualstudio.com/Download). To get the latest releases every day, install the [Insiders build](https://code.visualstudio.com/insiders).
+Needs node per `.nvmrc`, Python 3 with setuptools, Visual Studio Build Tools with the Spectre-mitigated
+libraries, and about 15 minutes after the first `npm ci`.
 
-## Contributing
+```
+bash build/drydock/build-win32.sh
+```
 
-There are many ways in which you can participate in this project, for example:
+App folder: `../VSCode-win32-x64/Drydock.exe`. Installer: `.build/drydock/DrydockUserSetup-x64-<version>.exe`.
+The version is upstream's plus a build stamp; `RELEASE_VERSION=... bash build/drydock/build-win32.sh` pins it.
 
-* [Submit bugs and feature requests](https://github.com/microsoft/vscode/issues), and help us verify them as they are checked in
-* Review [source code changes](https://github.com/microsoft/vscode/pulls)
-* Review the [documentation](https://github.com/microsoft/vscode-docs) and make pull requests for anything from typos to new content.
+To work on the extension alone: `npm run compile-extension:drydock-ide` from the root, and
+`node tools/check.mjs` inside `extensions/drydock-ide`. `bash extensions/drydock-ide/tools/baketest/run.sh`
+checks the Meshy paint bake headless in Edge.
 
-If you are interested in fixing issues and contributing directly to the codebase, please see the document [How to Contribute](https://github.com/microsoft/vscode/wiki/How-to-Contribute), which covers the following:
+## Keeping up with upstream
 
-* [How to build and run from source](https://github.com/microsoft/vscode/wiki/How-to-Contribute)
-* [The development workflow, including debugging and running tests](https://github.com/microsoft/vscode/wiki/How-to-Contribute#debugging)
-* [Coding guidelines](https://github.com/microsoft/vscode/wiki/Coding-Guidelines)
-* [Submitting pull requests](https://github.com/microsoft/vscode/wiki/How-to-Contribute#pull-requests)
-* [Finding an issue to work on](https://github.com/microsoft/vscode/wiki/How-to-Contribute#where-to-contribute)
-* [Contributing to translations](https://aka.ms/vscodeloc)
+Upstream history is in this repo. Merge the next tag (`git merge 1.136.0`), re-apply VSCodium's patch set
+where hunks moved (their `patches/` directory is the reference), rebuild.
 
-## Feedback
+## Licence
 
-* Ask a question on [Stack Overflow](https://stackoverflow.com/questions/tagged/vscode)
-* [Request a new feature](CONTRIBUTING.md)
-* Upvote [popular feature requests](https://github.com/microsoft/vscode/issues?q=is%3Aopen+is%3Aissue+label%3Afeature-request+sort%3Areactions-%2B1-desc)
-* [File an issue](https://github.com/microsoft/vscode/issues)
-* Connect with the extension author community on [GitHub Discussions](https://github.com/microsoft/vscode-discussions/discussions) or [Slack](https://aka.ms/vscode-dev-community)
-* Follow [@code](https://x.com/code) and let us know what you think!
-
-See our [wiki](https://github.com/microsoft/vscode/wiki/Feedback-Channels) for a description of each of these channels and information on some other available community-driven channels.
-
-## Related Projects
-
-Many of the core components and extensions to VS Code live in their own repositories on GitHub. For example, the [node debug adapter](https://github.com/microsoft/vscode-node-debug) and the [mono debug adapter](https://github.com/microsoft/vscode-mono-debug) repositories are separate from each other. For a complete list, please visit the [Related Projects](https://github.com/microsoft/vscode/wiki/Related-Projects) page on our [wiki](https://github.com/microsoft/vscode/wiki).
-
-## Bundled Extensions
-
-VS Code includes a set of built-in extensions located in the [extensions](extensions) folder, including grammars and snippets for many languages. Extensions that provide rich language support (inline suggestions, Go to Definition) for a language have the suffix `language-features`. For example, the `json` extension provides coloring for `JSON` and the `json-language-features` extension provides rich language support for `JSON`.
-
-## Development Container
-
-This repository includes a Visual Studio Code Dev Containers / GitHub Codespaces development container.
-
-* For [Dev Containers](https://aka.ms/vscode-remote/download/containers), use the **Dev Containers: Clone Repository in Container Volume...** command, which creates a Docker volume for better disk I/O on macOS and Windows.
-  * If you already have VS Code and Docker installed, you can also click [here](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/vscode) to get started. This will cause VS Code to automatically install the Dev Containers extension if needed, clone the source code into a container volume, and spin up a dev container for use.
-
-* For Codespaces, install the [GitHub Codespaces](https://marketplace.visualstudio.com/items?itemName=GitHub.codespaces) extension in VS Code, and use the **Codespaces: Create New Codespace** command.
-
-Docker / the Codespace should have at least **4 cores and 6 GB of RAM (8 GB recommended)** to run a full build. See the [development container README](.devcontainer/README.md) for more information.
-
-## Code of Conduct
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information, see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-## License
-
-Copyright (c) Microsoft Corporation. All rights reserved.
-
-Licensed under the [MIT](LICENSE.txt) license.
+Visual Studio Code is MIT, Microsoft Corporation (`LICENSE.txt`). VSCodium's patches are MIT. Drydock's
+changes and the extension are MIT, Maquoketa Research (`extensions/drydock-ide/LICENSE.txt`).
