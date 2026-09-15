@@ -13,7 +13,7 @@
     "Themes",
     "Other"
   ],
-  "main": "./out/extension.js",
+  "main": "./out/extension",
   "activationEvents": [
     "onStartupFinished"
   ],
