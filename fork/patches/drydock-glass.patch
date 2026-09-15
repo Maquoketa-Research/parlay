@@ -32,10 +32,10 @@ index 7c4f02ef..0b9a7c9a 100644
  		let borderSetting = windowSettings?.border || 'default';
  		if (borderSetting === 'system') {
 diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
-index 8c7a7a5f..350c92a6 100644
+index 8c7a7a5f..a81a5f62 100644
 --- a/src/vs/workbench/browser/media/style.css
 +++ b/src/vs/workbench/browser/media/style.css
-@@ -394,4 +394,133 @@ body {
+@@ -394,4 +394,139 @@ body {
  .monaco-workbench .part.sidebar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled), .monaco-workbench .part.auxiliarybar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled) {
      outline: calc(var(--vscode-workbench-sidebar-font-size) * 0.076923) dashed var(--vscode-toolbar-hoverOutline);
      outline-offset: calc(var(--vscode-workbench-sidebar-font-size) * -0.076923)
@@ -159,6 +159,12 @@ index 8c7a7a5f..350c92a6 100644
 +.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center { grid-row: 1; grid-column: 2; height: 30px !important; }
 +.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right { grid-row: 1; grid-column: 3; height: 30px !important; align-self: start; }
 +.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center > .window-title::before { font-size: 13px; }
++/* the account and settings icons centre in the 30px first row, level with the window buttons */
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container { height: 30px !important; display: flex !important; align-items: center !important; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar,
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .actions-container { height: 30px !important; align-items: center !important; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item { height: 30px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item .action-label { height: auto !important; line-height: normal !important; margin: 0 !important; padding: 0 6px !important; }
 +
 +/* the Drydock sidebar on the right stays: no hide button on its title */
 +.monaco-workbench .part.auxiliarybar > .title .title-actions .action-item .codicon-close,
@@ -207,3 +213,18 @@ index 47f28faa..6af2e6a7 100644
  		// Apply font aliasing
  		this.updateFontAliasing(configurationService);
  
+diff --git a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
+index 9fd23700..195598a2 100644
+--- a/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
++++ b/src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts
+@@ -274,7 +274,9 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
+ 		super.layout(width, height);
+ 
+ 		if (useWindowControlsOverlay(this.configurationService)) {
+-			const newHeight = Math.round(height * getZoomFactor(getWindow(this.element)));
++			// Drydock: with the stacked header the window controls belong to the first row, not the whole bar
++			const drydockMenuRow = this.configurationService.getValue<boolean>('drydock.stackedHeader') === true ? 26 : 0;
++			const newHeight = Math.round((height - drydockMenuRow) * getZoomFactor(getWindow(this.element)));
+ 			if (newHeight !== this.cachedWindowControlHeight) {
+ 				this.cachedWindowControlHeight = newHeight;
+ 				this.nativeHostService.updateWindowControls({

@@ -57,6 +57,12 @@ FILES = {
         "\t\t\t\t}\n"
         "\t\t\t\twindow.setBackgroundColor(splash.colorInfo.background);\n",
     ),
+    "src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts": (
+        "\t\t\tconst newHeight = Math.round(height * getZoomFactor(getWindow(this.element)));\n",
+        "\t\t\t// Drydock: with the stacked header the window controls belong to the first row, not the whole bar\n"
+        "\t\t\tconst drydockMenuRow = this.configurationService.getValue<boolean>('drydock.stackedHeader') === true ? 26 : 0;\n"
+        "\t\t\tconst newHeight = Math.round((height - drydockMenuRow) * getZoomFactor(getWindow(this.element)));\n",
+    ),
     "src/vs/workbench/browser/media/style.css": (
         None,  # append
         "\n/* Drydock: glass chrome (setting drydock.glass). The root is transparent so the window's acrylic\n"

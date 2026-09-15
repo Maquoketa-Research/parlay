@@ -107,6 +107,12 @@
 .monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center { grid-row: 1; grid-column: 2; height: 30px !important; }
 .monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right { grid-row: 1; grid-column: 3; height: 30px !important; align-self: start; }
 .monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center > .window-title::before { font-size: 13px; }
+/* the account and settings icons centre in the 30px first row, level with the window buttons */
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container { height: 30px !important; display: flex !important; align-items: center !important; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar,
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .actions-container { height: 30px !important; align-items: center !important; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item { height: 30px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item .action-label { height: auto !important; line-height: normal !important; margin: 0 !important; padding: 0 6px !important; }
 
 /* the Drydock sidebar on the right stays: no hide button on its title */
 .monaco-workbench .part.auxiliarybar > .title .title-actions .action-item .codicon-close,
