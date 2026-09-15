@@ -11,6 +11,7 @@ import * as https from "https";
 import * as os from "os";
 import * as path from "path";
 import { MeshyView } from "./meshy";
+import { startSourcemap } from "./sourcemap";
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
 const GLASS_THEME = "Drydock Glass";
@@ -45,6 +46,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 		void firstRun();
 	}
 	void ensureSeleneConfig();
+	startSourcemap(ctx);   // luau-lsp resolves instance requires from it
 
 	// The lens over the selection: Explain · Fix · Validate, without a right-click.
 	const lens = new SelectionLens();
