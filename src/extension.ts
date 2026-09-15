@@ -46,6 +46,16 @@ export function activate(ctx: vscode.ExtensionContext) {
 		void ctx.globalState.update("firstRunDone", true);
 		void firstRun();
 	}
+	// The workbench reads this before extension defaults are registered, so it has to live in user settings.
+	void ensureUserSetting("drydock.stackedHeader", true);
+	// Layout v2: Drydock is its own container in the right sidebar; the terminal panel goes back to the bottom.
+	if (!ctx.globalState.get("layoutV2Done")) {
+		void ctx.globalState.update("layoutV2Done", true);
+		void (async () => {
+			await vscode.commands.executeCommand("workbench.action.positionPanelBottom");
+			await vscode.commands.executeCommand("drydock.aqua.focus");
+		})();
+	}
 	void ensureSeleneConfig();
 	startSourcemap(ctx);   // luau-lsp resolves instance requires from it
 
@@ -64,6 +74,11 @@ export function activate(ctx: vscode.ExtensionContext) {
 	void refreshStatus(status);
 	const timer = setInterval(() => void refreshStatus(status), 30_000);
 	ctx.subscriptions.push({ dispose: () => clearInterval(timer) });
+}
+
+async function ensureUserSetting(key: string, value: unknown) {
+	const cfg = vscode.workspace.getConfiguration();
+	if (cfg.inspect(key)?.globalValue === undefined) await cfg.update(key, value, vscode.ConfigurationTarget.Global);
 }
 
 // ---- first run ----------------------------------------------------------------------------------
