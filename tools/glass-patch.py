@@ -64,6 +64,11 @@ def git(root, *args):
 
 def main(root):
     paths = list(FILES)
+    # Refuse a tree that already carries this patch: diffing against it yields a patch whose pre-image
+    # includes our own earlier hunks, which then silently fails to add anything on a fresh checkout.
+    marker = open(os.path.join(root, "src/vs/workbench/browser/media/style.css"), encoding="utf-8", newline="").read()
+    if "drydock-glass" in marker:
+        sys.exit("the tree already has the Drydock patch applied; revert it first: git apply -R fork/patches/drydock-glass.patch")
     git(root, "add", "--", *paths)  # index = the tree as VSCodium left it
     try:
         for rel, (anchor, replacement) in FILES.items():
