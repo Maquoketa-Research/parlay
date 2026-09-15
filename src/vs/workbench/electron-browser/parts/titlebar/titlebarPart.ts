@@ -274,7 +274,9 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
 		super.layout(width, height);
 
 		if (useWindowControlsOverlay(this.configurationService)) {
-			const newHeight = Math.round(height * getZoomFactor(getWindow(this.element)));
+			// Drydock: with the stacked header the window controls belong to the first row, not the whole bar
+			const drydockMenuRow = this.configurationService.getValue<boolean>('drydock.stackedHeader') === true ? 26 : 0;
+			const newHeight = Math.round((height - drydockMenuRow) * getZoomFactor(getWindow(this.element)));
 			if (newHeight !== this.cachedWindowControlHeight) {
 				this.cachedWindowControlHeight = newHeight;
 				this.nativeHostService.updateWindowControls({

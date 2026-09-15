@@ -166,6 +166,13 @@ export function defaultBrowserWindowOptions(accessor: ServicesAccessor, windowSt
 		experimentalDarkMode: true
 	};
 
+	// Drydock: glass chrome. Windows 11 draws acrylic behind the window; the window itself is transparent
+	// so the alpha-coloured parts of the Drydock Glass theme let it through. Gated on drydock.glass.
+	if (isWindows && configurationService.getValue<boolean>('drydock.glass') === true) {
+		options.backgroundMaterial = 'acrylic';
+		options.backgroundColor = '#00000000';
+	}
+
 	if (isWindows) {
 		let borderSetting = windowSettings?.border || 'default';
 		if (borderSetting === 'system') {
