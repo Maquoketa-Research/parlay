@@ -1,0 +1,124 @@
+# The branded build: VSCodium's harness (their patches, their scripts) over the upstream VS Code commit
+# they currently pin, with our product.json overlay, our icons, and our extension bundled as a built-in.
+# One job, one runner, about two hours. Output: a user installer and a zip as workflow artifacts.
+name: Fork (Windows x64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - fork/**
+      - .github/workflows/fork-windows.yml
+
+concurrency:
+  group: fork-windows
+  cancel-in-progress: true
+
+env:
+  # Names the harness substitutes into its patches (!!APP_NAME!! etc.). Single words: they end up in
+  # file names, mutexes and the exe basename. The human name "Drydock IDE" comes from fork/product.json.
+  APP_NAME: Drydock
+  BINARY_NAME: drydock
+  ORG_NAME: Maquoketa-Research
+  GH_REPO_PATH: Maquoketa-Research/drydock-ide
+  ASSETS_REPOSITORY: Maquoketa-Research/drydock-ide
+  OS_NAME: windows
+  VSCODE_ARCH: x64
+  VSCODE_QUALITY: stable
+  CI_BUILD: "yes"            # build.sh runs the packing step only when this is not "no"
+  SHOULD_BUILD: "yes"
+  SHOULD_BUILD_CLI: "no"     # the tunnel CLI needs a Rust toolchain; not for build 1
+  SHOULD_BUILD_REH: "no"
+  SHOULD_BUILD_REH_WEB: "no"
+  SHOULD_BUILD_ZIP: "yes"
+  SHOULD_BUILD_EXE_SYS: "no"
+  SHOULD_BUILD_EXE_USR: "yes"
+  SHOULD_BUILD_MSI: "no"
+  SHOULD_BUILD_MSI_NOUP: "no"
+  DISABLE_UPDATE: "yes"      # no update feed yet; fork/README.md step 4
+  VSCODE_SKIP_NODE_VERSION_CHECK: "yes"
+  NODE_OPTIONS: --max-old-space-size=8192
+  npm_config_arch: x64
+  npm_config_target_arch: x64
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 300
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out drydock-ide
+        uses: actions/checkout@v4
+        with:
+          path: ide
+
+      - name: Check out the VSCodium harness
+        uses: actions/checkout@v4
+        with:
+          repository: VSCodium/vscodium
+          ref: master
+          path: harness
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python build deps
+        run: pip install setuptools
+
+      - name: Build the Drydock extension
+        working-directory: ide
+        run: |
+          npm ci --no-audit --no-fund
+          npm run compile
+          node tools/check.mjs
+          npx @vscode/vsce package --no-dependencies --allow-missing-repository -o drydock-ide.vsix
+          ls -la drydock-ide.vsix
+
+      - name: Fetch upstream VS Code at the harness's pinned commit
+        working-directory: harness
+        run: ./get_repo.sh
+
+      - name: Overlay product.json, icons and the bundled extension
+        working-directory: harness
+        run: |
+          set -e
+          # our overlay becomes the file prepare_vscode.sh merges last (jq -s '.[0] * .[1]')
+          cp ../ide/fork/product.json product.json
+          # keep upstream's own built-ins (js-debug) ahead of ours; the overlay replaces the array wholesale
+          jq --slurpfile up vscode/product.json '.builtInExtensions = ($up[0].builtInExtensions // []) + .builtInExtensions' product.json > product.tmp && mv product.tmp product.json
+          # the extension we just built, as a local .vsix built-in, with its real hash
+          mkdir -p vscode/build/builtin
+          cp ../ide/drydock-ide.vsix vscode/build/builtin/drydock-ide.vsix
+          SHA=$(sha256sum vscode/build/builtin/drydock-ide.vsix | cut -d' ' -f1)
+          jq --arg sha "$SHA" '(.builtInExtensions[] | select(.name == "maquoketa.drydock-ide") | .sha256) = $sha' product.json > product.tmp && mv product.tmp product.json
+          # brand assets: same file names upstream's installer and manifest already reference
+          cp ../ide/fork/icons/* vscode/resources/win32/
+          echo "MS_TAG=$MS_TAG MS_COMMIT=$MS_COMMIT RELEASE_VERSION=$RELEASE_VERSION"
+          jq '{nameShort, nameLong, applicationName, dataFolderName, builtIns: (.builtInExtensions | map(.name))}' product.json
+
+      - name: Build
+        working-directory: harness
+        run: ./build.sh
+
+      - name: Installer and zip
+        working-directory: harness
+        run: ./prepare_assets.sh
+
+      - name: List assets
+        working-directory: harness
+        run: ls -la assets
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drydock-ide-win32-x64-${{ env.RELEASE_VERSION }}
+          path: harness/assets/*
+          if-no-files-found: error
+          retention-days: 14
