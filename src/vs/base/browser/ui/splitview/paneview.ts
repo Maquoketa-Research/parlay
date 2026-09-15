@@ -19,6 +19,7 @@ import './paneview.css';
 import { localize } from '../../../../nls.js';
 import { IView, Sizing, SplitView } from './splitview.js';
 import { applyDragImage } from '../dnd/dnd.js';
+import { FONT } from '../../../common/font.js';
 
 export interface IPaneOptions {
 	minimumBodySize?: number;
@@ -37,8 +38,7 @@ export interface IPaneStyles {
 	readonly leftBorder: string | undefined;
 }
 
-export const DEFAULT_PANE_HEADER_SIZE = 22;
-let globalPaneHeaderSize = DEFAULT_PANE_HEADER_SIZE;
+let globalPaneHeaderSize: number | undefined;
 
 /**
  * Updates the header size used by all panes.
@@ -127,7 +127,7 @@ export abstract class Pane extends Disposable implements IView {
 	}
 
 	private get headerSize(): number {
-		return this.headerVisible ? globalPaneHeaderSize : 0;
+		return this.headerVisible ? (globalPaneHeaderSize ?? FONT.sidebarSize22) : 0;
 	}
 
 	get minimumSize(): number {

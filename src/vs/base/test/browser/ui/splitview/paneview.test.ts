@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { DEFAULT_PANE_HEADER_SIZE, Pane, PaneView, setGlobalPaneHeaderSize } from '../../../../browser/ui/splitview/paneview.js';
+import { Pane, PaneView, setGlobalPaneHeaderSize } from '../../../../browser/ui/splitview/paneview.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../common/utils.js';
 
 class TestPane extends Pane {
@@ -28,7 +28,7 @@ suite('Paneview', () => {
 
 	const store = ensureNoDisposablesAreLeakedInTestSuite();
 
-	teardown(() => setGlobalPaneHeaderSize(DEFAULT_PANE_HEADER_SIZE));
+	teardown(() => setGlobalPaneHeaderSize(22));
 
 	test('uses the global pane header size', () => {
 		const pane = store.add(new TestPane());
@@ -67,7 +67,7 @@ suite('Paneview', () => {
 		paneView.layout(100, 200);
 		const overrideSize = paneView.getPaneSize(pane);
 
-		setGlobalPaneHeaderSize(DEFAULT_PANE_HEADER_SIZE);
+		setGlobalPaneHeaderSize(22);
 		paneView.layout(100, 200);
 
 		assert.deepStrictEqual({ defaultSize, overrideSize, restoredSize: paneView.getPaneSize(pane) }, {

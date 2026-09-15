@@ -12,11 +12,10 @@ import { URI } from '../../../../base/common/uri.js';
 import { AgentHostClientType } from '../../common/agentHostClientInfo.js';
 import { type ISyncedCustomization } from '../../common/agentPluginManager.js';
 import { AgentSession, type AgentProvider, type AgentSignal, type IActiveClient, type IAgent, type IAgentActionSignal, type IAgentChatConfigCompletionsParams, type IAgentChatContext, type IAgentChatMetadata, type IAgentChats, type IAgentCreateChatOptions, type IAgentCreateChatResult, type IAgentCreateSessionConfig, type IAgentDescriptor, type IAgentDiscoveredChat, type IAgentModelInfo, type IAgentResolveChatConfigParams, type IAgentSessionMetadata, type IAgentToolPendingConfirmationSignal, resolveAgentChatContext } from '../../common/agent.js';
-import { buildSubagentTurnsFromHistory, buildTurnsFromHistory, type IHistoryRecord } from './historyRecordFixtures.js';
 import { ProtectedResourceMetadata, ToolCallContributorKind, type AgentSelection, type MessageAttachment, type ModelSelection, type ToolDefinition } from '../../common/state/protocol/state.js';
 import type { ResolveSessionConfigResult, SessionConfigCompletionsResult } from '../../common/state/protocol/commands.js';
 import { ActionType, type AuthRequiredParams } from '../../common/state/sessionActions.js';
-import { ResponsePartKind, ToolCallConfirmationReason, ToolCallStatus, ToolResultContentType, CustomizationLoadStatus, buildDefaultChatUri, isAhpChatChannel, isDefaultChatUri, parseChatUri, parseSubagentSessionUri, type ClientPluginCustomization, type Customization, type PendingMessage, type StringOrMarkdown, type ToolCallResult, type Turn, type UsageInfo } from '../../common/state/sessionState.js';
+import { ResponsePartKind, ToolCallConfirmationReason, ToolCallStatus, ToolResultContentType, CustomizationLoadStatus, buildDefaultChatUri, isAhpChatChannel, parseChatUri, type ClientPluginCustomization, type Customization, type PendingMessage, type StringOrMarkdown, type ToolCallResult, type Turn, type UsageInfo } from '../../common/state/sessionState.js';
 import { hasKey } from '../../../../base/common/types.js';
 
 /** Well-known auto-generated title used by the 'with-title' prompt. */
@@ -109,13 +108,6 @@ export class MockAgent implements IAgent {
 		return this.getSessionCustomizations?.(configurationResource, hostCustomizations) ?? this.customizations;
 	};
 
-	/**
-	 * Configurable session history. Tests construct {@link IHistoryRecord}
-	 * entries (the agent-internal intermediate shape) and the mock converts
-	 * them to {@link Turn}s on demand. Subagent URIs are routed to filtered
-	 * subagent turns via {@link buildSubagentTurnsFromHistory}.
-	 */
-	sessionMessages: IHistoryRecord[] = [];
 	/** Usage stamped onto every reconstructed turn (e.g. an Auto-model stub). */
 	turnUsageOverride: UsageInfo | undefined = undefined;
 	chatModel: ModelSelection | undefined;
@@ -239,18 +231,6 @@ export class MockAgent implements IAgent {
 
 	setPendingMessages(chat: URI, steeringMessage: PendingMessage | undefined, queuedMessages: readonly PendingMessage[]): void {
 		this.setPendingMessagesCalls.push({ chat, steeringMessage, queuedMessages });
-	}
-
-	async getSessionMessages(session: URI): Promise<readonly Turn[]> {
-		const subagentInfo = parseSubagentSessionUri(session);
-		if (subagentInfo) {
-			return buildSubagentTurnsFromHistory(this.sessionMessages, subagentInfo.toolCallId, session.toString());
-		}
-		const turns = buildTurnsFromHistory(this.sessionMessages);
-		if (this.turnUsageOverride) {
-			return turns.map(turn => ({ ...turn, usage: this.turnUsageOverride }));
-		}
-		return turns;
 	}
 
 	/** Backing helper for {@link chats}.releaseChat: records a non-destructive release. */
@@ -381,8 +361,7 @@ export class MockAgent implements IAgent {
 			return this.changeAgent(session, agent, chat);
 		},
 		getMessages: (chat: URI, context: URI | IAgentChatContext): Promise<readonly Turn[]> => {
-			this._recordContext('getMessages', chat, context);
-			return this.getSessionMessages(chat);
+			return Promise.resolve([]);
 		},
 	};
 
@@ -504,13 +483,6 @@ export class ScriptedMockAgent implements IAgent {
 	 * Message history for the pre-existing session: a single user→assistant
 	 * turn with a tool call.
 	 */
-	private readonly _preExistingMessages: IHistoryRecord[] = [
-		{ type: 'message', role: 'user', session: PRE_EXISTING_SESSION_URI, messageId: 'h-msg-1', content: 'What files are here?' },
-		{ type: 'tool_start', session: PRE_EXISTING_SESSION_URI, toolCallId: 'h-tc-1', toolName: 'list_files', displayName: 'List Files', invocationMessage: 'Listing files...' },
-		{ type: 'tool_complete', session: PRE_EXISTING_SESSION_URI, toolCallId: 'h-tc-1', result: { pastTenseMessage: 'Listed files', content: [{ type: ToolResultContentType.Text, text: 'file1.ts\nfile2.ts' }], success: true } satisfies ToolCallResult },
-		{ type: 'message', role: 'assistant', session: PRE_EXISTING_SESSION_URI, messageId: 'h-msg-2', content: 'Here are the files: file1.ts and file2.ts' },
-	];
-
 	// Track pending permission requests
 	private readonly _pendingPermissions = new Map<string, (approved: boolean) => void>();
 	// Track the active turn ID per session, captured from sendMessage().
@@ -1040,21 +1012,6 @@ export class ScriptedMockAgent implements IAgent {
 		}
 	}
 
-	async getSessionMessages(session: URI): Promise<readonly Turn[]> {
-		const subagentInfo = parseSubagentSessionUri(session);
-		if (subagentInfo) {
-			return buildSubagentTurnsFromHistory(this._preExistingMessages, subagentInfo.toolCallId, session.toString());
-		}
-		// Restore addresses the default chat by its channel URI; normalize it
-		// back to the session URI (mirroring the real agents' getSessionMessages).
-		const parsed = parseChatUri(session);
-		const normalized = parsed && isDefaultChatUri(session) ? URI.parse(parsed.session) : session;
-		if (normalized.toString() === PRE_EXISTING_SESSION_URI.toString()) {
-			return buildTurnsFromHistory(this._preExistingMessages);
-		}
-		return [];
-	}
-
 	async abortSession(session: URI): Promise<void> {
 		const callback = this._pendingAborts.get(session.toString());
 		if (callback) {
@@ -1117,7 +1074,7 @@ export class ScriptedMockAgent implements IAgent {
 			return Promise.resolve();
 		},
 		getMessages: (chat: URI, context: URI | IAgentChatContext): Promise<readonly Turn[]> => {
-			return this.getSessionMessages(this._resolveChatTarget(chat, context).session);
+			return Promise.resolve([]);
 		},
 	};
 

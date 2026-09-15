@@ -15,18 +15,12 @@ import { URI } from '../../../base/common/uri.js';
 import { generateUuid } from '../../../base/common/uuid.js';
 import * as os from 'os';
 import * as inspector from 'inspector';
-import { AgentHostClaudeAgentEnabledEnvVar, AgentHostCodexAgentEnabledEnvVar, AgentHostIpcChannels, IAgentHostInspectInfo, IAgentHostSocketInfo, IConnectionTrackerService, isAgentEnabled } from '../common/agentService.js';
-import { AgentHostCodexEnabledConfigKey, platformRootSchema } from '../common/agentHostSchema.js';
+import { AgentHostIpcChannels, IAgentHostInspectInfo, IAgentHostSocketInfo, IConnectionTrackerService } from '../common/agentService.js';
 import { AgentModelRefreshScheduler, MODEL_REFRESH_INTERVAL_MS } from './agentModelRefreshScheduler.js';
 import { AgentService } from './agentService.js';
 import { AgentHostStateManager, IAgentHostStateManager } from './agentHostStateManager.js';
 import { IAgentConfigurationService } from './agentConfigurationService.js';
 import { IAgentHostCompletions } from './agentHostCompletions.js';
-import { CopilotAgent } from './copilot/copilotAgent.js';
-import { ClaudeAgent } from './claude/claudeAgent.js';
-import { ClaudeSdkPackage } from './claude/claudeAgentSdkService.js';
-import { CodexAgent, CodexSdkPackage } from './codex/codexAgent.js';
-import { createCodexProviderConfiguration } from './codex/codexProviderConfiguration.js';
 import { ByokLmBridgeRegistry } from './byokLmBridgeRegistry.js';
 import { IAgentHostProxyResolver } from './agentHostProxyResolver.js';
 import { IAgentSdkDownloader, type IAgentSdkDownloadProgress } from './agentSdkDownloader.js';
@@ -125,7 +119,7 @@ async function startAgentHost(): Promise<void> {
 			loggerService,
 			transientProxyConfiguration: true,
 			hostLaunchKind,
-			providerConfigurations: [createCodexProviderConfiguration(environmentService.userHome)],
+			providerConfigurations: [],
 			byok: { kind: 'renderer', bridgeRegistry: byokLmBridgeRegistry },
 		});
 		disposables.add(runtime);
@@ -140,50 +134,11 @@ async function startAgentHost(): Promise<void> {
 			stateManager: accessor.get(IAgentHostStateManager),
 			completions: accessor.get(IAgentHostCompletions),
 		}));
-		const agentConfigurationService = runtimeServices.configurationService;
 		fileService = runtimeServices.fileService;
 		proxyResolver = runtimeServices.proxyResolver;
 		stateManager = runtimeServices.stateManager;
 		completionTriggerCharacters = runtimeServices.completions.triggerCharacters;
 		errorTelemetry.value = new ErrorTelemetry(runtimeServices.telemetryService);
-		const agentSdkDownloader = runtimeServices.agentSdkDownloader;
-		sdkDownloadProgress = runtime.sdkDownloadProgress;
-		agentService.registerProvider(instantiationService.createInstance(CopilotAgent));
-		// Claude and Codex providers are gated on two things:
-		//  1. The user-facing enable toggle (`chat.agentHost.<x>Agent.enabled`,
-		//     forwarded as an env var by the starters). Claude defaults to on,
-		//     Codex defaults to off.
-		//  2. The SDK being reachable. Claude is a devDependency of this repo
-		//     so the bare-import path in `ClaudeAgentSdkService._loadSdk`
-		//     always succeeds in dev; in built products the SDK ships via
-		//     `product.agentSdks.claude` and the downloader handles it. Codex
-		//     is likewise a devDependency, so `CodexAgent._resolveSdkRoot`
-		//     resolves it from `node_modules` in dev; built products use the
-		//     env-var override or a `product.agentSdks.codex` entry.
-		// If either gate fails, the provider is not registered and never appears
-		// in the agent picker (matches the pre-CDN UX exactly).
-		if (isAgentEnabled(process.env[AgentHostClaudeAgentEnabledEnvVar], true) && (!environmentService.isBuilt || agentSdkDownloader.isAvailable(ClaudeSdkPackage))) {
-			agentService.registerProvider(instantiationService.createInstance(ClaudeAgent));
-		}
-		// Codex registration is one-way (register-on-enable): the env-var toggle
-		// or the renderer-forwarded `codexAgentEnabled` root config enables it.
-		// Disabling requires an agent host restart.
-		if (!environmentService.isBuilt || agentSdkDownloader.isAvailable(CodexSdkPackage)) {
-			let codexRegistered = false;
-			const registerCodexIfEnabled = () => {
-				if (codexRegistered) {
-					return;
-				}
-				const enabledByEnv = isAgentEnabled(process.env[AgentHostCodexAgentEnabledEnvVar], false);
-				const enabledByRootConfig = agentConfigurationService.getRootValue(platformRootSchema, AgentHostCodexEnabledConfigKey) === true;
-				if (enabledByEnv || enabledByRootConfig) {
-					codexRegistered = true;
-					agentService.registerProvider(instantiationService.createInstance(CodexAgent));
-				}
-			};
-			registerCodexIfEnabled();
-			disposables.add(agentConfigurationService.onDidRootConfigChange(registerCodexIfEnabled));
-		}
 	} catch (err) {
 		logService.error('Failed to create AgentService', err);
 		disposables.dispose();

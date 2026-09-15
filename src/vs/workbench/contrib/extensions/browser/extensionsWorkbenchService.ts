@@ -111,7 +111,8 @@ export class Extension implements IExtension {
 		@ITelemetryService private readonly telemetryService: ITelemetryService,
 		@ILogService private readonly logService: ILogService,
 		@IFileService private readonly fileService: IFileService,
-		@IProductService private readonly productService: IProductService
+		@IProductService private readonly productService: IProductService,
+		@IConfigurationService protected configurationService: IConfigurationService
 	) {
 	}
 
@@ -347,7 +348,15 @@ export class Extension implements IExtension {
 				return false;
 			}
 			if (semver.gt(this.latestVersion, this.version)) {
-				return true;
+				const minReleaseAge = this.configurationService.getValue<number>('extensions.minReleaseAge');
+
+				if(minReleaseAge === 0) {
+					return true;
+				}
+
+				const age = Math.round(Math.abs(Date.now() - this.gallery.lastUpdated) / (1000 * 60 * 60));
+
+				return age >= minReleaseAge;
 			}
 			if (this.outdatedTargetPlatform) {
 				return true;
@@ -477,7 +486,7 @@ export class Extension implements IExtension {
 
 		if (this.type === ExtensionType.System) {
 			return Promise.resolve(`# ${this.displayName || this.name}
-**Notice:** This extension is bundled with Visual Studio Code. It can be disabled but not uninstalled.
+**Notice:** This extension is bundled with Drydock. It can be disabled but not uninstalled.
 ## Features
 ${this.description}
 `);
@@ -515,7 +524,7 @@ ${this.description}
 		}
 
 		if (this.type === ExtensionType.System) {
-			return Promise.resolve(`Please check the [VS Code Release Notes](command:${ShowCurrentReleaseNotesActionId}) for changes to the built-in extensions.`);
+			return Promise.resolve(`Please check the [Drydock Release Notes](command:${ShowCurrentReleaseNotesActionId}) for changes to the built-in extensions.`);
 		}
 
 		return Promise.reject(new Error('not available'));

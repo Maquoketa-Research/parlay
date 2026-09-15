@@ -12,10 +12,11 @@ import { IConfigurationService } from '../../../platform/configuration/common/co
 import { TestConfigurationService } from '../../../platform/configuration/test/common/testConfigurationService.js';
 import { MockKeybindingService } from '../../../platform/keybinding/test/common/mockKeybindingService.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../base/test/common/utils.js';
-import { DEFAULT_NOTIFICATION_ROW_HEIGHT, onDidChangeNotificationRowHeight, setNotificationRowHeight } from '../../browser/parts/notifications/notificationsViewer.js';
+import { onDidChangeNotificationRowHeight, setNotificationRowHeight } from '../../browser/parts/notifications/notificationsViewer.js';
 import { DisposableStore, toDisposable } from '../../../base/common/lifecycle.js';
 import { workbenchInstantiationService } from './workbenchTestServices.js';
 import { NotificationsCenter } from '../../browser/parts/notifications/notificationsCenter.js';
+import { FONT } from '../../../base/common/font.js';
 
 suite('NotificationsList row height', () => {
 	suiteSetup(() => {
@@ -38,7 +39,7 @@ suite('NotificationsList row height', () => {
 
 	const store = ensureNoDisposablesAreLeakedInTestSuite();
 
-	teardown(() => setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT));
+	teardown(() => setNotificationRowHeight(FONT.sidebarSize42));
 
 	test('deduplicates row height changes', () => {
 		const changes: number[] = [];
@@ -46,9 +47,9 @@ suite('NotificationsList row height', () => {
 
 		setNotificationRowHeight(34);
 		setNotificationRowHeight(34);
-		setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT);
+		setNotificationRowHeight(FONT.sidebarSize42);
 
-		assert.deepStrictEqual(changes, [34, DEFAULT_NOTIFICATION_ROW_HEIGHT]);
+		assert.deepStrictEqual(changes, [34, FONT.sidebarSize42]);
 	});
 
 	test('notification center updates row heights and preserves the focused row viewport position', () => {
@@ -85,7 +86,7 @@ suite('NotificationsList row height', () => {
 		rowToFocus.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
 		rowToFocus.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
 		const before = getRowState();
-		setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT);
+		setNotificationRowHeight(FONT.sidebarSize42);
 		const after = getRowState();
 		center.dispose();
 		setNotificationRowHeight(36);
@@ -93,11 +94,11 @@ suite('NotificationsList row height', () => {
 		assert.deepStrictEqual({
 			beforeHeight: before.height,
 			afterHeight: after.height,
-			preservedFocusedRowViewportPosition: typeof before.viewportTop === 'number' && typeof after.viewportTop === 'number' && Math.abs(after.viewportTop - before.viewportTop) <= DEFAULT_NOTIFICATION_ROW_HEIGHT - 34,
+			preservedFocusedRowViewportPosition: typeof before.viewportTop === 'number' && typeof after.viewportTop === 'number' && Math.abs(after.viewportTop - before.viewportTop) <= FONT.sidebarSize42 - 34,
 			rowAfterDispose: container.querySelector('.monaco-list-row')
 		}, {
 			beforeHeight: '34px',
-			afterHeight: `${DEFAULT_NOTIFICATION_ROW_HEIGHT}px`,
+			afterHeight: `${FONT.sidebarSize42}px`,
 			preservedFocusedRowViewportPosition: true,
 			rowAfterDispose: null
 		});

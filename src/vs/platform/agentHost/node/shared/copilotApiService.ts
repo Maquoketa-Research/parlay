@@ -3,7 +3,6 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import type Anthropic from '@anthropic-ai/sdk';
 import { CAPIClient, RequestType, type CCAModel, type IExtensionInformation } from '@vscode/copilot-api';
 import { generateUuid } from '../../../../base/common/uuid.js';
 import { getDevDeviceId, getMachineId } from '../../../../base/node/id.js';
@@ -247,7 +246,7 @@ export class CopilotApiError extends Error {
 	 */
 	constructor(
 		readonly status: number,
-		readonly envelope: Anthropic.ErrorResponse,
+		readonly envelope: any,
 		message?: string,
 	) {
 		super(message ?? envelope.error.message);
@@ -267,7 +266,7 @@ export class CopilotApiError extends Error {
  * `messages`); pass `"CAPI models request failed"` for the `models()` path.
  */
 function buildCopilotApiHttpError(status: number, statusText: string, bodyText: string, prefix = 'CAPI request failed'): CopilotApiError {
-	let envelope: Anthropic.ErrorResponse | undefined;
+	let envelope: any | undefined;
 	if (bodyText) {
 		try {
 			const parsed = JSON.parse(bodyText) as unknown;
@@ -281,7 +280,7 @@ function buildCopilotApiHttpError(status: number, statusText: string, bodyText: 
 					&& typeof (err as { type?: unknown }).type === 'string'
 					&& typeof (err as { message?: unknown }).message === 'string'
 				) {
-					envelope = parsed as Anthropic.ErrorResponse;
+					envelope = parsed;
 				}
 			}
 		} catch {
@@ -416,9 +415,9 @@ export interface ICopilotApiService {
 	 */
 	messages(
 		githubToken: string,
-		request: Anthropic.MessageCreateParamsStreaming,
+		request: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): AsyncGenerator<Anthropic.MessageStreamEvent>;
+	): AsyncGenerator<any>;
 
 	/**
 	 * Send a chat completion and return the full aggregated response.
@@ -426,9 +425,9 @@ export interface ICopilotApiService {
 	 */
 	messages(
 		githubToken: string,
-		request: Anthropic.MessageCreateParamsNonStreaming,
+		request: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): Promise<Anthropic.Message>;
+	): Promise<any>;
 
 	/**
 	 * Count tokens for a hypothetical request.
@@ -438,9 +437,9 @@ export interface ICopilotApiService {
 	 */
 	countTokens(
 		githubToken: string,
-		req: Anthropic.MessageCountTokensParams,
+		req: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): Promise<Anthropic.MessageTokensCount>;
+	): Promise<any>;
 
 	/**
 	 * List models available to the GitHub user.
@@ -536,19 +535,19 @@ export class CopilotApiService implements ICopilotApiService {
 
 	messages(
 		githubToken: string,
-		request: Anthropic.MessageCreateParamsStreaming,
+		request: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): AsyncGenerator<Anthropic.MessageStreamEvent>;
+	): AsyncGenerator<any>;
 	messages(
 		githubToken: string,
-		request: Anthropic.MessageCreateParamsNonStreaming,
+		request: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): Promise<Anthropic.Message>;
+	): Promise<any>;
 	messages(
 		githubToken: string,
-		request: Anthropic.MessageCreateParams,
+		request: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): AsyncGenerator<Anthropic.MessageStreamEvent> | Promise<Anthropic.Message> {
+	): AsyncGenerator<any> | Promise<any> {
 		if (request.stream) {
 			return this._messagesStreaming(githubToken, request, options);
 		}
@@ -557,9 +556,9 @@ export class CopilotApiService implements ICopilotApiService {
 
 	async countTokens(
 		_githubToken: string,
-		_req: Anthropic.MessageCountTokensParams,
+		_req: any,
 		_options?: ICopilotApiServiceRequestOptions,
-	): Promise<Anthropic.MessageTokensCount> {
+	): Promise<any> {
 		throw new Error('countTokens not supported by CAPI');
 	}
 
@@ -742,9 +741,9 @@ export class CopilotApiService implements ICopilotApiService {
 
 	private async *_messagesStreaming(
 		githubToken: string,
-		request: Anthropic.MessageCreateParams,
+		request: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): AsyncGenerator<Anthropic.MessageStreamEvent> {
+	): AsyncGenerator<any> {
 		const response = await this._sendRequest(githubToken, request, true, options);
 
 		if (!response.body) {
@@ -760,11 +759,11 @@ export class CopilotApiService implements ICopilotApiService {
 
 	private async _messagesNonStreaming(
 		githubToken: string,
-		request: Anthropic.MessageCreateParams,
+		request: any,
 		options?: ICopilotApiServiceRequestOptions,
-	): Promise<Anthropic.Message> {
+	): Promise<any> {
 		const response = await this._sendRequest(githubToken, request, false, options);
-		return response.json() as Promise<Anthropic.Message>;
+		return response.json() as Promise<any>;
 	}
 
 	// #endregion
@@ -773,7 +772,7 @@ export class CopilotApiService implements ICopilotApiService {
 
 	private async _sendRequest(
 		githubToken: string,
-		request: Anthropic.MessageCreateParams,
+		request: any,
 		stream: boolean,
 		options?: ICopilotApiServiceRequestOptions,
 	): Promise<Response> {
@@ -1009,7 +1008,7 @@ export class CopilotApiService implements ICopilotApiService {
 
 	// #region SSE Parsing
 
-	private async *_readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<Anthropic.MessageStreamEvent> {
+	private async *_readSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<any> {
 		const reader = body.getReader();
 		const decoder = new TextDecoder();
 		let buffer = '';
@@ -1063,7 +1062,7 @@ export class CopilotApiService implements ICopilotApiService {
 	 * @returns the parsed stream event, or `undefined` to skip the line.
 	 * @throws on `error` events from the server.
 	 */
-	private _parseDataLine(line: string): Anthropic.MessageStreamEvent | undefined {
+	private _parseDataLine(line: string): any | undefined {
 		if (!line.startsWith('data: ')) {
 			return undefined;
 		}
@@ -1094,13 +1093,13 @@ export class CopilotApiService implements ICopilotApiService {
 			// passthrough proxy). Fall back to a clean api_error synthesis
 			// when fields are missing or `error` is unstructured.
 			const rawError = (parsed as { error?: unknown }).error;
-			let envelope: Anthropic.ErrorResponse;
+			let envelope: any;
 			if (
 				rawError && typeof rawError === 'object'
 				&& typeof (rawError as { type?: unknown }).type === 'string'
 				&& typeof (rawError as { message?: unknown }).message === 'string'
 			) {
-				envelope = parsed as Anthropic.ErrorResponse;
+				envelope = parsed as any;
 			} else {
 				let errorMessage: string;
 				if (typeof rawError === 'string') {
@@ -1123,7 +1122,7 @@ export class CopilotApiService implements ICopilotApiService {
 			return undefined;
 		}
 
-		return parsed as Anthropic.MessageStreamEvent;
+		return parsed as any;
 	}
 
 	// #endregion

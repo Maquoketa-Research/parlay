@@ -8,14 +8,11 @@ import { IConfigurationService } from '../../../../platform/configuration/common
 import { IWorkbenchLayoutService, LayoutSettings } from '../../../services/layout/browser/layoutService.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { DEFAULT_SCROLLBAR_SIZE, setGlobalDefaultScrollbarSize } from '../../../../base/browser/ui/scrollbar/scrollableElement.js';
-import { COMPACT_NOTIFICATION_ROW_HEIGHT, DEFAULT_NOTIFICATION_ROW_HEIGHT, setNotificationRowHeight } from '../../../browser/parts/notifications/notificationsViewer.js';
-import { DEFAULT_PANE_HEADER_SIZE, setGlobalPaneHeaderSize } from '../../../../base/browser/ui/splitview/paneview.js';
+import { setNotificationRowHeight } from '../../../browser/parts/notifications/notificationsViewer.js';
+import { setGlobalPaneHeaderSize } from '../../../../base/browser/ui/splitview/paneview.js';
 
 /** Reduced scrollbar size (px) applied when Modern UI is on. */
 const MODERN_UI_SCROLLBAR_SIZE = 8;
-
-/** Increased pane header size (px) applied when Modern UI is on. */
-const MODERN_UI_PANE_HEADER_SIZE = 28;
 
 // Bundle the CSS for every Modern UI module. Styles remain inert until their
 // corresponding classes are toggled onto the workbench container(s) below.
@@ -34,6 +31,7 @@ import './media/statusBar.css';
 import './media/tabs.css';
 import './media/titlebar.css';
 import '../../../services/themes/browser/modernTabColorCustomizations.js';
+import { FONT } from '../../../../base/common/font.js';
 
 interface IModernUIModule {
 	readonly id: string;
@@ -160,11 +158,11 @@ export class ModernUIContribution extends Disposable implements IWorkbenchContri
 	}
 
 	private applyNotificationRowHeight(enabled: boolean): void {
-		setNotificationRowHeight(enabled ? COMPACT_NOTIFICATION_ROW_HEIGHT : DEFAULT_NOTIFICATION_ROW_HEIGHT);
+		setNotificationRowHeight(enabled ? FONT.sidebarSize34 : FONT.sidebarSize42);
 	}
 
 	private applyPaneHeaderSize(enabled: boolean): void {
-		setGlobalPaneHeaderSize(enabled ? MODERN_UI_PANE_HEADER_SIZE : DEFAULT_PANE_HEADER_SIZE);
+		setGlobalPaneHeaderSize(enabled ? FONT.sidebarSize28 : FONT.sidebarSize22);
 	}
 
 	override dispose(): void {
@@ -176,8 +174,8 @@ export class ModernUIContribution extends Disposable implements IWorkbenchContri
 			container.classList.remove(MODERN_UI_UPPERCASE_VIEW_HEADERS_CLASS);
 		}
 		setGlobalDefaultScrollbarSize(DEFAULT_SCROLLBAR_SIZE);
-		setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT);
-		setGlobalPaneHeaderSize(DEFAULT_PANE_HEADER_SIZE);
+		setNotificationRowHeight(FONT.sidebarSize42);
+		setGlobalPaneHeaderSize(FONT.sidebarSize22);
 		super.dispose();
 	}
 }

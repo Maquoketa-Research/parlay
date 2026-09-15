@@ -12,13 +12,14 @@ import { IManagedSettingsPolicyDefinitions, ManagedSettingsData } from '../../..
 import { ILogService } from '../../log/common/log.js';
 import { collectManagedSettingsDefinitions, INativeManagedSettingsService, MANAGED_SETTINGS_CONTROL_DEFINITIONS } from '../common/copilotManagedSettings.js';
 import { PolicyDefinition, PolicyValue } from '../common/policy.js';
-import type { Watcher } from '@vscode/policy-watcher';
+import type { Watcher } from '@vscodium/policy-watcher';
 
 export interface INativePolicyWatcherOptions {
 	readonly registryPath?: string;
 }
 
 export type NativePolicyWatcherFactory = (
+	vendorName: string,
 	productName: string,
 	policies: Record<string, { type: 'string' | 'number' | 'boolean' }>,
 	onDidChange: (update: Record<string, PolicyValue | undefined>) => void,
@@ -120,11 +121,11 @@ export class NativeManagedSettingsService extends Disposable implements INativeM
 			return;
 		}
 
-		const { createWatcher } = this.watcherFactory ? { createWatcher: this.watcherFactory } : (await import('@vscode/policy-watcher') as { createWatcher: NativePolicyWatcherFactory });
+		const { createWatcher } = this.watcherFactory ? { createWatcher: this.watcherFactory } : (await import('@vscodium/policy-watcher') as { createWatcher: NativePolicyWatcherFactory });
 		await this.throttler.queue(() => new Promise<void>((c, e) => {
 			try {
 				this.logService.trace(`Creating native managed-settings watcher for productName ${this.productName}`);
-				this.watcher.value = createWatcher(this.productName, managedSettingDefinitions, update => {
+				this.watcher.value = createWatcher('Maquoketa-Research', this.productName, managedSettingDefinitions, update => {
 					this._onDidManagedSettingsChange(update as Record<string, PolicyValue | undefined>);
 					c();
 				}, this.watcherOptions);

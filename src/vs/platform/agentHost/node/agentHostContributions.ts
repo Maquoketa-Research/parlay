@@ -8,7 +8,6 @@ import { IInstantiationService, ServicesAccessor } from '../../instantiation/com
 import { ILogService } from '../../log/common/log.js';
 import { IAgentHostChangesetOperationService } from '../common/agentHostChangesetOperationService.js';
 import { IAgentHostStateManager } from './agentHostStateManager.js';
-import { AgentHostCommitOperationContribution } from './agentHostCommitOperationProvider.js';
 import { IAgentHostCompletions } from './agentHostCompletions.js';
 import { AgentHostDiscardChangesOperationContribution } from './agentHostDiscardChangesOperationProvider.js';
 import { AgentHostFileCompletionProvider } from './agentHostFileCompletionProvider.js';
@@ -24,7 +23,6 @@ export function activateAgentHostContributions(accessor: ServicesAccessor, insta
 	const store = new DisposableStore();
 	try {
 		const changesetOperationService = accessor.get(IAgentHostChangesetOperationService);
-		store.add(changesetOperationService.registerContribution(instantiationService.createInstance(AgentHostCommitOperationContribution)));
 		store.add(changesetOperationService.registerContribution(instantiationService.createInstance(AgentHostPullRequestOperationContribution)));
 		store.add(changesetOperationService.registerContribution(instantiationService.createInstance(AgentHostMergeOperationContribution)));
 		store.add(changesetOperationService.registerContribution(instantiationService.createInstance(AgentHostSyncOperationContribution)));

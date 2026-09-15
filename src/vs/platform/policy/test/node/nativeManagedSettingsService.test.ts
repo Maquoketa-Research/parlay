@@ -22,7 +22,7 @@ suite('NativeManagedSettingsService', () => {
 
 	test('watches managed-settings keys from policy definitions and exposes raw managed settings', async () => {
 		let onDidChange: ((update: Record<string, PolicyValue | undefined>) => void) | undefined;
-		const watcherFactory: NativePolicyWatcherFactory = (_productName, policies, callback) => {
+		const watcherFactory: NativePolicyWatcherFactory = (_venderName, _productName, policies, callback) => {
 			assert.deepStrictEqual(policies, {
 				[COPILOT_DISABLE_BYPASS_PERMISSIONS_MODE_KEY]: { type: 'string' },
 				[COPILOT_FORCE_REMOTE_SETTINGS_REFRESH_KEY]: { type: 'boolean' },
@@ -52,7 +52,7 @@ suite('NativeManagedSettingsService', () => {
 
 	test('watches transport controls without a managed-settings policy definition', async () => {
 		let watchedSettings: Record<string, { type: 'string' | 'number' | 'boolean' }> = {};
-		const watcherFactory: NativePolicyWatcherFactory = (_productName, policies, callback) => {
+		const watcherFactory: NativePolicyWatcherFactory = (_venderName, _productName, policies, callback) => {
 			watchedSettings = policies;
 			callback({ [COPILOT_FORCE_REMOTE_SETTINGS_REFRESH_KEY]: true });
 			return Disposable.None;
@@ -76,7 +76,7 @@ suite('NativeManagedSettingsService', () => {
 	test('clears stale watcher values when managed-settings definitions are removed', async () => {
 		let onDidChange: ((update: Record<string, PolicyValue | undefined>) => void) | undefined;
 		let disposeCount = 0;
-		const watcherFactory: NativePolicyWatcherFactory = (_productName, _policies, callback) => {
+		const watcherFactory: NativePolicyWatcherFactory = (_venderName, _productName, _policies, callback) => {
 			onDidChange = callback;
 			callback({});
 			return { dispose: () => disposeCount++ };
@@ -101,7 +101,7 @@ suite('NativeManagedSettingsService', () => {
 	test('keeps raw managed settings while definitions are unchanged', async () => {
 		let onDidChange: ((update: Record<string, PolicyValue | undefined>) => void) | undefined;
 		let watcherCreateCount = 0;
-		const watcherFactory: NativePolicyWatcherFactory = (_productName, _policies, callback) => {
+		const watcherFactory: NativePolicyWatcherFactory = (_venderName, _productName, _policies, callback) => {
 			watcherCreateCount++;
 			onDidChange = callback;
 			callback({});
@@ -139,7 +139,7 @@ suite('NativeManagedSettingsService', () => {
 
 	test('retries watcher creation after initialization fails', async () => {
 		let watcherCreateCount = 0;
-		const watcherFactory: NativePolicyWatcherFactory = (_productName, _policies, callback) => {
+		const watcherFactory: NativePolicyWatcherFactory = (_venderName, _productName, _policies, callback) => {
 			watcherCreateCount++;
 			if (watcherCreateCount === 1) {
 				throw new Error('initial watcher creation failed');
@@ -163,7 +163,7 @@ suite('NativeManagedSettingsService', () => {
 	test('removes raw managed settings whose definitions are no longer watched', async () => {
 		let onDidChange: ((update: Record<string, PolicyValue | undefined>) => void) | undefined;
 		const otherManagedSettingKey = 'permissions.otherManagedSetting';
-		const watcherFactory: NativePolicyWatcherFactory = (_productName, _policies, callback) => {
+		const watcherFactory: NativePolicyWatcherFactory = (_venderName, _productName, _policies, callback) => {
 			onDidChange = callback;
 			callback({});
 			return Disposable.None;

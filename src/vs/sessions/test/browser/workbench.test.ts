@@ -21,7 +21,8 @@ import { EditorInputCapabilities } from '../../../workbench/common/editor.js';
 import { GroupDirection, GroupOrientation } from '../../../workbench/services/editor/common/editorGroupsService.js';
 import { SESSIONS_LIST_MINIMUM_WIDTH } from '../../browser/parts/sidebarPart.js';
 import { Menus } from '../../browser/menus.js';
-import { DEFAULT_NOTIFICATION_ROW_HEIGHT, onDidChangeNotificationRowHeight, setNotificationRowHeight } from '../../../workbench/browser/parts/notifications/notificationsViewer.js';
+import { onDidChangeNotificationRowHeight, setNotificationRowHeight } from '../../../workbench/browser/parts/notifications/notificationsViewer.js';
+import { FONT } from '../../../base/common/font.js';
 
 interface IViewSize { width: number; height: number }
 
@@ -363,7 +364,7 @@ suite('Sessions - Workbench', () => {
 	// --- Notifications ------------------------------------------------------
 
 	test('uses touch-sized notification rows on phone layouts', () => {
-		setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT);
+		setNotificationRowHeight(FONT.sidebarSize42);
 		const registeredDisposables = new DisposableStore();
 		const isPhoneLayout = observableValue('isPhoneLayout', false);
 		const rowHeights: number[] = [];
@@ -383,7 +384,7 @@ suite('Sessions - Workbench', () => {
 		} finally {
 			listener.dispose();
 			registeredDisposables.dispose();
-			setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT);
+			setNotificationRowHeight(FONT.sidebarSize42);
 		}
 	});
 

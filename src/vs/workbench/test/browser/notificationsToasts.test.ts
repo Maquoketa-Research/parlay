@@ -12,7 +12,8 @@ import { Severity } from '../../../platform/notification/common/notification.js'
 import { NotificationsToasts } from '../../browser/parts/notifications/notificationsToasts.js';
 import { NotificationsModel } from '../../common/notifications.js';
 import { workbenchInstantiationService } from './workbenchTestServices.js';
-import { DEFAULT_NOTIFICATION_ROW_HEIGHT, setNotificationRowHeight } from '../../browser/parts/notifications/notificationsViewer.js';
+import { setNotificationRowHeight } from '../../browser/parts/notifications/notificationsViewer.js';
+import { FONT } from '../../../base/common/font.js';
 
 suite('NotificationsToasts', () => {
 
@@ -29,7 +30,7 @@ suite('NotificationsToasts', () => {
 	});
 
 	const disposables = ensureNoDisposablesAreLeakedInTestSuite();
-	teardown(() => setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT));
+	teardown(() => setNotificationRowHeight(FONT.sidebarSize42));
 
 	async function createToasts(testDisposables: Pick<DisposableStore, 'add'> = disposables): Promise<{
 		readonly container: HTMLElement;
@@ -152,7 +153,7 @@ suite('NotificationsToasts', () => {
 			}
 		}
 
-		setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT);
+		setNotificationRowHeight(FONT.sidebarSize42);
 		const standardVisibleToasts = container.querySelectorAll('.notification-toast-container').length;
 		setNotificationRowHeight(34);
 

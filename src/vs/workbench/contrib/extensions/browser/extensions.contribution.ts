@@ -200,6 +200,13 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration)
 				default: false,
 				agentsWindow: { default: true, readOnly: true },
 			},
+			'extensions.minReleaseAge': {
+				type: 'integer',
+				default: 48,
+				scope: ConfigurationScope.APPLICATION,
+				description: localize('extensions.minReleaseAge', "Control how old an extension need to be before auto-updating it (in hours)."),
+				tags: ['usesOnlineServices']
+			},
 			'extensions.showRecommendationsOnlyOnDemand': {
 				type: 'boolean',
 				deprecationMessage: localize('extensionsShowRecommendationsOnlyOnDemand_Deprecated', "This setting is deprecated. Use extensions.ignoreRecommendations setting to control recommendation notifications. Use Extensions view's visibility actions to hide Recommended view by default."),
@@ -372,6 +379,13 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration)
 				scope: ConfigurationScope.APPLICATION,
 				tags: ['advanced', 'usesOnlineServices']
 			},
+			'extensions.excludeUnsafes': {
+				scope: ConfigurationScope.MACHINE,
+				type: 'boolean',
+				default: true,
+				description: localize('extensionsExcludeUnsafes', "When enabled, it will download and cache the list of malicious and deprecated extensions. It's recommended to leave it enabled."),
+				tags: ['usesOnlineServices']
+			},
 		}
 	});
 
@@ -414,24 +428,24 @@ CommandsRegistry.registerCommand({
 			{
 				name: 'options',
 				description: '(optional) Options for installing the extension. Object with the following properties: ' +
-					'`installOnlyNewlyAddedFromExtensionPackVSIX`: When enabled, VS Code installs only newly added extensions from the extension pack VSIX. This option is considered only when installing VSIX. ',
+					'`installOnlyNewlyAddedFromExtensionPackVSIX`: When enabled, Drydock installs only newly added extensions from the extension pack VSIX. This option is considered only when installing VSIX. ',
 				isOptional: true,
 				schema: {
 					'type': 'object',
 					'properties': {
 						'installOnlyNewlyAddedFromExtensionPackVSIX': {
 							'type': 'boolean',
-							'description': localize('workbench.extensions.installExtension.option.installOnlyNewlyAddedFromExtensionPackVSIX', "When enabled, VS Code installs only newly added extensions from the extension pack VSIX. This option is considered only while installing a VSIX."),
+							'description': localize('workbench.extensions.installExtension.option.installOnlyNewlyAddedFromExtensionPackVSIX', "When enabled, Drydock installs only newly added extensions from the extension pack VSIX. This option is considered only while installing a VSIX."),
 							default: false
 						},
 						'installPreReleaseVersion': {
 							'type': 'boolean',
-							'description': localize('workbench.extensions.installExtension.option.installPreReleaseVersion', "When enabled, VS Code installs the pre-release version of the extension if available."),
+							'description': localize('workbench.extensions.installExtension.option.installPreReleaseVersion', "When enabled, Drydock installs the pre-release version of the extension if available."),
 							default: false
 						},
 						'donotSync': {
 							'type': 'boolean',
-							'description': localize('workbench.extensions.installExtension.option.donotSync', "When enabled, VS Code do not sync this extension when Settings Sync is on."),
+							'description': localize('workbench.extensions.installExtension.option.donotSync', "When enabled, Drydock do not sync this extension when Settings Sync is on."),
 							default: false
 						},
 						'justification': {
@@ -956,8 +970,8 @@ class ExtensionsContributions extends Disposable implements IWorkbenchContributi
 				if (requireReload) {
 					notificationService.prompt(
 						Severity.Info,
-						vsixs.length > 1 ? localize('InstallVSIXs.successReload', "Completed installing extensions. Please reload Visual Studio Code to enable them.")
-							: localize('InstallVSIXAction.successReload', "Completed installing extension. Please reload Visual Studio Code to enable it."),
+						vsixs.length > 1 ? localize('InstallVSIXs.successReload', "Completed installing extensions. Please reload Drydock to enable them.")
+							: localize('InstallVSIXAction.successReload', "Completed installing extension. Please reload Drydock to enable it."),
 						[{
 							label: localize('InstallVSIXAction.reloadNow', "Reload Now"),
 							run: () => hostService.reload()

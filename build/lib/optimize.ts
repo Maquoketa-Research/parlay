@@ -224,7 +224,7 @@ export function bundleTask(opts: IBundleTaskOpts): () => NodeJS.ReadWriteStream 
 }
 
 export function minifyTask(src: string, sourceMapBaseUrl?: string): (cb: any) => void {
-	const sourceMappingURL = sourceMapBaseUrl ? ((f: any) => `${sourceMapBaseUrl}/${f.relative}.map`) : undefined;
+	const sourceMappingURL = sourceMapBaseUrl ? ((f: any) => `${sourceMapBaseUrl}-${f.relative.replaceAll('/', '-')}.map`) : undefined;
 	const target = getBuildTarget();
 
 	return cb => {
@@ -249,17 +249,12 @@ export function minifyTask(src: string, sourceMapBaseUrl?: string): (cb: any) =>
 				}).then(res => {
 					const jsOrCSSFile = res.outputFiles.find(f => /\.(js|css)$/.test(f.path))!;
 					const sourceMapFile = res.outputFiles.find(f => /\.(js|css)\.map$/.test(f.path))!;
-
 					const contents = Buffer.from(jsOrCSSFile.contents);
-					const unicodeMatch = contents.toString().match(/[^\x00-\xFF]+/g);
-					if (unicodeMatch) {
-						cb(new Error(`Found non-ascii character ${unicodeMatch[0]} in the minified output of ${f.path}. Non-ASCII characters in the output can cause performance problems when loading. Please review if you have introduced a regular expression that esbuild is not automatically converting and convert it to using unicode escape sequences.`));
-					} else {
-						f.contents = contents;
-						f.sourceMap = JSON.parse(sourceMapFile.text);
 
-						cb(undefined, f);
-					}
+					f.contents = contents;
+					f.sourceMap = JSON.parse(sourceMapFile.text);
+
+					cb(undefined, f);
 				}, cb);
 			}),
 			esbuildFilter.restore,

@@ -61,7 +61,7 @@ import { NotificationsStatus } from '../../workbench/browser/parts/notifications
 import { registerNotificationCommands } from '../../workbench/browser/parts/notifications/notificationsCommands.js';
 import { CommandsRegistry } from '../../platform/commands/common/commands.js';
 import { NotificationsToasts } from '../../workbench/browser/parts/notifications/notificationsToasts.js';
-import { COMPACT_NOTIFICATION_ROW_HEIGHT, DEFAULT_NOTIFICATION_ROW_HEIGHT, setNotificationRowHeight } from '../../workbench/browser/parts/notifications/notificationsViewer.js';
+import { setNotificationRowHeight } from '../../workbench/browser/parts/notifications/notificationsViewer.js';
 import { IMarkdownRendererService } from '../../platform/markdown/browser/markdownRenderer.js';
 import { EditorMarkdownCodeBlockRenderer } from '../../editor/browser/widget/markdownRenderer/browser/editorMarkdownCodeBlockRenderer.js';
 import { SyncDescriptor } from '../../platform/instantiation/common/descriptors.js';
@@ -82,8 +82,7 @@ import { ICustomViewGridPartService } from '../services/customView/browser/custo
 import { ICustomViewDescriptor } from '../services/customView/browser/customView.js';
 import { ISessionsSetUpService } from './sessionsSetUpService.js';
 import { AGENTS_FLOATING_PANEL_GAP } from '../common/layoutConstants.js';
-
-const PHONE_NOTIFICATION_ROW_HEIGHT = 44;
+import { FONT } from '../../base/common/font.js';
 
 //#region Workbench Options
 
@@ -1048,9 +1047,9 @@ export class Workbench extends Disposable implements IAgentWorkbenchLayoutServic
 
 	private registerNotificationRowHeight(): void {
 		this._register(autorun(reader => {
-			setNotificationRowHeight(this.layoutPolicy.isPhoneLayout.read(reader) ? PHONE_NOTIFICATION_ROW_HEIGHT : COMPACT_NOTIFICATION_ROW_HEIGHT);
+			setNotificationRowHeight(this.layoutPolicy.isPhoneLayout.read(reader) ? FONT.sidebarSize44 : FONT.sidebarSize34);
 		}));
-		this._register(toDisposable(() => setNotificationRowHeight(DEFAULT_NOTIFICATION_ROW_HEIGHT)));
+		this._register(toDisposable(() => setNotificationRowHeight(FONT.sidebarSize42)));
 	}
 
 	private createPartContainer(id: string, role: string, classes: string[]): HTMLElement {

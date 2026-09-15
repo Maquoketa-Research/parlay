@@ -16,7 +16,6 @@ import { IAgentPluginManager } from '../common/agentPluginManager.js';
 import { IDiffComputeService } from '../common/diffComputeService.js';
 import { IAgentEditAttributionService } from '../common/fileEditAttribution.js';
 import { IAgentHostGitService } from '../common/agentHostGitService.js';
-import { IAgentHostOTelService } from '../common/otel/agentHostOTelService.js';
 import { IAgentHostChangesetOperationService } from '../common/agentHostChangesetOperationService.js';
 import { IAgentHostChangesetService } from '../common/agentHostChangesetService.js';
 import { IAgentHostChangesetSubscriptionService } from '../common/agentHostChangesetSubscriptionService.js';
@@ -29,13 +28,9 @@ import { AgentHostGitService } from './agentHostGitService.js';
 import { AgentPluginManager } from './agentPluginManager.js';
 import { AgentSdkDownloader, IAgentSdkDownloader } from './agentSdkDownloader.js';
 import { IByokLmBridgeRegistry } from './byokLmBridgeRegistry.js';
-import { ClaudeAgentSdkService, IClaudeAgentSdkService } from './claude/claudeAgentSdkService.js';
-import { ClaudeProxyService, IClaudeProxyService } from './claude/claudeProxyService.js';
 import { ByokLmProxyService, IByokLmProxyService, NullByokLmProxyService } from './copilot/byokLmProxyService.js';
-import { CodexProxyService, ICodexProxyService } from './codex/codexProxyService.js';
 import { NodeWorkerDiffComputeService } from './diffComputeService.js';
 import { NetworkDiagnosticsService, INetworkDiagnosticsService } from './networkDiagnosticsService.js';
-import { AgentHostOTelService } from './otel/agentHostOTelService.js';
 import { AgentHostChangesetOperationService } from './agentHostChangesetOperationService.js';
 import { AgentHostChangesetService } from './agentHostChangesetService.js';
 import { AgentHostChangesetSubscriptionService } from './agentHostChangesetSubscriptionService.js';
@@ -142,10 +137,6 @@ export function registerAgentHostHostServices(services: AgentHostServiceCollecti
 	registerService(services, ids, IAgentHostGitService, new SyncDescriptor(AgentHostGitService));
 	registerService(services, ids, IAgentPluginManager, new SyncDescriptor(AgentPluginManager, [inputs.userDataPath]));
 	registerService(services, ids, IAgentSdkDownloader, new SyncDescriptor(AgentSdkDownloader));
-	registerService(services, ids, IClaudeAgentSdkService, new SyncDescriptor(ClaudeAgentSdkService));
-	registerService(services, ids, IClaudeProxyService, new SyncDescriptor(ClaudeProxyService));
-	registerService(services, ids, ICodexProxyService, new SyncDescriptor(CodexProxyService));
-	registerService(services, ids, IAgentHostOTelService, new SyncDescriptor(AgentHostOTelService, [inputs.fetchFn]));
 	registerService(services, ids, IAgentHostWorktreeIsolation, new SyncDescriptor(WorktreeIsolation, [undefined]));
 	registerService(
 		services,

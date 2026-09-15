@@ -232,12 +232,13 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 					title: ChatSetupTriggerAction.CHAT_SETUP_ACTION_LABEL,
 					category: CHAT_CATEGORY,
 					f1: true,
-					precondition: ContextKeyExpr.or(
-						ChatContextKeys.Setup.hidden,
-						ChatContextKeys.Setup.disabledInWorkspace,
-						ChatContextKeys.Setup.untrusted,
-						ChatContextKeys.Setup.completed.negate(),
-						ChatContextKeys.Entitlement.canSignUp
+					precondition: ContextKeyExpr.and(
+						ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
+						ChatContextKeys.Setup.hidden.negate(),
+						ChatContextKeys.Setup.disabledInWorkspace.negate(),
+						ChatContextKeys.Setup.untrusted.negate(),
+						ChatContextKeys.Setup.completed,
+						ChatContextKeys.Entitlement.canSignUp.negate()
 					)
 				});
 			}
@@ -374,6 +375,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 						id: MenuId.AccountsContext,
 						group: '2_copilot',
 						when: ContextKeyExpr.and(
+							ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
 							ChatContextKeys.Setup.hidden.negate(),
 							ChatContextKeys.Setup.disabledInWorkspace.negate(),
 							CONTEXT_DEFAULT_ACCOUNT_STATE.notEqualsTo(DefaultAccountStatus.Available), // hide only when signed in (a default GitHub account is present); still shown while signed out or before the account state resolves, incl. untrusted workspaces — no auth prompt
@@ -407,6 +409,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 						id: MenuId.TitleBarAdjacentCenter,
 						order: 0,
 						when: ContextKeyExpr.and(
+							ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
 							IsWebContext.negate(),
 							ChatContextKeys.Entitlement.signedOut,
 							CONTEXT_DEFAULT_ACCOUNT_STATE.notEqualsTo(DefaultAccountStatus.Available), // hide only when signed in (a default GitHub account is present); still shown while signed out or before the account state resolves, incl. untrusted workspaces — no auth prompt
@@ -457,6 +460,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 					category: localize2('chat.category', 'Chat'),
 					f1: true,
 					precondition: ContextKeyExpr.and(
+						ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
 						ChatContextKeys.Setup.hidden.negate(),
 						ChatContextKeys.Setup.disabledInWorkspace.negate(),
 						ContextKeyExpr.or(
@@ -522,6 +526,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 					category: localize2('chat.category', 'Chat'),
 					f1: true,
 					precondition: ContextKeyExpr.and(
+						ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
 						ChatContextKeys.Setup.hidden.negate(),
 						ChatContextKeys.Setup.disabledInWorkspace.negate(),
 						ContextKeyExpr.or(
@@ -616,6 +621,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 		registerGenerateCodeCommand('chat.internal.review', 'github.copilot.chat.review');
 
 		const internalGenerateCodeContext = ContextKeyExpr.and(
+			ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
 			ChatContextKeys.Setup.hidden.negate(),
 			ChatContextKeys.Setup.disabledInWorkspace.negate(),
 			ChatContextKeys.Setup.completed.negate(),
@@ -881,7 +887,11 @@ export class ChatTeardownContribution extends Disposable implements IWorkbenchCo
 					title: ChatSetupHideAction.TITLE,
 					f1: true,
 					category: CHAT_CATEGORY,
-					precondition: ContextKeyExpr.and(ChatContextKeys.Setup.hidden.negate(), ChatContextKeys.Setup.disabledInWorkspace.negate()),
+					precondition: ContextKeyExpr.and(
+						ContextKeyExpr.has('config.chat.disableAIFeatures').negate(),
+						ChatContextKeys.Setup.hidden.negate(),
+						ChatContextKeys.Setup.disabledInWorkspace.negate()
+					),
 					menu: {
 						id: MenuId.ChatTitleBarMenu,
 						group: 'z_hide',

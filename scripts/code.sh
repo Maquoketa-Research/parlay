@@ -63,7 +63,7 @@ function code-wsl()
 		local CWD=$(pwd)
 		cd $ROOT
 		export WSLENV=ELECTRON_RUN_AS_NODE/w:VSCODE_DEV/w:$WSLENV
-		local WSL_EXT_ID="ms-vscode-remote.remote-wsl"
+		local WSL_EXT_ID="${VSCODE_WSL_EXTENSION_ID:-jeanp413.open-remote-wsl}"
 		local WSL_EXT_WLOC=$(echo "" | VSCODE_DEV=1 ELECTRON_RUN_AS_NODE=1 "$ROOT/.build/electron/Code - OSS.exe" "out/cli.js" --locate-extension $WSL_EXT_ID)
 		cd $CWD
 		if [ -n "$WSL_EXT_WLOC" ]; then

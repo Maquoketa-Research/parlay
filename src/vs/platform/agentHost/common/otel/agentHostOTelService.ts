@@ -3,7 +3,6 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import type { TelemetryConfig } from '@github/copilot-sdk';
 import type { URI } from '../../../../base/common/uri.js';
 import { createDecorator } from '../../../instantiation/common/instantiation.js';
 
@@ -51,13 +50,6 @@ export interface IAgentHostNativeOTelConfig {
 
 export interface IAgentHostOTelService {
 	readonly _serviceBrand: undefined;
-
-	/**
-	 * Returns the telemetry config to hand to `new CopilotClient({ telemetry })`,
-	 * starting the loopback receiver + store on first call when in DB mode.
-	 * Resolves to `undefined` when telemetry is disabled.
-	 */
-	getSdkTelemetryConfig(): Promise<TelemetryConfig | undefined>;
 
 	/** Resolve provider-neutral native SDK destinations. Logs and metrics always
 	 * use {@link IAgentHostNativeOTelConfig.external}; only traces use the DB loopback. */

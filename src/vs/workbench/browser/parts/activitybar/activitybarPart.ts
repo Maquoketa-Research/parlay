@@ -41,11 +41,13 @@ import { IWorkbenchEnvironmentService } from '../../../services/environment/comm
 import { IViewsService } from '../../../services/views/common/viewsService.js';
 import { SwitchCompositeViewAction } from '../compositeBarActions.js';
 import { IHostService } from '../../../services/host/browser/host.js';
+import { FONT, getFontSize, updateActivityBarSize } from '../../../../base/common/font.js';
 
 export class ActivitybarPart extends Part {
 
 	static readonly ACTION_HEIGHT = 48;
 	static readonly COMPACT_ACTION_HEIGHT = 28;
+	static readonly COMPACT_ACTION_HEIGHT_RATIO = 28/48;
 
 	static readonly ACTIVITYBAR_WIDTH = 48;
 	static readonly COMPACT_ACTIVITYBAR_WIDTH = 36;
@@ -54,6 +56,7 @@ export class ActivitybarPart extends Part {
 	static readonly FLOATING_ACTION_HEIGHT = 36;
 	static readonly FLOATING_ACTIVITYBAR_WIDTH = 36;
 	static readonly FLOATING_COMPACT_ACTIVITYBAR_WIDTH = 28;
+	static readonly FLOATING_COMPACT_ACTIVITYBAR_WIDTH_RATIO = 28/36;
 
 	/**
 	 * Vertical gap between activity bar items at the default size under the floating
@@ -87,17 +90,17 @@ export class ActivitybarPart extends Part {
 	/** The intrinsic activity bar width (excludes any floating gutter). */
 	private get baseWidth(): number {
 		if (this.layoutService.isFloatingPanelsEnabled()) {
-			return this._isCompact ? ActivitybarPart.FLOATING_COMPACT_ACTIVITYBAR_WIDTH : ActivitybarPart.FLOATING_ACTIVITYBAR_WIDTH;
+			return this._isCompact ? FONT.activityBarSize36 * ActivitybarPart.FLOATING_COMPACT_ACTIVITYBAR_WIDTH_RATIO : FONT.activityBarSize36;
 		}
-		return this._isCompact ? ActivitybarPart.COMPACT_ACTIVITYBAR_WIDTH : ActivitybarPart.ACTIVITYBAR_WIDTH;
+		return this._isCompact ? FONT.activityBarSize36 : FONT.activityBarSize48;
 	}
 
 	/** The action (item) height that drives visible item sizing. */
 	private get actionHeight(): number {
 		if (this._isCompact) {
-			return ActivitybarPart.COMPACT_ACTION_HEIGHT;
+			return FONT.activityBarSize48 * ActivitybarPart.COMPACT_ACTION_HEIGHT_RATIO;
 		}
-		return this.layoutService.isFloatingPanelsEnabled() ? ActivitybarPart.FLOATING_ACTION_HEIGHT : ActivitybarPart.ACTION_HEIGHT;
+		return this.layoutService.isFloatingPanelsEnabled() ? FONT.activityBarSize36 : FONT.activityBarSize48;
 	}
 
 	/**
@@ -105,7 +108,7 @@ export class ActivitybarPart extends Part {
 	 * experiment separates items, and only at the default size.
 	 */
 	private get actionGap(): number {
-		return this.layoutService.isFloatingPanelsEnabled() && !this._isCompact ? ActivitybarPart.FLOATING_ACTION_GAP : 0;
+		return this.layoutService.isFloatingPanelsEnabled() && !this._isCompact ? FONT.activityBarSize8 : 0;
 	}
 
 	/**
@@ -169,6 +172,15 @@ export class ActivitybarPart extends Part {
 
 		this._register(this.hostService.onDidChangeFocus(focused => this.setInactive(!focused)));
 		this._register(this.hostService.onDidChangeActiveWindow(windowId => this.setInactive(windowId !== mainWindow.vscodeWindowId)));
+
+		this._register(configurationService.onDidChangeConfiguration(e => {
+			if (e.affectsConfiguration('workbench.activityBar.experimental.fontFamily') || e.affectsConfiguration('workbench.activityBar.experimental.fontSize')) {
+				this.applyActivityBarFontFamily();
+				this.applyActivityBarFontSize();
+				this.recreateCompositeBar();
+				this._onDidChange.fire(undefined); // Signal grid that size constraints changed
+			}
+		}));
 	}
 
 	private setInactive(inactive: boolean): void {
@@ -190,7 +202,7 @@ export class ActivitybarPart extends Part {
 			this.element.style.setProperty('--activity-bar-width', `${this.baseWidth}px`);
 			this.element.style.setProperty('--activity-bar-action-height', `${this.actionHeight}px`);
 			this.element.style.setProperty('--activity-bar-action-gap', `${this.actionGap}px`);
-			this.element.style.setProperty('--activity-bar-icon-size', `${this._isCompact ? ActivitybarPart.COMPACT_ICON_SIZE : ActivitybarPart.ICON_SIZE}px`);
+			this.element.style.setProperty('--activity-bar-icon-size', `${this._isCompact ? FONT.activityBarSize16 : FONT.activityBarSize24}px`);
 		}
 	}
 
@@ -211,7 +223,7 @@ export class ActivitybarPart extends Part {
 
 	private createCompositeBar(): PaneCompositeBar {
 		const compositeSize = this.compositeSize;
-		const iconSize = this._isCompact ? ActivitybarPart.COMPACT_ICON_SIZE : ActivitybarPart.ICON_SIZE;
+		const iconSize = this._isCompact ? FONT.activityBarSize16 : FONT.activityBarSize24;
 
 		return this.instantiationService.createInstance(ActivityBarCompositeBar, this.location, {
 			partContainerClass: 'activitybar',
@@ -246,6 +258,10 @@ export class ActivitybarPart extends Part {
 		this.element = parent;
 		this.content = append(this.element, $('.content'));
 
+		// Apply font settings before show() so composite bar uses correct sizes
+		this.applyActivityBarFontFamily(parent);
+		this.applyActivityBarFontSize(parent);
+
 		this.updateCompactStyle();
 
 		if (this.layoutService.isVisible(Parts.ACTIVITYBAR_PART)) {
@@ -253,6 +269,38 @@ export class ActivitybarPart extends Part {
 		}
 
 		return this.content;
+	}
+
+	private applyActivityBarFontFamily(container?: HTMLElement): void {
+		const target = container ?? this.getContainer();
+		if (!target) {
+			return;
+		}
+
+		const family = this.configurationService.getValue<string>('workbench.activityBar.experimental.fontFamily');
+
+		if (family) {
+			target.style.setProperty('--vscode-workbench-activitybar-font-family', family);
+		} else {
+			target.style.removeProperty('--vscode-workbench-activitybar-font-family');
+		}
+
+		this._onDidChange.fire(undefined); // Signal grid that size constraints changed
+	}
+
+	private applyActivityBarFontSize(container?: HTMLElement): void {
+		const target = container ?? this.getContainer();
+		if (!target) {
+			return;
+		}
+
+		const configuredSize = getFontSize(this.configurationService, 'workbench.activityBar.experimental.fontSize', FONT.defaultActivityBarSize);
+
+		updateActivityBarSize(configuredSize);
+
+		target.style.setProperty('--vscode-workbench-activitybar-font-size', `${FONT.activityBarSize}px`);
+
+		this._onDidChange.fire(undefined); // Signal grid that size constraints changed
 	}
 
 	getPinnedPaneCompositeIds(): string[] {

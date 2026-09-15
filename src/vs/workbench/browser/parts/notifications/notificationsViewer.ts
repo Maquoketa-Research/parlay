@@ -33,15 +33,10 @@ import { getDefaultHoverDelegate } from '../../../../base/browser/ui/hover/hover
 import type { IManagedHover } from '../../../../base/browser/ui/hover/hover.js';
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
-
-/** Default height (px) of a single notification row. */
-export const DEFAULT_NOTIFICATION_ROW_HEIGHT = 42;
-
-/** Compact height (px) of a single notification row. */
-export const COMPACT_NOTIFICATION_ROW_HEIGHT = 34;
+import { FONT } from '../../../../base/common/font.js';
 
 /** Current height (px) of a single notification row; overridable via {@link setNotificationRowHeight}. */
-let notificationRowHeight = DEFAULT_NOTIFICATION_ROW_HEIGHT;
+let notificationRowHeight: number | undefined;
 const onDidChangeNotificationRowHeightEmitter = new Emitter<number>();
 export const onDidChangeNotificationRowHeight = onDidChangeNotificationRowHeightEmitter.event;
 
@@ -57,8 +52,7 @@ export function setNotificationRowHeight(height: number): void {
 
 export class NotificationsListDelegate implements IListVirtualDelegate<INotificationViewItem> {
 
-	private static get ROW_HEIGHT(): number { return notificationRowHeight; }
-	private static readonly LINE_HEIGHT = 22;
+	private static get ROW_HEIGHT(): number { return notificationRowHeight ?? FONT.sidebarSize42; }
 
 	private offsetHelper: HTMLElement;
 
@@ -80,9 +74,9 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
 
 		// Dynamic height: if message overflows
 		const preferredMessageHeight = this.computePreferredHeight(notification);
-		const messageOverflows = NotificationsListDelegate.LINE_HEIGHT < preferredMessageHeight;
+		const messageOverflows = FONT.sidebarSize22 < preferredMessageHeight;
 		if (messageOverflows) {
-			const overflow = preferredMessageHeight - NotificationsListDelegate.LINE_HEIGHT;
+			const overflow = preferredMessageHeight - FONT.sidebarSize22;
 			expandedHeight += overflow;
 		}
 

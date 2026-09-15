@@ -68,7 +68,6 @@ import { AgentHostChangesetCoordinator } from './agentHostChangesetCoordinator.j
 import { IAgentHostCompletions } from './agentHostCompletions.js';
 import { AgentHostSkillCompletionProvider } from './agentHostSkillCompletionProvider.js';
 import { SessionServerToolName } from '../common/serverToolNames.js';
-import { ICopilotApiService } from './shared/copilotApiService.js';
 import { INetworkDiagnosticsService } from './networkDiagnosticsService.js';
 import { parseMcpChannelUri } from './shared/mcpCustomizationController.js';
 import { toAgentClientUri } from '../common/agentClientUri.js';
@@ -357,7 +356,6 @@ function reconcileWorkingDirectories(requested: readonly URI[] | undefined, reso
 
 export interface IAgentServiceOptions {
 	readonly rootConfigResource?: URI;
-	readonly copilotApiService?: ICopilotApiService;
 	readonly providerConfigurations?: readonly IAgentCustomizationSettingsRegistration[];
 	readonly hostLaunchKind?: AgentHostLaunchKind;
 	readonly storageResource?: URI;

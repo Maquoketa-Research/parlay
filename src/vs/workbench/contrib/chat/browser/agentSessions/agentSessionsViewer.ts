@@ -56,6 +56,7 @@ import { IChatSessionsService } from '../../common/chatSessionsService.js';
 import { IVoicePlaybackService } from '../../common/voicePlaybackService.js';
 import { createPixelSpinner, IPixelSpinner } from '../../../../../base/browser/ui/pixelSpinner/pixelSpinner.js';
 import { IAccessibilityService } from '../../../../../platform/accessibility/common/accessibility.js';
+import { FONT } from '../../../../../base/common/font.js';
 
 export type AgentSessionListItem = IAgentSession | IAgentSessionSection | IAgentSessionShowMore | IAgentSessionShowLess;
 
@@ -956,10 +957,10 @@ export class AgentSessionShowLessRenderer implements ICompressibleTreeRenderer<I
 
 export class AgentSessionsListDelegate implements IListVirtualDelegate<AgentSessionListItem> {
 
-	static readonly ITEM_HEIGHT = 54;
-	static readonly COMPACT_ITEM_HEIGHT = 52;
-	static readonly SECTION_HEIGHT = 26;
-	static readonly SPACED_SECTION_HEIGHT = 30;
+	static get ITEM_HEIGHT() { return FONT.sidebarSize54; };
+	static get COMPACT_ITEM_HEIGHT() { return FONT.sidebarSize52; };
+	static get SECTION_HEIGHT() { return FONT.sidebarSize26; };
+	static get SPACED_SECTION_HEIGHT() { return FONT.sidebarSize30; };
 
 	constructor(private readonly _approvalModel?: AgentSessionApprovalModel,
 		private readonly _compactShowMore?: boolean,

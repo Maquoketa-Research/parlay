@@ -6,6 +6,7 @@
 import { localize } from '../../../../nls.js';
 import * as arrays from '../../../common/arrays.js';
 import { Emitter, Event } from '../../../common/event.js';
+import { FONT } from '../../../common/font.js';
 import { KeyCode, KeyCodeUtils } from '../../../common/keyCodes.js';
 import { Disposable, DisposableStore, IDisposable, MutableDisposable } from '../../../common/lifecycle.js';
 import { isMacintosh } from '../../../common/platform.js';
@@ -30,7 +31,6 @@ import './selectBoxCustom.css';
 const $ = dom.$;
 
 const SELECT_OPTION_ENTRY_TEMPLATE_ID = 'selectOption.entry.template';
-const SELECT_OPTION_HEIGHT = 22;
 
 interface ISelectListTemplateData {
 	root: HTMLElement;
@@ -188,7 +188,7 @@ export class SelectBoxList extends Disposable implements ISelectBoxDelegate, ILi
 	// IDelegate - List renderer
 
 	getHeight(_element: ISelectOptionItem): number {
-		return SELECT_OPTION_HEIGHT;
+		return FONT.sidebarSize22;
 	}
 
 	getTemplateId(): string {
@@ -635,8 +635,8 @@ export class SelectBoxList extends Disposable implements ISelectBoxDelegate, ILi
 			const maxDetailsPaneHeight = this._hasDetails ? this._cachedMaxDetailsHeight! : 0;
 
 			const minRequiredDropDownHeight = listHeight + maxDetailsPaneHeight;
-			const maxVisibleOptionsBelow = ((Math.floor((maxSelectDropDownHeightBelow - maxDetailsPaneHeight) / SELECT_OPTION_HEIGHT)));
-			const maxVisibleOptionsAbove = ((Math.floor((maxSelectDropDownHeightAbove - maxDetailsPaneHeight) / SELECT_OPTION_HEIGHT)));
+			const maxVisibleOptionsBelow = ((Math.floor((maxSelectDropDownHeightBelow - maxDetailsPaneHeight) / FONT.sidebarSize22)));
+			const maxVisibleOptionsAbove = ((Math.floor((maxSelectDropDownHeightAbove - maxDetailsPaneHeight) / FONT.sidebarSize22)));
 
 			// If we are only doing pre-layout check/adjust position only
 			// Calculate vertical space available, flip up if insufficient
@@ -648,7 +648,7 @@ export class SelectBoxList extends Disposable implements ISelectBoxDelegate, ILi
 				// Check if select moved out of viewport , do not open
 				// If at least one option cannot be shown, don't open the drop-down or hide/remove if open
 
-				if ((selectPosition.top + selectPosition.height) > (window.innerHeight - 22)
+				if ((selectPosition.top + selectPosition.height) > (window.innerHeight - FONT.sidebarSize22)
 					|| selectPosition.top < SelectBoxList.DEFAULT_DROPDOWN_MINIMUM_TOP_MARGIN
 					|| ((maxVisibleOptionsBelow < 1) && (maxVisibleOptionsAbove < 1))) {
 					// Indicate we cannot open
@@ -685,7 +685,7 @@ export class SelectBoxList extends Disposable implements ISelectBoxDelegate, ILi
 			}
 
 			// Check if select out of viewport or cutting into status bar
-			if ((selectPosition.top + selectPosition.height) > (window.innerHeight - 22)
+			if ((selectPosition.top + selectPosition.height) > (window.innerHeight - FONT.sidebarSize22)
 				|| selectPosition.top < SelectBoxList.DEFAULT_DROPDOWN_MINIMUM_TOP_MARGIN
 				|| (this._dropDownPosition === AnchorPosition.BELOW && maxVisibleOptionsBelow < 1)
 				|| (this._dropDownPosition === AnchorPosition.ABOVE && maxVisibleOptionsAbove < 1)) {
@@ -706,11 +706,11 @@ export class SelectBoxList extends Disposable implements ISelectBoxDelegate, ILi
 
 				// Adjust list height to max from select bottom to margin (default/minBottomMargin)
 				if (minRequiredDropDownHeight > maxSelectDropDownHeightBelow) {
-					listHeight = (maxVisibleOptionsBelow * SELECT_OPTION_HEIGHT);
+					listHeight = (maxVisibleOptionsBelow * FONT.sidebarSize22);
 				}
 			} else {
 				if (minRequiredDropDownHeight > maxSelectDropDownHeightAbove) {
-					listHeight = (maxVisibleOptionsAbove * SELECT_OPTION_HEIGHT);
+					listHeight = (maxVisibleOptionsAbove * FONT.sidebarSize22);
 				}
 			}
 

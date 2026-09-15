@@ -88,7 +88,6 @@ import { AgentHostLocalCommands } from './localCommands/localChatCommand.js';
 import './localCommands/localChatCommands.contribution.js';
 import { SessionPermissionManager } from './sessionPermissions.js';
 import type { IAgentHostOctoKitService } from './shared/agentHostOctoKitService.js';
-import type { ICopilotApiService } from './shared/copilotApiService.js';
 import { stripProxyErrorMarker, toChatErrorMeta, tryParseForwardedChatError } from './shared/proxyChatError.js';
 import { AGENT_HOST_TITLE_SOURCE_USER, customChatTitleMetadataKey, customChatTitleSourceMetadataKey, persistSessionMetadata, SESSION_CUSTOM_TITLE_KEY, SESSION_CUSTOM_TITLE_SOURCE_KEY } from './shared/persistSessionMetadata.js';
 import { targetForMcpServer, targetForPlugin } from './shared/customizationEnablementGate.js';
@@ -114,8 +113,6 @@ export interface IAgentSideEffectsOptions {
 	readonly getGitHubHost?: () => string | undefined;
 	/** GitHub REST client used to fetch issue and pull request context. */
 	readonly octoKitService?: IAgentHostOctoKitService;
-	/** CAPI service used for Copilot utility title generation. */
-	readonly copilotApiService?: ICopilotApiService;
 	/**
 	 * Host-owned working-directory resolution hook, awaited before the agent's
 	 * first send so the session's working directory (an isolated worktree created
@@ -310,7 +307,6 @@ export class AgentSideEffects extends Disposable {
 			getGitHubToken: this._options.getGitHubToken,
 			getGitHubHost: this._options.getGitHubHost,
 			octoKitService: this._options.octoKitService,
-			copilotApiService: this._options.copilotApiService,
 			isActiveAgentTitleGenerationEnabled: () => this._agentConfigService.getRootValue(platformRootSchema, AgentHostActiveAgentTitleGenerationConfigKey) === true,
 		}));
 		this._register(this._stateManager.onDidSnapshotDefaultChatTitle(event => this._persistDefaultChatTitleSnapshot(event.session, event.chat, event.title)));

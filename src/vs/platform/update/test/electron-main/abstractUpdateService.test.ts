@@ -82,7 +82,7 @@ class TestUpdateService extends AbstractUpdateService {
 		}
 	}
 
-	protected buildUpdateFeedUrl(_quality: string, _commit: string, _options?: IUpdateURLOptions): string | undefined {
+	protected buildUpdateFeedUrl(_quality: string, _options?: IUpdateURLOptions): string | undefined {
 		return this.feedUrl;
 	}
 

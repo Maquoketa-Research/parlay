@@ -9,6 +9,7 @@ import { downloadArtifact } from '@electron/get';
 import productJson from '../../product.json' with { type: 'json' };
 
 interface ProductConfiguration {
+	applicationName: string;
 	quality?: string;
 	[key: string]: unknown;
 }
@@ -53,8 +54,10 @@ export async function downloadExplorerDll(outDir: string, quality: string = 'sta
 		}
 	});
 
-	d(`moving ${artifact} to ${outDir}`);
-	await fs.copyFileSync(artifact, path.join(outDir, fileName));
+	const outFilePath = path.join(outDir, `${product.applicationName.replaceAll('-', '_')}_explorer_command_${targetArch}.dll`);
+
+	d(`moving ${artifact} as ${outFilePath}`);
+	await fs.copyFileSync(artifact, outFilePath);
 }
 
 async function main(outputDir?: string): Promise<void> {

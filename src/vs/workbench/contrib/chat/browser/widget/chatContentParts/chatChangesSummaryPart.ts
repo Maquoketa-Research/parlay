@@ -37,8 +37,8 @@ import { ChatCollapsibleContentPart } from './chatCollapsibleContentPart.js';
 import { ChatTreeItem } from '../../chat.js';
 import { ResourcePool } from './chatCollections.js';
 import { IChatContentPart, IChatContentPartRenderContext } from './chatContentParts.js';
+import { FONT } from '../../../../../../base/common/font.js';
 
-const CHANGES_SUMMARY_ELEMENT_HEIGHT = 22;
 const CHANGES_SUMMARY_MAX_ITEMS_SHOWN = 6;
 
 /** Options controlling how {@link renderChangesSummaryFileList} renders each row. */
@@ -118,7 +118,7 @@ export function renderChangesSummaryFileList(
 		columnWidths.deletions = deletionsColumnCharacters;
 
 		const itemsShown = Math.min(currentDiffs.length, CHANGES_SUMMARY_MAX_ITEMS_SHOWN);
-		const height = itemsShown * CHANGES_SUMMARY_ELEMENT_HEIGHT;
+		const height = itemsShown * FONT.sidebarSize22;
 		list.layout(height);
 		listNode.style.height = height + 'px';
 
@@ -347,7 +347,7 @@ interface ICollapsibleChangesSummaryListTemplate extends IDisposable {
 class CollapsibleChangesSummaryListDelegate implements IListVirtualDelegate<IEditSessionEntryDiff> {
 
 	getHeight(element: IEditSessionEntryDiff): number {
-		return CHANGES_SUMMARY_ELEMENT_HEIGHT;
+		return FONT.sidebarSize22;
 	}
 
 	getTemplateId(element: IEditSessionEntryDiff): string {

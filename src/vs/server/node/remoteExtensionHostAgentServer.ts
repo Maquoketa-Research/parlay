@@ -6,7 +6,6 @@
 import * as fs from 'fs';
 import type * as http from 'http';
 import * as net from 'net';
-import { createRequire } from 'node:module';
 import { performance } from 'perf_hooks';
 import { VSBuffer } from '../../base/common/buffer.js';
 import { CharCode } from '../../base/common/charCode.js';
@@ -39,7 +38,6 @@ import { IServerEnvironmentService, ServerParsedArgs } from './serverEnvironment
 import { IServerLifetimeService } from './serverLifetimeService.js';
 import { setupServerServices, SocketServer } from './serverServices.js';
 import { CacheControl, serveError, serveFile, WebClientServer } from './webClientServer.js';
-const require = createRequire(import.meta.url);
 
 function parseRequestUrl(requestUrl: string): URL | undefined {
 	try {
@@ -91,6 +89,7 @@ class RemoteExtensionHostAgentServer extends Disposable implements IServerAPI {
 		private readonly _vsdaMod: typeof vsda | null,
 		hasWebClient: boolean,
 		serverBasePath: string | undefined,
+		private readonly _disableClientValidation: boolean | undefined,
 		@IServerEnvironmentService private readonly _environmentService: IServerEnvironmentService,
 		@IProductService private readonly _productService: IProductService,
 		@ILogService private readonly _logService: ILogService,
@@ -114,7 +113,7 @@ class RemoteExtensionHostAgentServer extends Disposable implements IServerAPI {
 				? this._instantiationService.createInstance(WebClientServer, this._connectionToken, serverBasePath ?? '/', this._serverProductPath)
 				: null
 		);
-		this._logService.info(`Extension host agent started.`);
+		this._logService.info(`Extension host agent started. (validation: ${!this._disableClientValidation})`);
 		this._reconnectionGraceTime = this._environmentService.reconnectionGraceTime;
 	}
 
@@ -359,12 +358,14 @@ class RemoteExtensionHostAgentServer extends Disposable implements IServerAPI {
 					return rejectWebSocketConnection(`Invalid second message field type`);
 				}
 
-				const rendererCommit = msg2.commit;
-				const myCommit = this._productService.commit;
-				if (rendererCommit && myCommit) {
-					// Running in the built version where commits are defined
-					if (rendererCommit !== myCommit) {
-						return rejectWebSocketConnection(`Client refused: version mismatch`);
+				if(!this._disableClientValidation) {
+					const rendererCommit = msg2.commit;
+					const myCommit = this._productService.commit;
+					if (rendererCommit && myCommit) {
+						// Running in the built version where commits are defined
+						if (rendererCommit !== myCommit) {
+							return rejectWebSocketConnection(`Client refused: version mismatch`);
+						}
 					}
 				}
 
@@ -718,18 +719,7 @@ export async function createServer(address: string | net.AddressInfo | null, arg
 		}
 	});
 
-	const vsdaMod = instantiationService.invokeFunction((accessor) => {
-		const logService = accessor.get(ILogService);
-		const hasVSDA = fs.existsSync(join(FileAccess.asFileUri('').fsPath, '../node_modules/vsda'));
-		if (hasVSDA) {
-			try {
-				return require('vsda');
-			} catch (err) {
-				logService.error(err);
-			}
-		}
-		return null;
-	});
+	const vsdaMod = instantiationService.invokeFunction(() => null);
 
 	let serverBasePath = args['server-base-path'];
 	if (serverBasePath && !serverBasePath.startsWith('/')) {
@@ -744,7 +734,9 @@ export async function createServer(address: string | net.AddressInfo | null, arg
 		console.log(`Web UI available at http://localhost${address.port === 80 ? '' : `:${address.port}`}${serverBasePath ?? ''}${queryPart}`);
 	}
 
-	const remoteExtensionHostAgentServer = instantiationService.createInstance(RemoteExtensionHostAgentServer, socketServer, connectionToken, vsdaMod, hasWebClient, serverBasePath);
+	let disableClientValidation = args['disable-client-validation'];
+
+	const remoteExtensionHostAgentServer = instantiationService.createInstance(RemoteExtensionHostAgentServer, socketServer, connectionToken, vsdaMod, hasWebClient, serverBasePath, disableClientValidation);
 
 	perf.mark('code/server/ready');
 	const currentTime = performance.now();
