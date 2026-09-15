@@ -26,7 +26,7 @@ env:
   OS_NAME: windows
   VSCODE_ARCH: x64
   VSCODE_QUALITY: stable
-  CI_BUILD: "yes"            # build.sh runs the packing step only when this is not "no"
+  CI_BUILD: "no"             # build.sh packs on Windows only when this is "no"; VSCodium's CI packs in a separate job
   SHOULD_BUILD: "yes"
   SHOULD_BUILD_CLI: "no"     # the tunnel CLI needs a Rust toolchain; not for build 1
   SHOULD_BUILD_REH: "no"
@@ -90,8 +90,8 @@ jobs:
         working-directory: harness
         run: |
           set -e
-          # our overlay becomes the file prepare_vscode.sh merges last (jq -s '.[0] * .[1]')
-          cp ../ide/fork/product.json product.json
+          # prepare_vscode.sh merges ../product.json last (jq -s '.[0] * .[1]'); ours goes on top of VSCodium's
+          jq -s '.[0] * .[1]' product.json ../ide/fork/product.json > product.tmp && mv product.tmp product.json
           # keep upstream's own built-ins (js-debug) ahead of ours; the overlay replaces the array wholesale
           jq --slurpfile up vscode/product.json '.builtInExtensions = ($up[0].builtInExtensions // []) + .builtInExtensions' product.json > product.tmp && mv product.tmp product.json
           # the extension we just built, as a local .vsix built-in, with its real hash
