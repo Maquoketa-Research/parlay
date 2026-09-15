@@ -41,6 +41,11 @@ for (const t of pkg.contributes.themes) {
 }
 if (!pkg.contributes.themes.some((t) => t.label === pkg.contributes.configurationDefaults["workbench.colorTheme"])) fail("default theme is not one of ours");
 // the panel views have providers
-for (const v of pkg.contributes.views.drydock) if (!src.includes(`"${v.id}"`)) fail(`view ${v.id} has no provider`);
+const containers = pkg.contributes.viewsContainers.secondarySidebar.map((c) => c.id);
+for (const [container, views] of Object.entries(pkg.contributes.views)) {
+	if (!containers.includes(container)) fail(`views for ${container}, but no such secondary sidebar container`);
+	for (const v of views) if (!src.includes(`"${v.id}"`)) fail(`view ${v.id} has no provider`);
+}
+for (const c of pkg.contributes.viewsContainers.secondarySidebar) if (!existsSync(join(root, c.icon))) fail(`container ${c.id}: icon ${c.icon} missing`);
 
 console.log(`check: ok — ${commands.length} commands, ${actions.length} skills, ${pkg.contributes.themes.length} themes`);
