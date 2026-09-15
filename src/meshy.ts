@@ -1,64 +1,72 @@
-// The Meshy tab: a prompt or a reference image goes to Meshy, a textured 3D model comes back, lands in the
-// workspace's assets folder, goes up to Roblox through the Open Cloud Assets API as a Model, and a Claude
-// skill inserts it into the open Studio. Keys live in SecretStorage, never in settings files.
+// The Meshy tab, as a workflow: describe a prop; the game's own screenshots set the style; a few concept
+// drafts come back from an image model; approve one; Meshy turns it into a textured 3D model; a four-view
+// turntable lets you approve or reject; approval uploads it to Roblox through Open Cloud and a Claude skill
+// inserts it into the open Studio. Keys live in SecretStorage, never in settings files.
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import { spawn } from "child_process";
 
 const MESHY = "https://api.meshy.ai";
 const ROBLOX = "https://apis.roblox.com/assets/v1";
-const KEY_MESHY = "drydock.meshyApiKey";
-const KEY_ROBLOX = "drydock.robloxApiKey";
+const OPENAI = "https://api.openai.com/v1";
+const KEYS = { meshy: "drydock.meshyApiKey", roblox: "drydock.robloxApiKey", openai: "drydock.openaiApiKey" } as const;
+type KeyName = keyof typeof KEYS;
 
-export interface MeshyTask {
+export interface Job {
 	id: string;
-	kind: "preview" | "refine" | "image";
 	prompt: string;
-	status: string;          // PENDING | IN_PROGRESS | SUCCEEDED | FAILED | CANCELED
-	progress: number;
-	thumbnail?: string;
-	modelUrls?: Record<string, string>;
-	error?: string;
+	slug: string;
+	dir: string;                 // <workspace>/<assetsDir>/<slug>-<id>
 	createdAt: number;
-	previewId?: string;      // refine tasks point at their preview
-	file?: string;           // local .glb once downloaded
-	robloxOp?: string;       // operations/<id> while the upload is processing
+	status: "drafting" | "drafts" | "modeling" | "review" | "uploading" | "done" | "failed";
+	refs: string[];              // reference screenshots used for the drafts
+	drafts: string[];            // draft PNG paths
+	chosen?: number;             // index into drafts
+	meshyId?: string;
+	progress?: number;
+	thumbnail?: string;
+	views?: Record<string, string>;   // front/right/back/left from Meshy
+	modelUrls?: Record<string, string>;
+	file?: string;               // local .glb
+	robloxOp?: string;
 	robloxAssetId?: string;
-	robloxError?: string;
+	error?: string;
+	note?: string;
 }
 
 export class MeshyView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
-	private tasks: MeshyTask[];
+	private jobs: Job[];
 	private timer?: NodeJS.Timeout;
 
 	constructor(private ctx: vscode.ExtensionContext, private insert: (assetId: string, name: string) => Promise<void>) {
-		this.tasks = ctx.globalState.get<MeshyTask[]>("meshyTasks", []);
+		this.jobs = ctx.globalState.get<Job[]>("meshyJobs", []);
 	}
 
 	// ---- keys and settings -------------------------------------------------------------------------
 
-	async setKey(which: "meshy" | "roblox") {
-		const v = await vscode.window.showInputBox({
-			prompt: which === "meshy" ? "Meshy API key (meshy.ai, Settings, API Keys)" : "Roblox Open Cloud API key with Assets read and write",
-			password: true, ignoreFocusOut: true,
-		});
+	async setKey(which: KeyName) {
+		const prompts = { meshy: "Meshy API key (meshy.ai, Settings, API Keys)", roblox: "Roblox Open Cloud API key with Assets read and write", openai: "OpenAI API key (for the concept drafts)" };
+		const v = await vscode.window.showInputBox({ prompt: prompts[which], password: true, ignoreFocusOut: true });
 		if (v === undefined) return;
-		await this.ctx.secrets.store(which === "meshy" ? KEY_MESHY : KEY_ROBLOX, v.trim());
+		await this.ctx.secrets.store(KEYS[which], v.trim());
 		void this.push();
 	}
 
-	private async keys() {
-		return { meshy: !!(await this.ctx.secrets.get(KEY_MESHY)), roblox: !!(await this.ctx.secrets.get(KEY_ROBLOX)) };
+	private async key(which: KeyName): Promise<string | undefined> {
+		return (await this.ctx.secrets.get(KEYS[which])) || (which === "openai" ? process.env.OPENAI_API_KEY : undefined);
 	}
 
 	private cfg<T>(k: string, d: T): T { return vscode.workspace.getConfiguration("drydock").get<T>(k, d); }
+	private ws(): string { return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.join(process.env.USERPROFILE ?? ".", "Documents"); }
+	private assetsRoot(): string { const d = path.join(this.ws(), this.cfg("assetsDir", "assets/meshy")); fs.mkdirSync(d, { recursive: true }); return d; }
 
 	// ---- the view ----------------------------------------------------------------------------------
 
 	resolveWebviewView(view: vscode.WebviewView) {
 		this.view = view;
-		view.webview.options = { enableScripts: true };
+		view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.file(this.assetsRoot()), vscode.Uri.file(this.ws())] };
 		view.webview.html = this.html(view.webview);
 		view.webview.onDidReceiveMessage((m) => void this.onMessage(m));
 		view.onDidChangeVisibility(() => { if (view.visible) void this.push(); });
@@ -67,155 +75,189 @@ export class MeshyView implements vscode.WebviewViewProvider {
 		this.schedule();
 	}
 
-	private async onMessage(m: { type: string; [k: string]: unknown }) {
+	private async onMessage(m: { type: string; id?: string; index?: number; prompt?: string; which?: string }) {
+		const job = m.id ? this.jobs.find((j) => j.id === m.id) : undefined;
 		try {
 			switch (m.type) {
-				case "generate": await this.generate(String(m.prompt ?? ""), String(m.image ?? ""), String(m.model ?? "latest"), !!m.pbr); break;
-				case "refine": await this.refine(String(m.id)); break;
-				case "download": await this.download(String(m.id)); break;
-				case "upload": await this.upload(String(m.id)); break;
-				case "insert": { const t = this.find(String(m.id)); if (t?.robloxAssetId) await this.insert(t.robloxAssetId, slug(t.prompt)); break; }
-				case "remove": this.tasks = this.tasks.filter((t) => t.id !== m.id); await this.save(); break;
-				case "open": { const t = this.find(String(m.id)); if (t?.file) await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(t.file)); break; }
-				case "browse": {
-					const pick = await vscode.window.showOpenDialog({ canSelectMany: false, filters: { Images: ["png", "jpg", "jpeg"] }, title: "Reference image for Meshy" });
-					if (pick?.[0]) void this.view?.webview.postMessage({ type: "image", path: pick[0].fsPath });
-					break;
-				}
-				case "setKey": await this.setKey(m.which === "roblox" ? "roblox" : "meshy"); break;
-				case "settings": await vscode.commands.executeCommand("workbench.action.openSettings", "drydock.roblox"); break;
+				case "draft": await this.draft(String(m.prompt ?? "")); break;
+				case "approveDraft": if (job) await this.approveDraft(job, Number(m.index)); break;
+				case "denyDraft": if (job) { job.drafts.splice(Number(m.index), 1); if (!job.drafts.length) { job.status = "failed"; job.error = "every draft was rejected; try a different description"; } } break;
+				case "approveModel": if (job) await this.approveModel(job); break;
+				case "denyModel": if (job) { job.status = "drafts"; job.meshyId = undefined; job.views = undefined; job.modelUrls = undefined; job.thumbnail = undefined; job.note = "model rejected; pick another draft"; } break;
+				case "insert": if (job?.robloxAssetId) await this.insert(job.robloxAssetId, job.prompt); break;
+				case "open": if (job) await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(job.file ?? job.dir)); break;
+				case "remove": this.jobs = this.jobs.filter((j) => j !== job); break;
+				case "setKey": await this.setKey((m.which as KeyName) ?? "meshy"); break;
+				case "settings": await vscode.commands.executeCommand("workbench.action.openSettings", "drydock."); break;
 				case "refresh": await this.poll(); break;
 			}
 		} catch (e) {
-			void vscode.window.showErrorMessage(`Meshy: ${(e as Error).message}`);
+			if (job) { job.error = (e as Error).message; if (job.status === "drafting") job.status = "failed"; }
+			else void vscode.window.showErrorMessage(`Meshy: ${(e as Error).message}`);
 		}
-		await this.push();
+		await this.save(); await this.push();
 	}
 
-	private find(id: string) { return this.tasks.find((t) => t.id === id); }
-	private async save() { await this.ctx.globalState.update("meshyTasks", this.tasks); }
+	private async save() { await this.ctx.globalState.update("meshyJobs", this.jobs); }
 
 	private async push() {
 		if (!this.view) return;
-		void this.view.webview.postMessage({
-			type: "state", tasks: this.tasks, keys: await this.keys(),
+		const w = this.view.webview;
+		const uri = (p: string) => (p.startsWith("http") ? p : w.asWebviewUri(vscode.Uri.file(p)).toString());
+		void w.postMessage({
+			type: "state",
+			jobs: this.jobs.map((j) => ({ ...j, drafts: j.drafts.map(uri), refs: j.refs.map(uri), thumbnail: j.thumbnail && uri(j.thumbnail) })),
+			keys: { meshy: !!(await this.key("meshy")), roblox: !!(await this.key("roblox")), openai: !!(await this.key("openai")) },
 			creator: `${this.cfg("robloxCreatorType", "user")} ${this.cfg("robloxCreatorId", "") || "(not set)"}`,
+			refDir: this.cfg("referenceDir", "assets/reference"),
 		});
 	}
 
-	// ---- Meshy -------------------------------------------------------------------------------------
+	// ---- step 1: drafts ---------------------------------------------------------------------------
+
+	private async draft(prompt: string) {
+		prompt = prompt.trim();
+		if (!prompt) throw new Error("describe the prop first");
+		const id = Date.now().toString(36);
+		const slug = slugOf(prompt);
+		const dir = path.join(this.assetsRoot(), `${slug}-${id}`);
+		fs.mkdirSync(dir, { recursive: true });
+		const job: Job = { id, prompt, slug, dir, createdAt: Date.now(), status: "drafting", refs: [], drafts: [] };
+		this.jobs.unshift(job);
+		await this.save(); await this.push();
+		try {
+			job.refs = await this.gatherRefs(dir);
+			job.note = job.refs.length ? `style from ${job.refs.length} screenshot${job.refs.length === 1 ? "" : "s"}` : "no screenshots found; drafts follow the description alone";
+			await this.push();
+			job.drafts = await this.openaiDrafts(job);
+			job.status = "drafts";
+		} catch (e) {
+			job.status = "failed"; job.error = (e as Error).message;
+		}
+	}
+
+	// Screenshots of the game: whatever is in the reference folder, plus one live Studio capture when the
+	// Studio MCP is not held by another client (Claude Code holds it while it runs).
+	private async gatherRefs(dir: string): Promise<string[]> {
+		const refs: string[] = [];
+		const refDir = path.join(this.ws(), this.cfg("referenceDir", "assets/reference"));
+		if (fs.existsSync(refDir)) {
+			for (const f of fs.readdirSync(refDir)) if (/\.(png|jpe?g)$/i.test(f)) refs.push(path.join(refDir, f));
+		}
+		const shot = await studioCapture(path.join(dir, "studio.png")).catch(() => undefined);
+		if (shot) refs.unshift(shot);
+		return refs.slice(0, 6);
+	}
+
+	private async openaiDrafts(job: Job): Promise<string[]> {
+		const key = await this.key("openai");
+		if (!key) throw new Error("no OpenAI API key (Drydock: Set OpenAI API key), and OPENAI_API_KEY is not set");
+		const model = this.cfg("imageModel", "gpt-image-1");
+		const n = 3;
+		const base = `Concept art for a Roblox game prop: ${job.prompt}. One object only, centred, three-quarter view, plain neutral background, no text, no people, no hands.`;
+		let res: Response;
+		if (job.refs.length) {
+			const form = new FormData();
+			form.append("model", model); form.append("n", String(n)); form.append("size", "1024x1024"); form.append("quality", "medium");
+			form.append("prompt", `${base} Match the look of the reference screenshots exactly: same colour palette, material language, level of detail and lighting mood, so it belongs in that world.`);
+			for (const r of job.refs) form.append("image[]", new Blob([fs.readFileSync(r)], { type: r.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg" }), path.basename(r));
+			res = await fetch(`${OPENAI}/images/edits`, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
+		} else {
+			res = await fetch(`${OPENAI}/images/generations`, {
+				method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+				body: JSON.stringify({ model, prompt: `${base} Stylised, game-ready, readable silhouette.`, n, size: "1024x1024", quality: "medium" }),
+			});
+		}
+		const text = await res.text();
+		if (!res.ok) throw new Error(`OpenAI ${res.status}: ${text.slice(0, 300)}`);
+		const data = JSON.parse(text).data as { b64_json?: string; url?: string }[];
+		const out: string[] = [];
+		for (const [i, d] of data.entries()) {
+			const file = path.join(job.dir, `draft-${i + 1}.png`);
+			if (d.b64_json) fs.writeFileSync(file, Buffer.from(d.b64_json, "base64"));
+			else if (d.url) await save(d.url, file);
+			else continue;
+			out.push(file);
+		}
+		if (!out.length) throw new Error("the image model returned no images");
+		return out;
+	}
+
+	// ---- step 2: the model -------------------------------------------------------------------------
 
 	private async meshy(method: string, p: string, body?: unknown): Promise<any> {
-		const key = await this.ctx.secrets.get(KEY_MESHY);
-		if (!key) throw new Error("no Meshy API key. Use the Set key link in the Meshy tab.");
+		const key = await this.key("meshy");
+		if (!key) throw new Error("no Meshy API key (Drydock: Set Meshy API key)");
 		const r = await fetch(MESHY + p, { method, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
 		const text = await r.text();
 		if (!r.ok) throw new Error(`Meshy ${r.status}: ${text.slice(0, 300)}`);
 		return text ? JSON.parse(text) : {};
 	}
 
-	private async generate(prompt: string, image: string, model: string, pbr: boolean) {
-		if (!prompt.trim() && !image.trim()) throw new Error("write a prompt or pick a reference image");
-		const polycount = this.cfg("meshyPolycount", 10000);
-		let id: string, kind: MeshyTask["kind"];
-		if (image.trim()) {
-			const buf = fs.readFileSync(image.trim());
-			const mime = image.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
-			const res = await this.meshy("POST", "/openapi/v1/image-to-3d", {
-				image_url: `data:${mime};base64,${buf.toString("base64")}`, ai_model: model, should_texture: true, enable_pbr: pbr,
-				should_remesh: true, target_polycount: polycount, target_formats: ["glb", "fbx"], texture_prompt: prompt.trim() || undefined,
-			});
-			id = res.result; kind = "image";
-		} else {
-			const res = await this.meshy("POST", "/openapi/v2/text-to-3d", {
-				mode: "preview", prompt: prompt.trim(), ai_model: model, should_remesh: true, target_polycount: polycount, target_formats: ["glb", "fbx"],
-			});
-			id = res.result; kind = "preview";
-		}
-		this.tasks.unshift({ id, kind, prompt: prompt.trim() || path.basename(image), status: "PENDING", progress: 0, createdAt: Date.now() });
-		await this.save(); this.schedule();
+	private async approveDraft(job: Job, index: number) {
+		const file = job.drafts[index]; if (!file) return;
+		job.chosen = index; job.error = undefined; job.note = undefined;
+		const buf = fs.readFileSync(file);
+		const res = await this.meshy("POST", "/openapi/v1/image-to-3d", {
+			image_url: `data:image/png;base64,${buf.toString("base64")}`,
+			ai_model: this.cfg("meshyModel", "latest"), should_texture: true, enable_pbr: this.cfg("meshyPbr", false),
+			should_remesh: true, target_polycount: this.cfg("meshyPolycount", 10000), target_formats: ["glb", "fbx"],
+			texture_prompt: job.prompt, multi_view_thumbnails: true, image_enhancement: true,
+		});
+		job.meshyId = res.result; job.status = "modeling"; job.progress = 0;
+		this.schedule();
 	}
 
-	private async refine(previewId: string) {
-		const pv = this.find(previewId); if (!pv) return;
-		const res = await this.meshy("POST", "/openapi/v2/text-to-3d", { mode: "refine", preview_task_id: previewId, enable_pbr: true, target_formats: ["glb", "fbx"] });
-		this.tasks.unshift({ id: res.result, kind: "refine", prompt: pv.prompt, status: "PENDING", progress: 0, createdAt: Date.now(), previewId });
-		await this.save(); this.schedule();
-	}
-
-	private schedule() {
-		if (this.timer) return;
-		this.timer = setInterval(() => void this.poll(), 4000);
-	}
+	private schedule() { if (!this.timer) this.timer = setInterval(() => void this.poll(), 4000); }
 
 	private async poll() {
-		const live = this.tasks.filter((t) => t.status === "PENDING" || t.status === "IN_PROGRESS" || (t.robloxOp && !t.robloxAssetId && !t.robloxError));
+		const live = this.jobs.filter((j) => j.status === "modeling" || j.status === "uploading");
 		if (!live.length) { if (this.timer) { clearInterval(this.timer); this.timer = undefined; } return; }
-		for (const t of live) {
+		for (const j of live) {
 			try {
-				if (t.status === "PENDING" || t.status === "IN_PROGRESS") {
-					const r = await this.meshy("GET", t.kind === "image" ? `/openapi/v1/image-to-3d/${t.id}` : `/openapi/v2/text-to-3d/${t.id}`);
-					t.status = r.status; t.progress = r.progress ?? t.progress; t.thumbnail = r.thumbnail_url ?? t.thumbnail;
-					t.modelUrls = r.model_urls ?? t.modelUrls; t.error = r.task_error?.message;
+				if (j.status === "modeling" && j.meshyId) {
+					const r = await this.meshy("GET", `/openapi/v1/image-to-3d/${j.meshyId}`);
+					j.progress = r.progress ?? j.progress; j.thumbnail = r.thumbnail_url ?? j.thumbnail;
+					if (r.thumbnail_urls) j.views = r.thumbnail_urls;
+					if (r.status === "SUCCEEDED") { j.modelUrls = r.model_urls; j.status = "review"; }
+					else if (r.status === "FAILED" || r.status === "CANCELED") { j.status = "failed"; j.error = r.task_error?.message ?? `Meshy task ${r.status.toLowerCase()}`; }
+				} else if (j.status === "uploading" && j.robloxOp) {
+					const r = await this.roblox("GET", "/" + j.robloxOp);
+					if (r.done) {
+						if (r.response?.assetId) { j.robloxAssetId = String(r.response.assetId); j.status = "done"; await this.insert(j.robloxAssetId, j.prompt).catch(() => undefined); }
+						else { j.status = "failed"; j.error = r.error?.message ?? JSON.stringify(r).slice(0, 200); }
+					}
 				}
-				if (t.robloxOp && !t.robloxAssetId) await this.pollUpload(t);
-			} catch (e) { t.error = (e as Error).message; }
+			} catch (e) { j.error = (e as Error).message; }
 		}
 		await this.save(); await this.push();
 	}
 
-	// ---- files -------------------------------------------------------------------------------------
-
-	private assetsDir(): string {
-		const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.join(process.env.USERPROFILE ?? process.env.HOME ?? ".", "Documents");
-		const dir = path.join(ws, this.cfg("assetsDir", "assets/meshy"));
-		fs.mkdirSync(dir, { recursive: true });
-		return dir;
-	}
-
-	private async download(id: string) {
-		const t = this.find(id); if (!t?.modelUrls?.glb) throw new Error("no model yet");
-		const base = path.join(this.assetsDir(), `${slug(t.prompt)}-${t.id.slice(-6)}`);
-		await save(t.modelUrls.glb, base + ".glb");
-		if (t.modelUrls.fbx) await save(t.modelUrls.fbx, base + ".fbx");
-		if (t.thumbnail) await save(t.thumbnail, base + ".png");
-		t.file = base + ".glb";
-		await this.save();
-		void vscode.window.showInformationMessage(`Meshy: saved ${path.basename(t.file)} to ${path.dirname(t.file)}`);
-	}
-
-	// ---- Roblox ------------------------------------------------------------------------------------
+	// ---- step 3: approve the model -----------------------------------------------------------------
 
 	private async roblox(method: string, p: string, body?: FormData): Promise<any> {
-		const key = await this.ctx.secrets.get(KEY_ROBLOX);
-		if (!key) throw new Error("no Roblox Open Cloud key. Use the Set key link in the Meshy tab.");
+		const key = await this.key("roblox");
+		if (!key) throw new Error("no Roblox Open Cloud key (Drydock: Set Roblox Open Cloud API key)");
 		const r = await fetch(ROBLOX + p, { method, headers: { "x-api-key": key }, body });
 		const text = await r.text();
 		if (!r.ok) throw new Error(`Roblox ${r.status}: ${text.slice(0, 300)}`);
 		return text ? JSON.parse(text) : {};
 	}
 
-	private async upload(id: string) {
-		const t = this.find(id); if (!t) return;
-		if (!t.file) await this.download(id);
+	private async approveModel(job: Job) {
+		if (!job.modelUrls?.glb) throw new Error("no model yet");
+		job.file = path.join(job.dir, "model.glb");
+		await save(job.modelUrls.glb, job.file);
+		if (job.modelUrls.fbx) await save(job.modelUrls.fbx, path.join(job.dir, "model.fbx"));
 		const creatorId = this.cfg("robloxCreatorId", "");
-		if (!creatorId) throw new Error("set drydock.robloxCreatorId (your user id or group id) first");
+		if (!creatorId) { job.note = `model saved to ${job.dir}; set drydock.robloxCreatorId to upload it to Roblox`; return; }
 		const creator = this.cfg<string>("robloxCreatorType", "user") === "group" ? { groupId: creatorId } : { userId: creatorId };
 		const form = new FormData();
-		form.append("request", JSON.stringify({ assetType: "Model", displayName: t.prompt.slice(0, 50) || "Meshy model", description: `Meshy ${t.kind} ${t.id}`, creationContext: { creator } }));
-		form.append("fileContent", new Blob([fs.readFileSync(t.file!)], { type: "model/gltf-binary" }), path.basename(t.file!));
+		form.append("request", JSON.stringify({ assetType: "Model", displayName: job.prompt.slice(0, 50), description: `Meshy ${job.meshyId}`, creationContext: { creator } }));
+		form.append("fileContent", new Blob([fs.readFileSync(job.file)], { type: "model/gltf-binary" }), "model.glb");
 		const res = await this.roblox("POST", "/assets", form);
-		t.robloxOp = res.path; t.robloxError = undefined; t.robloxAssetId = undefined;
-		await this.save(); this.schedule();
-	}
-
-	private async pollUpload(t: MeshyTask) {
-		if (!t.robloxOp) return;
-		const r = await this.roblox("GET", "/" + t.robloxOp);
-		if (r.done) {
-			if (r.response?.assetId) { t.robloxAssetId = String(r.response.assetId); }
-			else { t.robloxError = r.error?.message ?? JSON.stringify(r).slice(0, 200); }
-		}
+		job.robloxOp = res.path; job.status = "uploading"; job.error = undefined;
+		this.schedule();
 	}
 
 	// ---- html --------------------------------------------------------------------------------------
@@ -223,73 +265,74 @@ export class MeshyView implements vscode.WebviewViewProvider {
 	private html(webview: vscode.Webview): string {
 		const nonce = Math.random().toString(36).slice(2);
 		return `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
 <style>
 body{margin:0;padding:10px 12px;font:13px/1.45 var(--vscode-font-family);color:var(--vscode-foreground);background:transparent}
-textarea,input,select{width:100%;box-sizing:border-box;border:1px solid var(--vscode-input-border,transparent);background:var(--vscode-input-background);color:var(--vscode-input-foreground);border-radius:8px;padding:6px 8px;font:inherit}
-textarea{min-height:56px;resize:vertical}
+textarea{width:100%;box-sizing:border-box;min-height:52px;resize:vertical;border:1px solid var(--vscode-input-border,transparent);background:var(--vscode-input-background);color:var(--vscode-input-foreground);border-radius:8px;padding:6px 8px;font:inherit}
 .row{display:flex;gap:8px;align-items:center;margin-top:8px}
-.row>*{flex:1}
 button{border:0;border-radius:999px;padding:5px 12px;font:inherit;cursor:pointer;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground)}
 button.primary{background:var(--vscode-button-background);color:var(--vscode-button-foreground)}
 button:disabled{opacity:.5;cursor:default}
 .keys{margin-top:8px;font-size:12px;color:var(--vscode-descriptionForeground)}
-.keys a{color:var(--vscode-textLink-foreground);cursor:pointer;margin-left:6px}
-.task{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:10px 0;border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.25))}
-.task img,.task .ph{width:72px;height:72px;border-radius:10px;object-fit:cover;background:var(--vscode-editorWidget-background)}
-.task .t{font-weight:600}
-.task .s{font-size:12px;color:var(--vscode-descriptionForeground)}
-.task .err{font-size:12px;color:var(--vscode-errorForeground)}
-.bar{height:3px;border-radius:2px;background:var(--vscode-progressBar-background);opacity:.35;margin:6px 0}
-.bar>i{display:block;height:100%;border-radius:2px;background:var(--vscode-progressBar-background);opacity:1}
-.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.acts button{padding:3px 10px;font-size:12px}
+.keys a{color:var(--vscode-textLink-foreground);cursor:pointer;margin-left:4px}
+.job{padding:12px 0;border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.25))}
+.job .t{font-weight:600}
+.job .s{font-size:12px;color:var(--vscode-descriptionForeground);margin-top:2px}
+.job .err{font-size:12px;color:var(--vscode-errorForeground);margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px}
+.card{position:relative;border-radius:10px;overflow:hidden;background:var(--vscode-editorWidget-background)}
+.card img{display:block;width:100%;aspect-ratio:1;object-fit:cover}
+.card .acts{display:flex;gap:4px;padding:6px;justify-content:center}
+.card .acts button{padding:3px 9px;font-size:12px}
+.views{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.views img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--vscode-editorWidget-background)}
+.views .cap{font-size:11px;color:var(--vscode-descriptionForeground);text-align:center;margin-top:2px}
+.bar{height:3px;border-radius:2px;background:var(--vscode-progressBar-background);opacity:.35;margin:8px 0 4px}
+.bar>i{display:block;height:100%;border-radius:2px;background:var(--vscode-progressBar-background)}
+.acts2{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.acts2 button{padding:4px 11px;font-size:12px}
 .empty{color:var(--vscode-descriptionForeground);padding:18px 0;text-align:center}
+.refs{display:flex;gap:4px;margin-top:6px}
+.refs img{width:36px;height:36px;object-fit:cover;border-radius:6px;opacity:.85}
 </style></head><body>
-<textarea id="prompt" placeholder="A weathered brass lighthouse lamp, low-poly, game-ready"></textarea>
-<div class="row"><input id="image" placeholder="Reference image (optional)"><button id="browse" style="flex:0 0 auto">Browse</button></div>
-<div class="row">
-  <select id="model"><option value="latest">Meshy latest</option><option value="meshy-7">meshy-7</option><option value="meshy-6">meshy-6</option><option value="meshy-6-lite">meshy-6-lite (cheap)</option></select>
-  <label style="flex:0 0 auto"><input type="checkbox" id="pbr" style="width:auto"> PBR</label>
-  <button id="go" class="primary" style="flex:0 0 auto">Generate</button>
-</div>
-<div class="keys" id="keys"></div>
+<textarea id="prompt" placeholder="What does the game need? An axe, a rusted gas pump, a lantern for the dock..."></textarea>
+<div class="row"><span class="keys" id="keys" style="flex:1;margin:0"></span><button id="go" class="primary">Draft</button></div>
 <div id="list"></div>
 <script nonce="${nonce}">
-const vs = acquireVsCodeApi();
-const $ = (id) => document.getElementById(id);
-$("go").onclick = () => vs.postMessage({ type: "generate", prompt: $("prompt").value, image: $("image").value, model: $("model").value, pbr: $("pbr").checked });
-$("browse").onclick = () => vs.postMessage({ type: "browse" });
+const vs = acquireVsCodeApi(); const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+$("go").onclick = () => { vs.postMessage({ type: "draft", prompt: $("prompt").value }); $("prompt").value = ""; };
 function render(st) {
-  $("keys").innerHTML = "Meshy key: " + (st.keys.meshy ? "set" : "missing") + '<a data-k="meshy">Set</a> · Roblox key: ' + (st.keys.roblox ? "set" : "missing") + '<a data-k="roblox">Set</a> · Creator: ' + esc(st.creator) + '<a data-s="1">Settings</a>';
+  const k = st.keys;
+  $("keys").innerHTML = ["openai", "meshy", "roblox"].map((n) => n + ": " + (k[n] ? "set" : '<a data-k="' + n + '">set key</a>')).join(" · ") + ' · creator ' + esc(st.creator) + ' <a data-s="1">settings</a>';
   document.querySelectorAll("#keys a[data-k]").forEach((a) => a.onclick = () => vs.postMessage({ type: "setKey", which: a.dataset.k }));
   document.querySelectorAll("#keys a[data-s]").forEach((a) => a.onclick = () => vs.postMessage({ type: "settings" }));
-  if (!st.tasks.length) { $("list").innerHTML = '<div class="empty">Nothing generated yet. Describe a prop, or pick a reference image, and press Generate.</div>'; return; }
-  $("list").innerHTML = st.tasks.map((t) => {
-    const done = t.status === "SUCCEEDED", live = t.status === "PENDING" || t.status === "IN_PROGRESS";
-    const acts = [];
-    if (done && t.kind === "preview") acts.push('<button data-a="refine">Refine + texture</button>');
-    if (done) acts.push('<button data-a="download">' + (t.file ? "Re-download" : "Download") + '</button>');
-    if (t.file) acts.push('<button data-a="open">Show file</button>');
-    if (done && t.kind !== "preview") acts.push('<button data-a="upload"' + (t.robloxOp && !t.robloxAssetId && !t.robloxError ? " disabled" : "") + '>' + (t.robloxAssetId ? "Re-upload" : "Upload to Roblox") + '</button>');
-    if (t.robloxAssetId) acts.push('<button data-a="insert" class="primary">Insert in Studio</button>');
-    acts.push('<button data-a="remove">Remove</button>');
-    const status = live ? t.status.toLowerCase().replace("_", " ") + " · " + (t.progress || 0) + "%" : t.status.toLowerCase();
-    const rbx = t.robloxAssetId ? " · Roblox asset " + esc(t.robloxAssetId) : t.robloxOp && !t.robloxError ? " · uploading to Roblox…" : "";
-    return '<div class="task" data-id="' + esc(t.id) + '">' + (t.thumbnail ? '<img src="' + esc(t.thumbnail) + '">' : '<div class="ph"></div>') +
-      '<div><div class="t">' + esc(t.prompt) + '</div><div class="s">' + esc(t.kind) + " · " + status + rbx + "</div>" +
-      (live ? '<div class="bar"><i style="width:' + (t.progress || 0) + '%"></i></div>' : "") +
-      (t.error ? '<div class="err">' + esc(t.error) + "</div>" : "") + (t.robloxError ? '<div class="err">' + esc(t.robloxError) + "</div>" : "") +
-      '<div class="acts">' + acts.join("") + "</div></div></div>";
+  if (!st.jobs.length) { $("list").innerHTML = '<div class="empty">Describe a prop and press Draft. Screenshots in <b>' + esc(st.refDir) + '</b> (and a live Studio capture when free) set the style.</div>'; return; }
+  $("list").innerHTML = st.jobs.map((j) => {
+    let body = "";
+    if (j.status === "drafting") body = '<div class="bar"><i style="width:35%"></i></div><div class="s">drafting concept images…</div>';
+    if (j.status === "drafts") body = '<div class="grid">' + j.drafts.map((d, i) => '<div class="card"><img src="' + esc(d) + '"><div class="acts"><button class="primary" data-a="approveDraft" data-i="' + i + '">Use</button><button data-a="denyDraft" data-i="' + i + '">No</button></div></div>').join("") + "</div>";
+    if (j.status === "modeling") body = '<div class="bar"><i style="width:' + (j.progress || 2) + '%"></i></div><div class="s">Meshy is modelling · ' + (j.progress || 0) + '%</div>' + (j.thumbnail ? '<div class="grid"><div class="card"><img src="' + esc(j.thumbnail) + '"></div></div>' : "");
+    if (j.status === "review") {
+      const v = j.views || {}; const order = ["front", "right", "back", "left"];
+      body = (Object.keys(v).length ? '<div class="views">' + order.filter((o) => v[o]).map((o) => '<div><img src="' + esc(v[o]) + '"><div class="cap">' + o + '</div></div>').join("") + "</div>" : (j.thumbnail ? '<div class="grid"><div class="card"><img src="' + esc(j.thumbnail) + '"></div></div>' : ""))
+        + '<div class="acts2"><button class="primary" data-a="approveModel">Approve · upload and insert</button><button data-a="denyModel">Reject</button></div>';
+    }
+    if (j.status === "uploading") body = '<div class="bar"><i style="width:70%"></i></div><div class="s">uploading to Roblox…</div>';
+    if (j.status === "done") body = '<div class="s">Roblox asset ' + esc(j.robloxAssetId) + ' · inserted into Studio</div><div class="acts2"><button data-a="insert">Insert again</button><button data-a="open">Show files</button></div>';
+    const refs = j.refs && j.refs.length ? '<div class="refs">' + j.refs.slice(0, 5).map((r) => '<img src="' + esc(r) + '">').join("") + "</div>" : "";
+    return '<div class="job" data-id="' + esc(j.id) + '"><div class="t">' + esc(j.prompt) + '</div><div class="s">' + esc(j.status) + (j.note ? " · " + esc(j.note) : "") + '</div>' + (j.status === "drafting" || j.status === "drafts" ? refs : "") + body
+      + (j.error ? '<div class="err">' + esc(j.error) + "</div>" : "") + '<div class="acts2"><button data-a="remove">Remove</button></div></div>';
   }).join("");
-  document.querySelectorAll(".task button").forEach((b) => b.onclick = () => vs.postMessage({ type: b.dataset.a, id: b.closest(".task").dataset.id }));
+  document.querySelectorAll(".job button").forEach((b) => b.onclick = () => vs.postMessage({ type: b.dataset.a, id: b.closest(".job").dataset.id, index: b.dataset.i !== undefined ? Number(b.dataset.i) : undefined }));
 }
-window.addEventListener("message", (e) => { const m = e.data; if (m.type === "state") render(m); if (m.type === "image") $("image").value = m.path; });
+window.addEventListener("message", (e) => { if (e.data.type === "state") render(e.data); });
 vs.postMessage({ type: "refresh" });
 </script></body></html>`;
 	}
 }
+
+// ---- helpers -------------------------------------------------------------------------------------
 
 async function save(url: string, file: string) {
 	const r = await fetch(url);
@@ -297,6 +340,42 @@ async function save(url: string, file: string) {
 	fs.writeFileSync(file, Buffer.from(await r.arrayBuffer()));
 }
 
-export function slug(s: string): string {
+export function slugOf(s: string): string {
 	return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "asset";
+}
+
+// One screenshot from the open Studio through Roblox's own MCP server (stdio JSON-RPC). The Studio seat is
+// exclusive per machine: while Claude Code holds it this fails fast and the drafts use the reference folder.
+function studioCapture(outFile: string): Promise<string | undefined> {
+	return new Promise((resolve, reject) => {
+		const bat = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "mcp.bat");
+		if (!fs.existsSync(bat)) return resolve(undefined);
+		const child = spawn("cmd.exe", ["/d", "/s", "/c", bat], { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
+		let buf = ""; let nextId = 1; const pending = new Map<number, (v: any) => void>();
+		const call = (method: string, params: any) => new Promise<any>((res) => { const id = nextId++; pending.set(id, res); child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"); });
+		const done = (v: string | undefined, err?: Error) => { clearTimeout(t); child.kill(); err ? reject(err) : resolve(v); };
+		const t = setTimeout(() => done(undefined, new Error("Studio MCP timed out")), 20000);
+		child.on("error", (e) => done(undefined, e));
+		child.stdout.on("data", (d) => {
+			buf += d.toString();
+			let i; while ((i = buf.indexOf("\n")) >= 0) {
+				const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+				if (!line) continue;
+				try { const msg = JSON.parse(line); if (msg.id && pending.has(msg.id)) { pending.get(msg.id)!(msg); pending.delete(msg.id); } } catch { /* not json */ }
+			}
+		});
+		(async () => {
+			await call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "drydock-ide", version: "0.0.4" } });
+			child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+			const studios = await call("tools/call", { name: "list_roblox_studios", arguments: {} });
+			const text = JSON.stringify(studios.result ?? {});
+			const idMatch = /"(?:id|studio_id|instanceId)"\s*:\s*"?([A-Za-z0-9_-]+)"?/.exec(text);
+			if (!idMatch) return done(undefined);
+			const shot = await call("tools/call", { name: "screen_capture", arguments: { studio_id: idMatch[1] } });
+			const img = (shot.result?.content ?? []).find((c: any) => c.type === "image" && c.data);
+			if (!img) return done(undefined);
+			fs.writeFileSync(outFile, Buffer.from(img.data, "base64"));
+			done(outFile);
+		})().catch((e) => done(undefined, e));
+	});
 }

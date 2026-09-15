@@ -93,6 +93,26 @@
 	content: "Drydock IDE"; font-weight: 700; letter-spacing: 0.02em; margin-right: 14px; opacity: 1;
 }
 
+/* stacked header (setting drydock.stackedHeader; the title bar part adds 26px and workbench.ts adds the class):
+   row 1 = mark, "Drydock IDE" and the file, window controls; row 2 = the menu bar. The DOM is untouched. */
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container {
+	display: grid !important; grid-template-columns: auto 1fr auto; grid-template-rows: 30px 26px; align-items: center;
+}
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left { display: contents !important; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { grid-row: 1; grid-column: 1; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left > .menubar {
+	grid-row: 2; grid-column: 1 / -1; order: 0; height: 26px; align-items: center; padding-left: 4px;
+}
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left > .menubar .menubar-menu-button { height: 26px !important; line-height: 26px !important; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center { grid-row: 1; grid-column: 2; height: 30px !important; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right { grid-row: 1; grid-column: 3; height: 30px !important; align-self: start; }
+.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center > .window-title::before { font-size: 13px; }
+
+/* the Drydock sidebar on the right stays: no hide button on its title */
+.monaco-workbench .part.auxiliarybar > .title .title-actions .action-item .codicon-close,
+.monaco-workbench .part.auxiliarybar > .title .global-actions .action-item .codicon-close,
+.monaco-workbench .part.auxiliarybar .composite.title .actions-container .action-item .codicon-layout-sidebar-right-off { display: none !important; }
+
 /* status bar: a thin quiet line */
 .monaco-workbench .part.statusbar { font-size: 11px; }
 .monaco-workbench .part.statusbar > .items-container > .statusbar-item > .statusbar-item-label { padding: 0 6px; }

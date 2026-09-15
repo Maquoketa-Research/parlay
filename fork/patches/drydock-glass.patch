@@ -32,10 +32,10 @@ index 7c4f02ef..0b9a7c9a 100644
  		let borderSetting = windowSettings?.border || 'default';
  		if (borderSetting === 'system') {
 diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
-index 8c7a7a5f..e35553b1 100644
+index 8c7a7a5f..350c92a6 100644
 --- a/src/vs/workbench/browser/media/style.css
 +++ b/src/vs/workbench/browser/media/style.css
-@@ -394,4 +394,113 @@ body {
+@@ -394,4 +394,133 @@ body {
  .monaco-workbench .part.sidebar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled), .monaco-workbench .part.auxiliarybar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled) {
      outline: calc(var(--vscode-workbench-sidebar-font-size) * 0.076923) dashed var(--vscode-toolbar-hoverOutline);
      outline-offset: calc(var(--vscode-workbench-sidebar-font-size) * -0.076923)
@@ -145,17 +145,52 @@ index 8c7a7a5f..e35553b1 100644
 +	content: "Drydock IDE"; font-weight: 700; letter-spacing: 0.02em; margin-right: 14px; opacity: 1;
 +}
 +
++/* stacked header (setting drydock.stackedHeader; the title bar part adds 26px and workbench.ts adds the class):
++   row 1 = mark, "Drydock IDE" and the file, window controls; row 2 = the menu bar. The DOM is untouched. */
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container {
++	display: grid !important; grid-template-columns: auto 1fr auto; grid-template-rows: 30px 26px; align-items: center;
++}
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left { display: contents !important; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { grid-row: 1; grid-column: 1; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left > .menubar {
++	grid-row: 2; grid-column: 1 / -1; order: 0; height: 26px; align-items: center; padding-left: 4px;
++}
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-left > .menubar .menubar-menu-button { height: 26px !important; line-height: 26px !important; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center { grid-row: 1; grid-column: 2; height: 30px !important; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right { grid-row: 1; grid-column: 3; height: 30px !important; align-self: start; }
++.monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-center > .window-title::before { font-size: 13px; }
++
++/* the Drydock sidebar on the right stays: no hide button on its title */
++.monaco-workbench .part.auxiliarybar > .title .title-actions .action-item .codicon-close,
++.monaco-workbench .part.auxiliarybar > .title .global-actions .action-item .codicon-close,
++.monaco-workbench .part.auxiliarybar .composite.title .actions-container .action-item .codicon-layout-sidebar-right-off { display: none !important; }
++
 +/* status bar: a thin quiet line */
 +.monaco-workbench .part.statusbar { font-size: 11px; }
 +.monaco-workbench .part.statusbar > .items-container > .statusbar-item > .statusbar-item-label { padding: 0 6px; }
 +
 +/* the activity bar rides at the bottom of the sidebar (setting); keep its icons calm */
 +.monaco-workbench .part.sidebar > .composite.title .actions-container .action-item .action-label { opacity: 0.85; }
+diff --git a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+index 9d2e8a85..6b7f517b 100644
+--- a/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
++++ b/src/vs/workbench/browser/parts/titlebar/titlebarPart.ts
+@@ -234,6 +234,10 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
+ 	get minimumHeight(): number {
+ 		const wcoEnabled = isWeb && isWCOEnabled();
+ 		let value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;
++		// Drydock: a second row for the menu when the header is stacked (drydock.css lays it out)
++		if (!this.isAuxiliary && this.configurationService.getValue<boolean>('drydock.stackedHeader') === true) {
++			value += 26;
++		}
+ 		if (wcoEnabled) {
+ 			value = Math.max(value, getWCOTitlebarAreaRect(getWindow(this.element))?.height ?? 0);
+ 		}
 diff --git a/src/vs/workbench/browser/workbench.ts b/src/vs/workbench/browser/workbench.ts
-index 47f28faa..9b3360f2 100644
+index 47f28faa..6af2e6a7 100644
 --- a/src/vs/workbench/browser/workbench.ts
 +++ b/src/vs/workbench/browser/workbench.ts
-@@ -374,6 +374,12 @@ export class Workbench extends Layout {
+@@ -374,6 +374,16 @@ export class Workbench extends Layout {
  
  		this.mainContainer.classList.add(...workbenchClasses);
  
@@ -163,6 +198,10 @@ index 47f28faa..9b3360f2 100644
 +		if (configurationService.getValue<boolean>('drydock.glass') === true) {
 +			this.mainContainer.classList.add('drydock-glass');
 +			this.mainContainer.ownerDocument.body.classList.add('drydock-glass');
++		}
++		// Drydock: two-row header (mark and title above the menu); the title bar reports the extra height
++		if (configurationService.getValue<boolean>('drydock.stackedHeader') === true) {
++			this.mainContainer.classList.add('drydock-stacked');
 +		}
 +
  		// Apply font aliasing

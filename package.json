@@ -2,7 +2,7 @@
   "name": "drydock-ide",
   "displayName": "Drydock IDE",
   "description": "Roblox game development with Claude inside the editor: right-click actions on your code, Script Sync awareness, Aqua and Sonar on the right, three looks (Dark, Paper, Glass).",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "maquoketa",
   "private": true,
   "license": "MIT",
@@ -83,6 +83,11 @@
         "command": "drydock.roblox.setKey",
         "title": "Set Roblox Open Cloud API key",
         "category": "Drydock"
+      },
+      {
+        "command": "drydock.openai.setKey",
+        "title": "Set OpenAI API key (concept drafts)",
+        "category": "Drydock"
       }
     ],
     "submenus": [
@@ -150,7 +155,7 @@
       ]
     },
     "viewsContainers": {
-      "panel": [
+      "secondarySidebar": [
         {
           "id": "drydock",
           "title": "Drydock",
@@ -251,12 +256,26 @@
           "type": "number",
           "default": 10000,
           "description": "Target triangle count for Meshy remeshing. Roblox MeshParts are happiest well under 20000."
+        },
+        "drydock.stackedHeader": {
+          "type": "boolean",
+          "default": true,
+          "description": "Two-row header: the mark and Drydock IDE above the menu bar. Needs the Drydock IDE build; a change applies to new windows."
+        },
+        "drydock.imageModel": {
+          "type": "string",
+          "default": "gpt-image-1",
+          "description": "OpenAI image model used to draft concept images for Meshy (gpt-image-1, gpt-image-1-mini, or a newer gpt-image model)."
+        },
+        "drydock.referenceDir": {
+          "type": "string",
+          "default": "assets/reference",
+          "description": "Folder inside the workspace with screenshots of the game; drafts match their look. A Studio capture is added when the Studio MCP is free."
         }
       }
     },
     "configurationDefaults": {
       "workbench.colorTheme": "Drydock Dark",
-      "workbench.panel.defaultLocation": "right",
       "window.title": "${dirty}${activeEditorShort}${separator}${rootName}",
       "editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
       "editor.fontSize": 13,
@@ -275,8 +294,9 @@
       "workbench.tree.indent": 14,
       "workbench.editor.tabSizing": "shrink",
       "workbench.startupEditor": "none",
-      "workbench.secondarySideBar.defaultVisibility": "hidden",
-      "window.titleSeparator": "  ·  "
+      "workbench.secondarySideBar.defaultVisibility": "visible",
+      "window.titleSeparator": "  ·  ",
+      "drydock.stackedHeader": true
     }
   },
   "scripts": {

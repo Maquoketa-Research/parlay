@@ -34,6 +34,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.meshy", meshy, { webviewOptions: { retainContextWhenHidden: true } }));
 	ctx.subscriptions.push(vscode.commands.registerCommand("drydock.meshy.setKey", () => meshy.setKey("meshy")));
 	ctx.subscriptions.push(vscode.commands.registerCommand("drydock.roblox.setKey", () => meshy.setKey("roblox")));
+	ctx.subscriptions.push(vscode.commands.registerCommand("drydock.openai.setKey", () => meshy.setKey("openai")));
 	ctx.subscriptions.push(vscode.commands.registerCommand("drydock.claude.insert-asset", async () => {
 		const id = await vscode.window.showInputBox({ prompt: "Roblox asset id to insert into the open Studio", placeHolder: "1234567890" });
 		if (!id?.trim()) return;
@@ -81,9 +82,7 @@ async function firstRun() {
 	for (const [k, v] of Object.entries(want)) {
 		if (cfg.inspect(k)?.globalValue === undefined) await cfg.update(k, v, vscode.ConfigurationTarget.Global);
 	}
-	await vscode.commands.executeCommand("workbench.action.positionPanelRight");
-	await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
-	await vscode.commands.executeCommand("drydock.aqua.focus");
+	await vscode.commands.executeCommand("drydock.aqua.focus");   // opens the Drydock sidebar on the right
 }
 
 // Selene only parses Luau syntax (type annotations, `::`, string interpolation) when the project's selene.toml

@@ -34,6 +34,18 @@ FILES = {
         "\t\tif (configurationService.getValue<boolean>('drydock.glass') === true) {\n"
         "\t\t\tthis.mainContainer.classList.add('drydock-glass');\n"
         "\t\t\tthis.mainContainer.ownerDocument.body.classList.add('drydock-glass');\n"
+        "\t\t}\n"
+        "\t\t// Drydock: two-row header (mark and title above the menu); the title bar reports the extra height\n"
+        "\t\tif (configurationService.getValue<boolean>('drydock.stackedHeader') === true) {\n"
+        "\t\t\tthis.mainContainer.classList.add('drydock-stacked');\n"
+        "\t\t}\n",
+    ),
+    "src/vs/workbench/browser/parts/titlebar/titlebarPart.ts": (
+        "\t\tlet value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;\n",
+        "\t\tlet value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;\n"
+        "\t\t// Drydock: a second row for the menu when the header is stacked (drydock.css lays it out)\n"
+        "\t\tif (!this.isAuxiliary && this.configurationService.getValue<boolean>('drydock.stackedHeader') === true) {\n"
+        "\t\t\tvalue += 26;\n"
         "\t\t}\n",
     ),
     "src/vs/platform/theme/electron-main/themeMainServiceImpl.ts": (
