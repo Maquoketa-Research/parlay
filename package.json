@@ -56,7 +56,7 @@
       },
       {
         "command": "drydock.ask",
-        "title": "Ask about the selection\u2026",
+        "title": "Ask about the selection…",
         "category": "Claude"
       },
       {
@@ -257,7 +257,7 @@
     "configurationDefaults": {
       "workbench.colorTheme": "Drydock Dark",
       "workbench.panel.defaultLocation": "right",
-      "window.title": "M | Drydock IDE${separator}${dirty}${activeEditorShort}${separator}${rootName}",
+      "window.title": "${dirty}${activeEditorShort}${separator}${rootName}",
       "editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
       "editor.fontSize": 13,
       "editor.lineHeight": 1.65,
@@ -275,7 +275,8 @@
       "workbench.tree.indent": 14,
       "workbench.editor.tabSizing": "shrink",
       "workbench.startupEditor": "none",
-      "workbench.secondarySideBar.defaultVisibility": "hidden"
+      "workbench.secondarySideBar.defaultVisibility": "hidden",
+      "window.titleSeparator": "  ·  "
     }
   },
   "scripts": {
