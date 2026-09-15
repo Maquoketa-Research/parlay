@@ -26,6 +26,10 @@ VS Code today; the fork (`fork/README.md`) turns it into the standalone **M | Dr
 - **Match assets to a Studio screenshot** (command): the `drydock-match-assets` skill finds six Creator Store
   candidates that fit the frame's look and lines them up in Studio for you to pick.
 - **Script Sync light** in the status bar: on when Studio syncs the open folder.
+- **Script Sync folders just work with the tooling**: the extension writes `sourcemap.json` from the folder
+  shape so luau-lsp resolves `require(ReplicatedStorage.Modules.X)`, and `selene.toml` with the Roblox
+  standard so Selene reads Luau. Non-script instances (RemoteEvents, parts) come from luau-lsp's Studio
+  companion plugin when you install it; the notification it shows is the one-click for that.
 - **Themes**: Drydock Dark (default), Drydock Glass (real acrylic in the Drydock IDE build; the extension flips
   `drydock.glass` when you pick it), Drydock Paper, Drydock Aqua. Generated from one palette each by
   `tools/themes.py`. The editor is always opaque.
