@@ -26,7 +26,7 @@ for (const a of actions) {
 	const f = join(root, "skills", `drydock-${a}`, "SKILL.md");
 	if (!existsSync(f)) fail(`missing skill for action ${a}: ${f}`);
 	const text = readFileSync(f, "utf8");
-	if (!/^---\r?\nname: drydock-[a-z]+\r?\ndescription: .+\r?\n/m.test(text)) fail(`bad frontmatter in ${f}`);
+	if (!/^---\r?\nname: drydock-[a-z-]+\r?\ndescription: .+\r?\n/m.test(text)) fail(`bad frontmatter in ${f}`);
 	if (/usr\/bin\/bash|\/bin\/sh/.test(text)) fail(`shell path leaked into ${f}`);
 	if (!text.includes("`$0`")) fail(`${f} never reads its target argument`);
 }

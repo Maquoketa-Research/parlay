@@ -99,6 +99,7 @@ jobs:
           cp ../ide/drydock-ide.vsix vscode/build/builtin/drydock-ide.vsix
           curl -sSL -o vscode/build/builtin/luau-lsp.vsix "https://open-vsx.org/api/JohnnyMorganz/luau-lsp/win32-x64/1.69.0/file/JohnnyMorganz.luau-lsp-1.69.0@win32-x64.vsix"
           curl -sSL -o vscode/build/builtin/stylua.vsix "https://open-vsx.org/api/JohnnyMorganz/stylua/1.7.2/file/JohnnyMorganz.stylua-1.7.2.vsix"
+          bash ../ide/tools/selene-vsix.sh "$PWD/vscode/build/builtin" && mv vscode/build/builtin/selene-vscode-*.vsix vscode/build/builtin/selene.vsix
           for f in $(jq -r '.builtInExtensions[] | select(.vsix) | .vsix' product.json | tr -d '\r'); do
             SHA=$(sha256sum "vscode/$f" | cut -d' ' -f1)
             jq --arg f "$f" --arg sha "$SHA" '(.builtInExtensions[] | select(.vsix == $f) | .sha256) = $sha' product.json > product.tmp && mv product.tmp product.json

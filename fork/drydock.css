@@ -1,0 +1,73 @@
+/* Drydock look. Appended to the workbench stylesheet by the fork (fork/patches/drydock-glass.patch, generated
+   from this file by tools/glass-patch.py). Rounded surfaces with a thin light edge, quiet chrome, pill buttons.
+   Layout is untouched: the gaps are clip-paths, so nothing moves and nothing breaks when upstream changes. */
+
+.monaco-workbench {
+	--drydock-radius: 12px;
+	--drydock-edge: rgba(255, 255, 255, 0.08);
+	font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+.vs .monaco-workbench, .hc-light .monaco-workbench { --drydock-edge: rgba(0, 0, 0, 0.08); }
+
+/* the side surfaces float: a small transparent inset shows the root (glass, or the theme base) around them */
+.monaco-workbench .part.sidebar,
+.monaco-workbench .part.auxiliarybar,
+.monaco-workbench .part.panel {
+	clip-path: inset(4px round var(--drydock-radius));
+}
+.monaco-workbench .part.sidebar > .content,
+.monaco-workbench .part.auxiliarybar > .content,
+.monaco-workbench .part.panel > .content {
+	box-shadow: inset 0 0 0 1px var(--drydock-edge);
+	border-radius: var(--drydock-radius);
+}
+
+/* editor groups are cards; the code itself stays exactly where the editor puts it */
+.monaco-workbench .part.editor > .content .editor-group-container {
+	border-radius: 10px;
+	overflow: hidden;
+	box-shadow: inset 0 0 0 1px var(--drydock-edge);
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title {
+	border-bottom: 1px solid var(--drydock-edge) !important;
+}
+
+/* tabs: quiet pills in the strip, no hard dividers */
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab {
+	border-radius: 8px;
+	margin: 4px 2px 0;
+	height: 27px !important;
+	line-height: 27px !important;
+	border-right: 0 !important;
+	border-left: 0 !important;
+}
+.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.active {
+	border-top: 0 !important;
+}
+
+/* titles and headers: small caps, wider tracking, like the mockup */
+.monaco-workbench .part > .title > .title-label h2,
+.monaco-workbench .part > .composite.title > .title-label h2,
+.monaco-workbench .pane-header > .title {
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+/* controls: pills and soft inputs everywhere */
+.monaco-workbench .monaco-button,
+.monaco-workbench .monaco-text-button { border-radius: 999px !important; }
+.monaco-workbench .monaco-inputbox { border-radius: 8px; }
+.monaco-workbench .quick-input-widget { border-radius: 14px; overflow: hidden; }
+.monaco-workbench .notifications-toasts .notification-toast { border-radius: 12px; overflow: hidden; }
+.monaco-workbench .monaco-menu-container .monaco-menu { border-radius: 12px; overflow: hidden; }
+.monaco-workbench .monaco-hover { border-radius: 10px; }
+.monaco-workbench .suggest-widget { border-radius: 10px; overflow: hidden; }
+.monaco-workbench .editor-widget.find-widget { border-radius: 10px; }
+
+/* status bar: a thin quiet line */
+.monaco-workbench .part.statusbar { font-size: 11px; }
+.monaco-workbench .part.statusbar > .items-container > .statusbar-item > .statusbar-item-label { padding: 0 6px; }
+
+/* the activity bar rides at the bottom of the sidebar (setting); keep its icons calm */
+.monaco-workbench .part.sidebar > .composite.title .actions-container .action-item .action-label { opacity: 0.85; }

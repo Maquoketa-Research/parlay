@@ -52,7 +52,8 @@ FILES = {
         "body.drydock-glass,\n"
         ".monaco-workbench.drydock-glass {\n"
         "\tbackground-color: transparent !important;\n"
-        "}\n",
+        "}\n\n"
+        + open(os.path.join(IDE, "fork", "drydock.css"), encoding="utf-8").read().replace("\r\n", "\n"),
     ),
 }
 

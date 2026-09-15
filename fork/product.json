@@ -58,8 +58,25 @@
       }
     },
     {
+      "name": "Kampfkarren.selene-vscode",
+      "version": "1.5.1",
+      "sha256": "FILLED_IN_BY_CI",
+      "repo": "https://github.com/Kampfkarren/selene",
+      "vsix": "build/builtin/selene.vsix",
+      "metadata": {
+        "id": "dfe82d07-f57e-4d21-abef-56a8ec579a24",
+        "publisherId": {
+          "publisherId": "867cde35-81c7-452b-a16f-5f143016ca6e",
+          "publisherName": "Kampfkarren",
+          "displayName": "Kampfkarren",
+          "flags": "verified"
+        },
+        "publisherDisplayName": "Kampfkarren"
+      }
+    },
+    {
       "name": "maquoketa.drydock-ide",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "sha256": "FILLED_IN_BY_CI",
       "repo": "https://github.com/Maquoketa-Research/drydock-ide",
       "vsix": "build/builtin/drydock-ide.vsix",
@@ -83,7 +100,19 @@
     "telemetry.telemetryLevel": "off",
     "update.mode": "manual",
     "extensions.autoUpdate": true,
-    "drydock.glass": false
+    "drydock.glass": false,
+    "workbench.activityBar.location": "bottom",
+    "window.menuBarVisibility": "compact",
+    "window.menuStyle": "custom",
+    "window.commandCenter": false,
+    "workbench.layoutControl.enabled": false,
+    "editor.minimap.enabled": false,
+    "editor.renderLineHighlight": "gutter",
+    "editor.scrollBeyondLastLine": false,
+    "workbench.tree.indent": 14,
+    "workbench.editor.tabSizing": "shrink",
+    "workbench.startupEditor": "none",
+    "editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace"
   },
   "win32AppId": "{{6B0D8AF5-20AB-4A2A-837A-EBEE29B9CF40}",
   "win32x64AppId": "{{2BBF55EA-42CD-4AA5-9245-C9DACA8DA3C2}",

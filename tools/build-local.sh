@@ -61,6 +61,9 @@ fetch "https://open-vsx.org/api/JohnnyMorganz/luau-lsp/win32-x64/1.69.0/file/Joh
 fetch "https://open-vsx.org/api/JohnnyMorganz/stylua/1.7.2/file/JohnnyMorganz.stylua-1.7.2.vsix" "$CACHE/stylua-1.7.2.vsix"
 cp "$CACHE/luau-lsp-1.69.0-win32-x64.vsix" vscode/build/builtin/luau-lsp.vsix
 cp "$CACHE/stylua-1.7.2.vsix" vscode/build/builtin/stylua.vsix
+# Selene is not on Open VSX; its extension is built from source once (tools/selene-vsix.sh) into the cache
+[[ -f "$CACHE/selene-vscode-1.5.1.vsix" ]] || bash "$IDE/tools/selene-vsix.sh" "$CACHE"
+cp "$CACHE/selene-vscode-1.5.1.vsix" vscode/build/builtin/selene.vsix
 # every vsix built-in carries the hash of the file it points at
 for f in $(jq -r '.builtInExtensions[] | select(.vsix) | .vsix' product.json | tr -d '\r'); do   # Windows jq prints CRLF
   SHA="$(sha256sum "vscode/$f" | cut -d' ' -f1)"

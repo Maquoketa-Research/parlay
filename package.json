@@ -2,7 +2,7 @@
   "name": "drydock-ide",
   "displayName": "Drydock IDE",
   "description": "Roblox game development with Claude inside the editor: right-click actions on your code, Script Sync awareness, Aqua and Sonar on the right, three looks (Dark, Paper, Glass).",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "maquoketa",
   "private": true,
   "license": "MIT",
@@ -60,8 +60,28 @@
         "category": "Claude"
       },
       {
+        "command": "drydock.claude.match-assets",
+        "title": "Match assets to a Studio screenshot",
+        "category": "Drydock"
+      },
+      {
         "command": "drydock.installSkills",
         "title": "Install Claude skills",
+        "category": "Drydock"
+      },
+      {
+        "command": "drydock.claude.insert-asset",
+        "title": "Insert a Roblox asset into Studio",
+        "category": "Drydock"
+      },
+      {
+        "command": "drydock.meshy.setKey",
+        "title": "Set Meshy API key",
+        "category": "Drydock"
+      },
+      {
+        "command": "drydock.roblox.setKey",
+        "title": "Set Roblox Open Cloud API key",
         "category": "Drydock"
       }
     ],
@@ -116,6 +136,16 @@
           "command": "drydock.claude.ab",
           "group": "3_verify@2",
           "when": "editorHasSelection"
+        },
+        {
+          "command": "drydock.claude.match-assets",
+          "group": "4_studio@1"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "submenu": "drydock.claudeMenu",
+          "group": "1_drydock"
         }
       ]
     },
@@ -137,6 +167,11 @@
         },
         {
           "type": "webview",
+          "id": "drydock.meshy",
+          "name": "Meshy"
+        },
+        {
+          "type": "webview",
           "id": "drydock.sonar",
           "name": "Sonar"
         }
@@ -149,14 +184,19 @@
         "path": "./themes/drydock-dark.json"
       },
       {
+        "label": "Drydock Glass",
+        "uiTheme": "vs-dark",
+        "path": "./themes/drydock-glass.json"
+      },
+      {
         "label": "Drydock Paper",
         "uiTheme": "vs",
         "path": "./themes/drydock-paper.json"
       },
       {
-        "label": "Drydock Glass",
+        "label": "Drydock Aqua",
         "uiTheme": "vs-dark",
-        "path": "./themes/drydock-glass.json"
+        "path": "./themes/drydock-aqua.json"
       }
     ],
     "configuration": {
@@ -182,6 +222,35 @@
           "default": false,
           "scope": "application",
           "description": "Draw the window over Windows 11 acrylic so the Drydock Glass theme is real glass. Set automatically when that theme is chosen; applies to windows opened afterwards. Needs the Drydock IDE build."
+        },
+        "drydock.aquaRepo": {
+          "type": "string",
+          "default": "",
+          "description": "Folder of the aqua checkout (has pyproject.toml). Used by the Start button in the Aqua panel. Empty: a sibling of the workspace named aqua, or ~/Documents/GitHub/aqua."
+        },
+        "drydock.robloxCreatorId": {
+          "type": "string",
+          "default": "",
+          "description": "Roblox user id or group id that owns uploaded Meshy models (Open Cloud creationContext)."
+        },
+        "drydock.robloxCreatorType": {
+          "type": "string",
+          "enum": [
+            "user",
+            "group"
+          ],
+          "default": "user",
+          "description": "Whether drydock.robloxCreatorId is a user or a group."
+        },
+        "drydock.assetsDir": {
+          "type": "string",
+          "default": "assets/meshy",
+          "description": "Folder inside the workspace where Meshy downloads land."
+        },
+        "drydock.meshyPolycount": {
+          "type": "number",
+          "default": 10000,
+          "description": "Target triangle count for Meshy remeshing. Roblox MeshParts are happiest well under 20000."
         }
       }
     },
@@ -189,13 +258,26 @@
       "workbench.colorTheme": "Drydock Dark",
       "workbench.panel.defaultLocation": "right",
       "window.title": "M | Drydock IDE${separator}${dirty}${activeEditorShort}${separator}${rootName}",
-      "editor.fontFamily": "'JetBrains Mono', Consolas, 'Courier New', monospace",
+      "editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
       "editor.fontSize": 13,
       "editor.lineHeight": 1.65,
       "files.associations": {
         "*.luau": "luau"
       },
-      "drydock.glass": false
+      "drydock.glass": false,
+      "workbench.activityBar.location": "bottom",
+      "window.menuBarVisibility": "compact",
+      "window.commandCenter": false,
+      "workbench.layoutControl.enabled": false,
+      "editor.minimap.enabled": false,
+      "editor.renderLineHighlight": "gutter",
+      "editor.scrollBeyondLastLine": false,
+      "editor.cursorBlinking": "smooth",
+      "workbench.tree.indent": 14,
+      "workbench.editor.tabSizing": "shrink",
+      "workbench.startupEditor": "none",
+      "window.titleBarStyle": "custom",
+      "window.menuStyle": "custom"
     }
   },
   "scripts": {

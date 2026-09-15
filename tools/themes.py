@@ -104,8 +104,20 @@ paper_colors = chrome(
 paper_colors.update({"diffEditor.insertedLineBackground": "#F0FDF4", "diffEditor.removedLineBackground": "#FEF3F2", "widget.shadow": "#00000014"})
 paper_tokens = tokens("#0D0D0D", "#5D5D5D", "#0D0D0D", "#3B5B7A", "#8F8F8F", "#0D0D0D", "#5D5D5D", kw_style="bold")
 
+# Aqua: the Brex-derived language of Design A. Black-dominant, off-white type, orange rationed to the places that
+# ask for a human (badges, progress, focus), neutrals for everything else.
+aqua_colors = chrome(
+    bg="#1F1B21", surface="#141117", deep="#0F0D12", fg="#F9F9F9", muted="#A8A3AA", faint="#6F6973", border="#2B262E",
+    line="#6F6973", sel="#F9F9F91A", button_bg="#F46A35", button_fg="#141117", accent="#F46A35",
+    widget="#241F27", widget_border="#332D37", green="#7BE0A0", red="#FF6B7A", yellow="#E8B27A", blue="#B8C4D6", magenta="#C9BFD6",
+)
+aqua_colors.update({"badge.background": "#F46A35", "badge.foreground": "#141117", "activityBarBadge.background": "#F46A35", "activityBarBadge.foreground": "#141117",
+                    "list.focusOutline": "#F46A35", "tab.activeBorderTop": "#F46A35", "panelTitle.activeBorder": "#F46A35"})
+aqua_tokens = tokens("#C9BFD6", "#B9C9A8", "#F9F9F9", "#E8B27A", "#7E7883", "#E6E2E7", "#D8C4B0")
+
 THEMES = {
     "drydock-dark": {"name": "Drydock Dark", "type": "dark", "semanticHighlighting": True, "colors": dark_colors, "tokenColors": dark_tokens},
+    "drydock-aqua": {"name": "Drydock Aqua", "type": "dark", "semanticHighlighting": True, "colors": aqua_colors, "tokenColors": aqua_tokens},
     "drydock-glass": {"name": "Drydock Glass", "type": "dark", "semanticHighlighting": True, "colors": glass_colors, "tokenColors": dark_tokens},
     "drydock-paper": {"name": "Drydock Paper", "type": "light", "semanticHighlighting": True, "colors": paper_colors, "tokenColors": paper_tokens},
 }
