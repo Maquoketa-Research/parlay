@@ -33,7 +33,7 @@
   "titleBar.activeBackground": "#111317",
   "titleBar.activeForeground": "#D7DAE0",
   "titleBar.inactiveBackground": "#111317",
-  "titleBar.inactiveForeground": "#9AA0A6",
+  "titleBar.inactiveForeground": "#D7DAE0",
   "titleBar.border": "#23262E",
   "statusBar.background": "#111317",
   "statusBar.foreground": "#9AA0A6",

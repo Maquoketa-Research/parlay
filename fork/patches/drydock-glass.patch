@@ -32,10 +32,10 @@ index 7c4f02ef..0b9a7c9a 100644
  		let borderSetting = windowSettings?.border || 'default';
  		if (borderSetting === 'system') {
 diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
-index 8c7a7a5f..e729bf6a 100644
+index 8c7a7a5f..f0622399 100644
 --- a/src/vs/workbench/browser/media/style.css
 +++ b/src/vs/workbench/browser/media/style.css
-@@ -394,4 +394,85 @@ body {
+@@ -394,4 +394,96 @@ body {
  .monaco-workbench .part.sidebar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled), .monaco-workbench .part.auxiliarybar .monaco-action-bar:not(.vertical) .action-item .action-label:hover:not(.disabled) {
      outline: calc(var(--vscode-workbench-sidebar-font-size) * 0.076923) dashed var(--vscode-toolbar-hoverOutline);
      outline-offset: calc(var(--vscode-workbench-sidebar-font-size) * -0.076923)
@@ -116,6 +116,17 @@ index 8c7a7a5f..e729bf6a 100644
 +.monaco-workbench .monaco-hover { border-radius: 10px; }
 +.monaco-workbench .suggest-widget { border-radius: 10px; overflow: hidden; }
 +.monaco-workbench .editor-widget.find-widget { border-radius: 10px; }
++
++/* title bar: the mark and "M | Drydock IDE" sit together at the top left, like a document title, not centred */
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { display: block !important; }
++.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-left { flex: 0 0 auto; width: auto; }
++.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-center {
++	flex: 0 1 auto; width: auto; max-width: none; margin: 0 8px 0 0; justify-content: flex-start;
++}
++.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-right { flex: 1 1 auto; }
++.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-center > .window-title {
++	margin-left: 0; font-weight: 600; letter-spacing: 0.01em;
++}
 +
 +/* status bar: a thin quiet line */
 +.monaco-workbench .part.statusbar { font-size: 11px; }

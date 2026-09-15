@@ -77,6 +77,8 @@ echo "== 4/6 icons"
 # prepare_vscode.sh overlays src/stable/* onto the tree (VSCodium's own icons among them), so ours go into that
 # overlay, not into vscode/ directly, or they are overwritten a step later
 cp "$IDE"/fork/icons/*.ico "$IDE"/fork/icons/*.png "$IDE"/fork/icons/*.bmp src/stable/resources/win32/
+# the in-app title bar icon is a separate SVG the workbench stylesheet points at
+mkdir -p src/stable/src/vs/workbench/browser/media && cp "$IDE"/fork/icons/code-icon.svg src/stable/src/vs/workbench/browser/media/code-icon.svg
 
 echo "== 5/6 build.sh (patches, npm ci, prepack, packing)  $(date)"
 ./build.sh

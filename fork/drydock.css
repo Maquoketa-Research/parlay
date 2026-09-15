@@ -65,6 +65,17 @@
 .monaco-workbench .suggest-widget { border-radius: 10px; overflow: hidden; }
 .monaco-workbench .editor-widget.find-widget { border-radius: 10px; }
 
+/* title bar: the mark and "M | Drydock IDE" sit together at the top left, like a document title, not centred */
+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { display: block !important; }
+.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-left { flex: 0 0 auto; width: auto; }
+.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-center {
+	flex: 0 1 auto; width: auto; max-width: none; margin: 0 8px 0 0; justify-content: flex-start;
+}
+.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-right { flex: 1 1 auto; }
+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-center > .window-title {
+	margin-left: 0; font-weight: 600; letter-spacing: 0.01em;
+}
+
 /* status bar: a thin quiet line */
 .monaco-workbench .part.statusbar { font-size: 11px; }
 .monaco-workbench .part.statusbar > .items-container > .statusbar-item > .statusbar-item-label { padding: 0 6px; }

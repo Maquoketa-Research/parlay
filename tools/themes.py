@@ -38,7 +38,7 @@ def chrome(bg, surface, deep, fg, muted, faint, border, line, sel, button_bg, bu
         "activityBar.background": deep, "activityBar.foreground": fg, "activityBar.inactiveForeground": faint, "activityBar.border": border,
         "activityBarBadge.background": button_bg, "activityBarBadge.foreground": button_fg,
         "titleBar.activeBackground": surface, "titleBar.activeForeground": fg, "titleBar.inactiveBackground": surface,
-        "titleBar.inactiveForeground": muted, "titleBar.border": border,
+        "titleBar.inactiveForeground": fg, "titleBar.border": border,   # the title keeps its colour when focus is elsewhere
         "statusBar.background": surface, "statusBar.foreground": muted, "statusBar.border": border,
         "statusBar.noFolderBackground": surface, "statusBarItem.hoverBackground": fg + "14",
         "panel.background": surface, "panel.border": border,

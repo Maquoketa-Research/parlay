@@ -109,6 +109,7 @@ jobs:
           # brand assets: same file names upstream's installer and manifest already reference. They go into the
           # harness's src/stable overlay, which prepare_vscode.sh copies over the tree (its own icons live there).
           cp ../ide/fork/icons/*.ico ../ide/fork/icons/*.png ../ide/fork/icons/*.bmp src/stable/resources/win32/
+          mkdir -p src/stable/src/vs/workbench/browser/media && cp ../ide/fork/icons/code-icon.svg src/stable/src/vs/workbench/browser/media/code-icon.svg
           echo "MS_TAG=$MS_TAG MS_COMMIT=$MS_COMMIT RELEASE_VERSION=$RELEASE_VERSION"
           jq '{nameShort, nameLong, applicationName, dataFolderName, builtIns: (.builtInExtensions | map(.name))}' product.json
 
