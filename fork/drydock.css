@@ -66,14 +66,20 @@
 .monaco-workbench .editor-widget.find-widget { border-radius: 10px; }
 
 /* title bar: the mark and "M | Drydock IDE" sit together at the top left, like a document title, not centred */
-.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { display: block !important; }
-.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-left { flex: 0 0 auto; width: auto; }
-.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-center {
-	flex: 0 1 auto; width: auto; max-width: none; margin: 0 8px 0 0; justify-content: flex-start;
+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon {
+	display: block !important;
+	/* the navy mark sits on a small light plate so it reads on dark chrome */
+	width: 24px !important; height: 24px !important; margin: 0 6px 0 8px; align-self: center;
+	background-color: rgba(243, 244, 246, 0.92); border-radius: 6px; background-size: 18px !important;
 }
-.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-right { flex: 1 1 auto; }
+/* titlebarpart.css is bundled after this file at equal specificity, so these carry !important */
+.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-left { flex: 0 0 auto !important; width: auto !important; }
+.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-center {
+	flex: 0 1 auto !important; width: auto !important; max-width: none !important; margin: 0 8px 0 0 !important; justify-content: flex-start !important;
+}
+.monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-right { flex: 1 1 auto !important; width: auto !important; }
 .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-center > .window-title {
-	margin-left: 0; font-weight: 600; letter-spacing: 0.01em;
+	margin-left: 0 !important; margin-right: 0 !important; font-weight: 600; letter-spacing: 0.01em;
 }
 
 /* status bar: a thin quiet line */
