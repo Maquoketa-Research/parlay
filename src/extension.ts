@@ -70,10 +70,11 @@ export function activate(ctx: vscode.ExtensionContext) {
 async function firstRun() {
 	const cfg = vscode.workspace.getConfiguration();
 	const want: Record<string, unknown> = {
-		"window.menuBarVisibility": "compact",   // the menu folds into a hamburger in the activity bar
-		"window.menuStyle": "custom",             // menus drawn by the theme, not by Windows
-		"window.titleBarStyle": "custom",
+		"window.menuBarVisibility": "compact",   // the menu folds into a hamburger in the activity bar; applies live
 		"editor.minimap.enabled": false,
+		// Script Sync folders have no Rojo project; stop luau-lsp asking for one. The Studio companion plugin
+		// can supply the DataModel later (luau-lsp's own "Setup Plugin" flow).
+		"luau-lsp.sourcemap.autogenerate": false,
 	};
 	for (const [k, v] of Object.entries(want)) {
 		if (cfg.inspect(k)?.globalValue === undefined) await cfg.update(k, v, vscode.ConfigurationTarget.Global);

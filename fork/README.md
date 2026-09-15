@@ -24,8 +24,16 @@ Follow `Documents/ide-designs-2026-09-14/research/01-vscode-fork.md` for the sou
    `style.css` makes that root transparent so the theme's alpha chrome shows the acrylic. The editor keeps its
    opaque background. Regenerate with `python tools/glass-patch.py <vscode-checkout>` when upstream moves an
    anchor; the script fails loudly rather than guessing.
-6. **Bundled tooling:** luau-lsp (win32-x64) and StyLua are downloaded from Open VSX at build time and shipped
-   as `vsix` built-ins beside our own extension, so a fresh install opens `.luau` with language support.
+6. **Bundled tooling:** luau-lsp (win32-x64) and StyLua are downloaded from Open VSX at build time, Selene is
+   built from its repo by `tools/selene-vsix.sh` (it is not on Open VSX), and all three ship as `vsix` built-ins
+   beside our own extension, so a fresh install opens `.luau` with language support, formatting and linting.
+7. **The look:** `fork/drydock.css` is appended to the workbench stylesheet by the glass patch (regenerate the
+   patch after editing it). Rounded floating surfaces (a 6px clip-path inset, so layout is untouched), thin
+   edges, pill tabs and buttons, small-caps headers. Settings VS Code lets an extension default are in the
+   extension manifest; the application-scoped ones (compact menu, custom menus and title bar) plus the panel
+   position are written once on first run by the extension, because VS Code refuses extension defaults for
+   application scope and the panel position is layout state, not a setting. `product.json` has no say in
+   defaults in Code OSS; the `configurationDefaults` block there is inert and kept only as documentation.
 
 CI: `.github/workflows/fork-windows.yml`, one windows-2022 job. `tools/build-local.sh` runs the same steps on a
 developer machine (first local build 2026-09-15: about 10 minutes to the app bundle on a 64-core box, then the
