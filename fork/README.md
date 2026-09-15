@@ -22,5 +22,9 @@ Follow `Documents/ide-designs-2026-09-14/research/01-vscode-fork.md` for the sou
    patch in `src/vs/platform/windows/electron-main/windowImpl.ts`, gated on a setting. Do it after the first
    plain build ships; a wrong patch there is a blank window.
 
-CI: a `build-windows.yml` comes with the first real build, written against the harness as it stands that
-day rather than guessed now.
+CI: `.github/workflows/fork-windows.yml`, one windows-2022 job. `tools/build-local.sh` runs the same steps on a
+developer machine (first local build 2026-09-15: about 10 minutes to the app bundle on a 64-core box, then the
+installer). Local prerequisites beyond Node, Python and jq: Visual Studio C++ tools **with the Spectre-mitigated
+libraries** (`Microsoft.VisualStudio.Component.VC.Runtimes.x86.x64.Spectre` and the ATL/MFC Spectre components),
+or node-gyp fails on `@vscode/deviceid` with MSB8040. Inno Setup AppIds are written `{{GUID}`; a single brace is
+read as an Inno constant and the installer step fails.
