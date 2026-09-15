@@ -1,5 +1,5 @@
 # Launch the built Parlay once per theme on the sample workspace and capture each window to PNG.
-#   powershell -File tools\shots.ps1 [-App <path\to\Drydock.exe>] [-Workspace <folder>] [-Out <folder>]
+#   powershell -File tools\shots.ps1 [-App <path\to\Parlay.exe>] [-Workspace <folder>] [-Out <folder>]
 # Each theme gets its own temporary user-data-dir, so the captures show first-run defaults. Other Drydock windows
 # (yours) are left alone: only the instance this script launches is captured and closed.
 param(
