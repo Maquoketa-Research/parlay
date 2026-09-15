@@ -71,7 +71,7 @@ export function getUpdateRequestHeaders(productVersion: string): Record<string, 
 export type UpdateErrorClassification = {
 	owner: 'joaomoreno';
 	messageHash: { classification: 'SystemMetaData'; purpose: 'FeatureInsight'; comment: 'The hash of the error message.' };
-	comment: 'This is used to know how often Drydock updates have failed.';
+	comment: 'This is used to know how often Parlay updates have failed.';
 };
 
 /**

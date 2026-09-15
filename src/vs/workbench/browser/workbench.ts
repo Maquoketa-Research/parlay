@@ -242,7 +242,7 @@ export class Workbench extends Layout {
 			if (e.affectsConfiguration('workbench.experimental.fontSize')) {
 				this.updateFontSize(configurationService);
 			}
-			// Drydock: the Glass theme flips drydock.glass; follow it live (the main process swaps the acrylic)
+			// Parlay: the Glass theme flips drydock.glass; follow it live (the main process swaps the acrylic)
 			if (e.affectsConfiguration('drydock.glass')) {
 				const glass = configurationService.getValue<boolean>('drydock.glass') === true;
 				this.mainContainer.classList.toggle('drydock-glass', glass);
@@ -380,12 +380,12 @@ export class Workbench extends Layout {
 
 		this.mainContainer.classList.add(...workbenchClasses);
 
-		// Drydock: glass chrome marks the root so style.css can make it transparent
+		// Parlay: glass chrome marks the root so style.css can make it transparent
 		if (configurationService.getValue<boolean>('drydock.glass') === true) {
 			this.mainContainer.classList.add('drydock-glass');
 			this.mainContainer.ownerDocument.body.classList.add('drydock-glass');
 		}
-		// Drydock: two-row header (mark and title above the menu); the title bar reports the extra height
+		// Parlay: two-row header (mark and title above the menu); the title bar reports the extra height
 		if (configurationService.getValue<boolean>('drydock.stackedHeader') === true) {
 			this.mainContainer.classList.add('drydock-stacked');
 		}

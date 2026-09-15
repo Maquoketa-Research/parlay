@@ -162,7 +162,7 @@ class OpenNewsletterSignupUrlAction extends Action2 {
 	constructor() {
 		super({
 			id: OpenNewsletterSignupUrlAction.ID,
-			title: localize2('newsletterSignup', 'Signup for the Drydock Newsletter'),
+			title: localize2('newsletterSignup', 'Signup for the Parlay Newsletter'),
 			category: Categories.Help,
 			f1: true
 		});

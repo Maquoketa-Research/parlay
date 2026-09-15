@@ -116,10 +116,10 @@ aqua_colors.update({"badge.background": "#F46A35", "badge.foreground": "#141117"
 aqua_tokens = tokens("#C9BFD6", "#B9C9A8", "#F9F9F9", "#E8B27A", "#7E7883", "#E6E2E7", "#D8C4B0")
 
 THEMES = {
-    "drydock-dark": {"name": "Drydock Dark", "type": "dark", "semanticHighlighting": True, "colors": dark_colors, "tokenColors": dark_tokens},
-    "drydock-aqua": {"name": "Drydock Aqua", "type": "dark", "semanticHighlighting": True, "colors": aqua_colors, "tokenColors": aqua_tokens},
-    "drydock-glass": {"name": "Drydock Glass", "type": "dark", "semanticHighlighting": True, "colors": glass_colors, "tokenColors": dark_tokens},
-    "drydock-paper": {"name": "Drydock Paper", "type": "light", "semanticHighlighting": True, "colors": paper_colors, "tokenColors": paper_tokens},
+    "drydock-dark": {"name": "Parlay Dark", "type": "dark", "semanticHighlighting": True, "colors": dark_colors, "tokenColors": dark_tokens},
+    "drydock-aqua": {"name": "Parlay Aqua", "type": "dark", "semanticHighlighting": True, "colors": aqua_colors, "tokenColors": aqua_tokens},
+    "drydock-glass": {"name": "Parlay Glass", "type": "dark", "semanticHighlighting": True, "colors": glass_colors, "tokenColors": dark_tokens},
+    "drydock-paper": {"name": "Parlay Paper", "type": "light", "semanticHighlighting": True, "colors": paper_colors, "tokenColors": paper_tokens},
 }
 
 if __name__ == "__main__":

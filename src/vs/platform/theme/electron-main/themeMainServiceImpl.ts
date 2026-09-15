@@ -94,7 +94,7 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 		this.updateSystemColorTheme();
 		this.logThemeSettings();
 
-		// Drydock: glass follows the setting live. Windows 11 can swap the backdrop of an existing window;
+		// Parlay: glass follows the setting live. Windows 11 can swap the backdrop of an existing window;
 		// the workbench toggles its transparency class on the same change.
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (e.affectsConfiguration('drydock.glass') && process.platform === 'win32') {
@@ -341,7 +341,7 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 	private updateBackgroundColor(windowId: number, splash: IPartsSplash): void {
 		for (const window of getAllWindowsExcludingOffscreen()) {
 			if (window.id === windowId) {
-				// Drydock: a glass window keeps its transparent background; the splash colour would paint it opaque
+				// Parlay: a glass window keeps its transparent background; the splash colour would paint it opaque
 				if (this.configurationService.getValue<boolean>('drydock.glass') === true) {
 					break;
 				}

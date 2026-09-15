@@ -55,6 +55,6 @@ dist
 # Local agent validation evidence
 .agent-validation/
 
-# Drydock build
+# Parlay build
 build/builtin/*.vsix
 LICENSE.rtf

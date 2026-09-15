@@ -1173,7 +1173,7 @@ export class GettingStartedPage extends EditorPane {
 		if (this.announcementList) { this.announcementList.dispose(); }
 
 		const announcementList = this.announcementList = new GettingStartedIndexList({
-			title: localize('announcements', "Drydock Announcements"),
+			title: localize('announcements', "Parlay Announcements"),
 			klass: 'announcements',
 			limit: 5,
 			empty: $('.empty-recent', {}, localize('noAnnouncements', "There are no current announcements.")),

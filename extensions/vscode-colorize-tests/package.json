@@ -1,6 +1,6 @@
 {
   "name": "vscode-colorize-tests",
-  "description": "Colorize tests for Drydock",
+  "description": "Colorize tests for Parlay",
   "version": "0.0.1",
   "publisher": "vscode",
   "license": "MIT",

@@ -1,4 +1,4 @@
-// Drydock IDE: Claude actions on the code under your cursor (right-click, editor title, and a lens over the
+// Parlay: Claude actions on the code under your cursor (right-click, editor title, and a lens over the
 // selection), Aqua and Sonar in the right-hand panel with a Start button when they are down, a Script Sync
 // status light, the asset matcher, and the switch that turns the Glass theme into real glass.
 // Every action is a Claude Code skill (skills/*/SKILL.md) run in a terminal, so the code Claude writes
@@ -14,7 +14,7 @@ import { MeshyView } from "./meshy";
 import { startSourcemap } from "./sourcemap";
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
-const GLASS_THEME = "Drydock Glass";
+const GLASS_THEME = "Parlay Glass";
 const LUAU = [{ language: "luau" }, { language: "lua" }, { pattern: "**/*.luau" }];
 
 let claudeTerminal: vscode.Terminal | undefined; // the one terminal Claude Code runs in

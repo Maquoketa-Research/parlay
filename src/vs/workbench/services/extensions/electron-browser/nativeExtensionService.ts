@@ -165,7 +165,7 @@ export class NativeExtensionService extends AbstractExtensionService implements 
 					Severity.Error,
 					nls.localize('extensionService.versionMismatchCrash', "Extension host cannot start: version mismatch."),
 					[{
-						label: nls.localize('relaunch', "Relaunch Drydock"),
+						label: nls.localize('relaunch', "Relaunch Parlay"),
 						run: () => {
 							this._instantiationService.invokeFunction((accessor) => {
 								const hostService = accessor.get(IHostService);

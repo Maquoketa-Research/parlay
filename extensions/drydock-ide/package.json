@@ -1,6 +1,6 @@
 {
   "name": "drydock-ide",
-  "displayName": "Drydock IDE",
+  "displayName": "Parlay",
   "description": "Roblox game development with Claude inside the editor: right-click actions on your code, Script Sync awareness, Aqua and Sonar on the right, three looks (Dark, Paper, Glass).",
   "version": "0.0.5",
   "publisher": "maquoketa",
@@ -198,22 +198,22 @@
     },
     "themes": [
       {
-        "label": "Drydock Dark",
+        "label": "Parlay Dark",
         "uiTheme": "vs-dark",
         "path": "./themes/drydock-dark.json"
       },
       {
-        "label": "Drydock Glass",
+        "label": "Parlay Glass",
         "uiTheme": "vs-dark",
         "path": "./themes/drydock-glass.json"
       },
       {
-        "label": "Drydock Paper",
+        "label": "Parlay Paper",
         "uiTheme": "vs",
         "path": "./themes/drydock-paper.json"
       },
       {
-        "label": "Drydock Aqua",
+        "label": "Parlay Aqua",
         "uiTheme": "vs-dark",
         "path": "./themes/drydock-aqua.json"
       }
@@ -240,7 +240,7 @@
           "type": "boolean",
           "default": false,
           "scope": "application",
-          "description": "Draw the window over Windows 11 acrylic so the Drydock Glass theme is real glass. Set automatically when that theme is chosen; applies to windows opened afterwards. Needs the Drydock IDE build."
+          "description": "Draw the window over Windows 11 acrylic so the Parlay Glass theme is real glass. Set automatically when that theme is chosen; applies to windows opened afterwards. Needs the Parlay build."
         },
         "drydock.aquaRepo": {
           "type": "string",
@@ -274,7 +274,7 @@
         "drydock.stackedHeader": {
           "type": "boolean",
           "default": true,
-          "description": "Two-row header: the mark and Drydock IDE above the menu bar. Needs the Drydock IDE build; a change applies to new windows."
+          "description": "Two-row header: the mark and Parlay above the menu bar. Needs the Parlay build; a change applies to new windows."
         },
         "drydock.imageModel": {
           "type": "string",
@@ -289,7 +289,7 @@
       }
     },
     "configurationDefaults": {
-      "workbench.colorTheme": "Drydock Dark",
+      "workbench.colorTheme": "Parlay Dark",
       "window.title": "${dirty}${activeEditorShort}${separator}${rootName}",
       "editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
       "editor.fontSize": 13,

@@ -1,6 +1,6 @@
 {
   "name": "vscode-api-tests",
-  "description": "API tests for Drydock",
+  "description": "API tests for Parlay",
   "version": "0.0.1",
   "publisher": "vscode",
   "license": "MIT",

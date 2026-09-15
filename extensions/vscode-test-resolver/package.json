@@ -1,6 +1,6 @@
 {
   "name": "vscode-test-resolver",
-  "description": "Test resolver for Drydock",
+  "description": "Test resolver for Parlay",
   "version": "0.0.1",
   "publisher": "vscode",
   "license": "MIT",

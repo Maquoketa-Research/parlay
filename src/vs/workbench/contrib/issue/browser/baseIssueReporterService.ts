@@ -1022,8 +1022,8 @@ export class BaseIssueReporterService extends Disposable {
 
 		sourceSelect.innerText = '';
 		sourceSelect.append(this.makeOption('', localize('selectSource', "Select source"), true));
-		sourceSelect.append(this.makeOption(IssueSource.VSCode, localize('vscode', "Drydock"), false));
-		sourceSelect.append(this.makeOption(IssueSource.Extension, localize('extension', "A Drydock extension"), false));
+		sourceSelect.append(this.makeOption(IssueSource.VSCode, localize('vscode', "Parlay"), false));
+		sourceSelect.append(this.makeOption(IssueSource.Extension, localize('extension', "A Parlay extension"), false));
 		if (this.product.reportMarketplaceIssueUrl) {
 			sourceSelect.append(this.makeOption(IssueSource.Marketplace, localize('marketplace', "Extensions Marketplace"), false));
 		}
@@ -1126,7 +1126,7 @@ export class BaseIssueReporterService extends Disposable {
 		if (selectedExtension && this.nonGitHubIssueUrl) {
 			hide(titleTextArea);
 			hide(descriptionTextArea);
-			reset(descriptionTitle, localize('handlesIssuesElsewhere', "This extension handles issues outside of Drydock"));
+			reset(descriptionTitle, localize('handlesIssuesElsewhere', "This extension handles issues outside of Parlay"));
 			reset(descriptionSubtitle, localize('elsewhereDescription', "The '{0}' extension prefers to use an external issue reporter. To be taken to that issue reporting experience, click the button below.", selectedExtension.displayName));
 			this.publicGithubButton.label = localize('openIssueReporter', "Open External Issue Reporter");
 			return;

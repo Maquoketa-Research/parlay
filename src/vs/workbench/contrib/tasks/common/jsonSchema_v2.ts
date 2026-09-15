@@ -437,7 +437,7 @@ const taskConfiguration: IJSONSchema = {
 		},
 		promptOnClose: {
 			type: 'boolean',
-			description: nls.localize('JsonSchema.tasks.promptOnClose', 'Whether the user is prompted when Drydock closes with a running task.'),
+			description: nls.localize('JsonSchema.tasks.promptOnClose', 'Whether the user is prompted when Parlay closes with a running task.'),
 			default: false
 		},
 		presentation: Objects.deepClone(presentation),

@@ -2,8 +2,8 @@ import code from './code';
 
 const codiumCompletionSpec: Fig.Spec = {
 	...code,
-	name: 'drydock',
-	description: 'Drydock',
+	name: 'parlay',
+	description: 'Parlay',
 };
 
 export default codiumCompletionSpec;

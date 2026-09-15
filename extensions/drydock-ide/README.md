@@ -1,11 +1,11 @@
-# Drydock IDE
+# Parlay
 
 Roblox game development with Claude in the editor: see the code, see the code Claude writes, right-click
 to act on a selection, and keep Aqua, Sonar and the terminal on the right. Three looks, one setting:
-**Drydock Dark** (default), **Drydock Paper**, **Drydock Glass**.
+**Parlay Dark** (default), **Parlay Paper**, **Parlay Glass**.
 
 This repo is a VS Code extension plus the fork configuration under `fork/`. The extension runs in plain
-VS Code today; the fork (`fork/README.md`) turns it into the standalone **Drydock IDE** app.
+VS Code today; the fork (`fork/README.md`) turns it into the standalone **Parlay** app.
 
 ## What it does
 
@@ -31,7 +31,7 @@ VS Code today; the fork (`fork/README.md`) turns it into the standalone **Drydoc
     `OPENAI_API_KEY`), **Set Meshy API key**, **Set Roblox Open Cloud API key**; SecretStorage, never settings
     files. three.js renders the viewport and the bake (vendored into `media/three` at compile time).
   - **Sonar**: the market instrument (`drydock.sonarUrl`).
-- **Header**: the mark, "Drydock IDE" and the file on the first row, the menu bar on the second
+- **Header**: the mark, "Parlay" and the file on the first row, the menu bar on the second
   (`drydock.stackedHeader`; a fork patch adds the height, the stylesheet lays it out).
 - **Match assets to a Studio screenshot** (command): the `drydock-match-assets` skill finds six Creator Store
   candidates that fit the frame's look and lines them up in Studio for you to pick.
@@ -40,8 +40,8 @@ VS Code today; the fork (`fork/README.md`) turns it into the standalone **Drydoc
   shape so luau-lsp resolves `require(ReplicatedStorage.Modules.X)`, and `selene.toml` with the Roblox
   standard so Selene reads Luau. Non-script instances (RemoteEvents, parts) come from luau-lsp's Studio
   companion plugin when you install it; the notification it shows is the one-click for that.
-- **Themes**: Drydock Dark (default), Drydock Glass (real acrylic in the Drydock IDE build; the extension flips
-  `drydock.glass` when you pick it), Drydock Paper, Drydock Aqua. Generated from one palette each by
+- **Themes**: Parlay Dark (default), Parlay Glass (real acrylic in the Parlay build; the extension flips
+  `drydock.glass` when you pick it), Parlay Paper, Parlay Aqua. Generated from one palette each by
   `tools/themes.py`. The editor is always opaque.
 - **The look**: activity bar at the bottom of the sidebar, menu folded into a hamburger, custom menus, no
   command center or minimap. The fork adds `fork/drydock.css`: rounded surfaces, thin edges, pill tabs and

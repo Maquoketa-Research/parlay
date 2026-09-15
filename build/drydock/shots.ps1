@@ -1,12 +1,12 @@
-# Launch the built Drydock IDE once per theme on the sample workspace and capture each window to PNG.
+# Launch the built Parlay once per theme on the sample workspace and capture each window to PNG.
 #   powershell -File tools\shots.ps1 [-App <path\to\Drydock.exe>] [-Workspace <folder>] [-Out <folder>]
 # Each theme gets its own temporary user-data-dir, so the captures show first-run defaults. Other Drydock windows
 # (yours) are left alone: only the instance this script launches is captured and closed.
 param(
-  [string]$App = "$env:USERPROFILE\dd\harness\VSCode-win32-x64\Drydock.exe",
+  [string]$App = "$env:USERPROFILE\dd\harness\VSCode-win32-x64\Parlay.exe",
   [string]$Workspace = "$env:USERPROFILE\Documents\drydock-ide-sample",
   [string]$Out = "$env:USERPROFILE\dd\shots",
-  [string[]]$Themes = @("Drydock Dark", "Drydock Glass", "Drydock Paper", "Drydock Aqua")
+  [string[]]$Themes = @("Parlay Dark", "Parlay Glass", "Parlay Paper", "Parlay Aqua")
 )
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
@@ -44,7 +44,7 @@ foreach ($theme in $Themes) {
   $ud = Join-Path $env:TEMP "drydock-shot-$slug"
   if (Test-Path $ud) { Remove-Item -Recurse -Force $ud }
   New-Item -ItemType Directory -Force (Join-Path $ud "User") | Out-Null
-  $settings = @{ "workbench.colorTheme" = $theme; "drydock.glass" = ($theme -eq "Drydock Glass"); "window.systemColorTheme" = "auto"; "workbench.startupEditor" = "none"; "window.restoreWindows" = "none" }
+  $settings = @{ "workbench.colorTheme" = $theme; "drydock.glass" = ($theme -eq "Parlay Glass"); "window.systemColorTheme" = "auto"; "workbench.startupEditor" = "none"; "window.restoreWindows" = "none" }
   ($settings | ConvertTo-Json) | Set-Content -Encoding utf8 (Join-Path $ud "User\settings.json")
   $launched = Start-Process -PassThru -FilePath $App -ArgumentList @('--user-data-dir', "`"$ud`"", '--disable-workspace-trust', "`"$Workspace`"", "`"$file`"")
   # The window shows at once with the folder name as its title; the workbench is up when the title carries the

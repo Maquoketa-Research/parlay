@@ -396,14 +396,14 @@ body {
     outline-offset: calc(var(--vscode-workbench-sidebar-font-size) * -0.076923)
 }
 
-/* Drydock: glass chrome (setting drydock.glass). The root is transparent so the window's acrylic
+/* Parlay: glass chrome (setting drydock.glass). The root is transparent so the window's acrylic
    shows through the theme's alpha-coloured chrome; the editor keeps its own opaque background. */
 body.drydock-glass,
 .monaco-workbench.drydock-glass {
 	background-color: transparent !important;
 }
 
-/* Drydock look. Appended to the workbench stylesheet by the fork (fork/patches/drydock-glass.patch, generated
+/* Parlay look. Appended to the workbench stylesheet by the fork (fork/patches/drydock-glass.patch, generated
    from this file by tools/glass-patch.py). Rounded surfaces with a thin light edge, quiet chrome, pill buttons.
    Layout is untouched: the gaps are clip-paths, so nothing moves and nothing breaks when upstream changes. */
 
@@ -470,7 +470,7 @@ body.drydock-glass,
 .monaco-workbench .suggest-widget { border-radius: 10px; overflow: hidden; }
 .monaco-workbench .editor-widget.find-widget { border-radius: 10px; }
 
-/* title bar: the mark at the far left, the menu, then "Drydock IDE" in bold and the file beside it.
+/* title bar: the mark at the far left, the menu, then "Parlay" in bold and the file beside it.
    titlebarpart.css is bundled after this file at equal specificity, so the layout rules carry !important.
    The mark is inlined twice: sky blue for dark themes, navy for light ones (no plate). Regenerate the data
    URIs from fork/logo.png with tools/icons.py if the logo changes. */
@@ -495,11 +495,11 @@ body.drydock-glass,
 	margin-left: 0 !important; margin-right: 0 !important; font-weight: 400 !important; font-size: 12px !important; opacity: 0.85;
 }
 .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-center > .window-title::before {
-	content: "Drydock IDE"; font-weight: 700; letter-spacing: 0.02em; margin-right: 14px; opacity: 1;
+	content: "Parlay"; font-weight: 700; letter-spacing: 0.02em; margin-right: 14px; opacity: 1;
 }
 
 /* stacked header (setting drydock.stackedHeader; the title bar part adds 26px and workbench.ts adds the class):
-   row 1 = mark, "Drydock IDE" and the file, window controls; row 2 = the menu bar. The DOM is untouched. */
+   row 1 = mark, "Parlay" and the file, window controls; row 2 = the menu bar. The DOM is untouched. */
 .monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container {
 	display: grid !important; grid-template-columns: auto 1fr auto; grid-template-rows: 30px 26px; align-items: center;
 }
@@ -519,7 +519,7 @@ body.drydock-glass,
 .monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item { height: 30px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
 .monaco-workbench.drydock-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item .action-label { height: auto !important; line-height: normal !important; margin: 0 !important; padding: 0 6px !important; }
 
-/* the Drydock sidebar on the right stays: no hide button on its title */
+/* the Parlay sidebar on the right stays: no hide button on its title */
 .monaco-workbench .part.auxiliarybar > .title .title-actions .action-item .codicon-close,
 .monaco-workbench .part.auxiliarybar > .title .global-actions .action-item .codicon-close,
 .monaco-workbench .part.auxiliarybar .composite.title .actions-container .action-item .codicon-layout-sidebar-right-off { display: none !important; }

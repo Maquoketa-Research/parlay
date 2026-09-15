@@ -428,24 +428,24 @@ CommandsRegistry.registerCommand({
 			{
 				name: 'options',
 				description: '(optional) Options for installing the extension. Object with the following properties: ' +
-					'`installOnlyNewlyAddedFromExtensionPackVSIX`: When enabled, Drydock installs only newly added extensions from the extension pack VSIX. This option is considered only when installing VSIX. ',
+					'`installOnlyNewlyAddedFromExtensionPackVSIX`: When enabled, Parlay installs only newly added extensions from the extension pack VSIX. This option is considered only when installing VSIX. ',
 				isOptional: true,
 				schema: {
 					'type': 'object',
 					'properties': {
 						'installOnlyNewlyAddedFromExtensionPackVSIX': {
 							'type': 'boolean',
-							'description': localize('workbench.extensions.installExtension.option.installOnlyNewlyAddedFromExtensionPackVSIX', "When enabled, Drydock installs only newly added extensions from the extension pack VSIX. This option is considered only while installing a VSIX."),
+							'description': localize('workbench.extensions.installExtension.option.installOnlyNewlyAddedFromExtensionPackVSIX', "When enabled, Parlay installs only newly added extensions from the extension pack VSIX. This option is considered only while installing a VSIX."),
 							default: false
 						},
 						'installPreReleaseVersion': {
 							'type': 'boolean',
-							'description': localize('workbench.extensions.installExtension.option.installPreReleaseVersion', "When enabled, Drydock installs the pre-release version of the extension if available."),
+							'description': localize('workbench.extensions.installExtension.option.installPreReleaseVersion', "When enabled, Parlay installs the pre-release version of the extension if available."),
 							default: false
 						},
 						'donotSync': {
 							'type': 'boolean',
-							'description': localize('workbench.extensions.installExtension.option.donotSync', "When enabled, Drydock do not sync this extension when Settings Sync is on."),
+							'description': localize('workbench.extensions.installExtension.option.donotSync', "When enabled, Parlay do not sync this extension when Settings Sync is on."),
 							default: false
 						},
 						'justification': {
@@ -970,8 +970,8 @@ class ExtensionsContributions extends Disposable implements IWorkbenchContributi
 				if (requireReload) {
 					notificationService.prompt(
 						Severity.Info,
-						vsixs.length > 1 ? localize('InstallVSIXs.successReload', "Completed installing extensions. Please reload Drydock to enable them.")
-							: localize('InstallVSIXAction.successReload', "Completed installing extension. Please reload Drydock to enable it."),
+						vsixs.length > 1 ? localize('InstallVSIXs.successReload', "Completed installing extensions. Please reload Parlay to enable them.")
+							: localize('InstallVSIXAction.successReload', "Completed installing extension. Please reload Parlay to enable it."),
 						[{
 							label: localize('InstallVSIXAction.reloadNow', "Reload Now"),
 							run: () => hostService.reload()

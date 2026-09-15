@@ -93,8 +93,8 @@ interface IUnknownLayout {
 }
 
 const DEFAULT_CONTENT: string = [
-	`// ${nls.localize('displayLanguage', 'Defines the keyboard layout used in Drydock in the browser environment.')}`,
-	`// ${nls.localize('doc', 'Open Drydock and run "Developer: Inspect Key Mappings (JSON)" from Command Palette.')}`,
+	`// ${nls.localize('displayLanguage', 'Defines the keyboard layout used in Parlay in the browser environment.')}`,
+	`// ${nls.localize('doc', 'Open Parlay and run "Developer: Inspect Key Mappings (JSON)" from Command Palette.')}`,
 	``,
 	`// Once you have the keyboard layout info, please paste it below.`,
 	'\n'

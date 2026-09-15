@@ -175,7 +175,7 @@ export class AdapterManager extends Disposable implements IAdapterManager {
 					},
 					'debugServer': {
 						type: 'number',
-						description: nls.localize('debugServer', "For debug extension development only: if a port is specified Drydock tries to connect to a debug adapter running in server mode"),
+						description: nls.localize('debugServer', "For debug extension development only: if a port is specified Parlay tries to connect to a debug adapter running in server mode"),
 						default: 4711
 					},
 					'preLaunchTask': {

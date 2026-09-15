@@ -454,7 +454,7 @@ export class SwitchProductQualityContribution extends Disposable implements IWor
 					const { result } = await dialogService.prompt<UserDataSyncStoreType>({
 						type: Severity.Info,
 						message: nls.localize('selectSyncService.message', "Choose the settings sync service to use after changing the version"),
-						detail: nls.localize('selectSyncService.detail', "The Insiders version of Drydock will synchronize your settings, keybindings, extensions, snippets and UI State using separate insiders settings sync service by default."),
+						detail: nls.localize('selectSyncService.detail', "The Insiders version of Parlay will synchronize your settings, keybindings, extensions, snippets and UI State using separate insiders settings sync service by default."),
 						buttons: [
 							{
 								label: nls.localize({ key: 'use insiders', comment: ['&& denotes a mnemonic'] }, "&&Insiders"),

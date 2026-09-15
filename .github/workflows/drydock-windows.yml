@@ -1,6 +1,6 @@
-# Drydock IDE, Windows x64: the same steps as build/drydock/build-win32.sh on a hosted runner. Output: the
+# Parlay, Windows x64: the same steps as build/drydock/build-win32.sh on a hosted runner. Output: the
 # user installer as a workflow artifact. Around two hours.
-name: Drydock IDE (Windows x64)
+name: Parlay (Windows x64)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: drydock-windows
+  group: parlay-windows
   cancel-in-progress: true
 
 jobs:
@@ -39,6 +39,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: DrydockUserSetup-x64
-          path: .build/drydock/*.exe
+          name: ParlayUserSetup-x64
+          path: .build/parlay/*.exe
           if-no-files-found: error

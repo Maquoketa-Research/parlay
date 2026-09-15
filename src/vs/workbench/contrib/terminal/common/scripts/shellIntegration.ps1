@@ -85,7 +85,7 @@ if (-not $env:VSCODE_PYTHON_AUTOACTIVATE_GUARD) {
 		}
 		catch {
 			$activationError = $_
-			Write-Host "`e[0m`e[7m * `e[0;103m Drydock Python powershell activation failed with exit code $($activationError.Exception.Message) `e[0m"
+			Write-Host "`e[0m`e[7m * `e[0;103m Parlay Python powershell activation failed with exit code $($activationError.Exception.Message) `e[0m"
 		}
 	}
 	# Remove any leftover Python activation env vars.

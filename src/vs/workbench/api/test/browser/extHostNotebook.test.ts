@@ -362,7 +362,7 @@ suite('NotebookCell#Document', function () {
 	});
 
 
-	test('Opening a notebook results in Drydock firing the event onDidChangeActiveNotebookEditor twice #118470', function () {
+	test('Opening a notebook results in Parlay firing the event onDidChangeActiveNotebookEditor twice #118470', function () {
 		let count = 0;
 		disposables.add(extHostNotebooks.onDidChangeActiveNotebookEditor(() => count += 1));
 
