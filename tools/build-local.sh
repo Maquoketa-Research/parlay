@@ -2,13 +2,17 @@
 # Build the branded Drydock IDE on this machine with VSCodium's harness: the same steps as
 # .github/workflows/fork-windows.yml, so a green run here means the workflow is right.
 #
-#   mise exec -- bash tools/build-local.sh [harness-dir]      (Git Bash; node, npm and jq come from mise)
+#   mise exec -- bash tools/build-local.sh [harness-dir]              (Git Bash; node, npm and jq come from mise)
+#   mise exec -- bash tools/build-local.sh [harness-dir] --pack-only  re-pack the app and the installer from the
+#         compiled tree with the current extension; no fetch, no compile. For when Drydock was running at packing
+#         time (EBUSY), or when only the extension changed.
 #
 # Output: <harness>/assets/DrydockUserSetup-x64-<version>.exe. Zip is off (no 7-Zip here).
 set -euo pipefail
 
 IDE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HARNESS="${1:-$HOME/dd/harness}"
+PACK_ONLY=no; [[ "${2:-}" == "--pack-only" ]] && PACK_ONLY=yes
 LOG="$HARNESS/../build-local.log"          # one file, appended, so a watcher can follow across runs
 
 # names the harness substitutes into its patches; the human name lives in fork/product.json
@@ -73,6 +77,11 @@ jq '{nameShort, nameLong, applicationName, dataFolderName, builtIns: (.builtInEx
 # our source patches ride behind VSCodium's (prepare_vscode.sh applies patches/user last)
 mkdir -p patches/user && cp "$IDE"/fork/patches/*.patch patches/user/ && ls patches/user
 
+if [[ "$PACK_ONLY" == "yes" ]]; then
+  # the merged product.json inside the tree has to carry the new vsix hash too
+  jq -s '.[0] * .[1]' vscode/product.json product.json > vscode/product.tmp && mv vscode/product.tmp vscode/product.json
+fi
+
 echo "== 4/6 icons"
 # prepare_vscode.sh overlays src/stable/* onto the tree (VSCodium's own icons among them), so ours go into that
 # overlay, not into vscode/ directly, or they are overwritten a step later
@@ -80,8 +89,17 @@ cp "$IDE"/fork/icons/*.ico "$IDE"/fork/icons/*.png "$IDE"/fork/icons/*.bmp src/s
 # the in-app title bar icon is a separate SVG the workbench stylesheet points at
 mkdir -p src/stable/src/vs/workbench/browser/media && cp "$IDE"/fork/icons/code-icon.svg src/stable/src/vs/workbench/browser/media/code-icon.svg
 
-echo "== 5/6 build.sh (patches, npm ci, prepack, packing)  $(date)"
-./build.sh
+# packing rewrites VSCode-win32-x64; a running Drydock holds it (EBUSY ten minutes in), so say so up front
+running_drydock() { tasklist 2>/dev/null | grep -q "^Drydock.exe"; }
+if [[ "$PACK_ONLY" == "yes" ]]; then
+  if running_drydock; then echo "!! Drydock is running; close it, then re-run with --pack-only"; exit 2; fi
+  echo "== 5/6 packing only (the tree is already compiled)  $(date)"
+  ( cd vscode && . ../build/windows/rtf/make.sh && npm run copy-policy-dto --prefix build     && node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc win32     && npm run gulp "vscode-win32-${VSCODE_ARCH}-min-packing" )
+else
+  running_drydock && echo "!! Drydock is running: the compile will go through, packing will fail with EBUSY; close it and re-run with --pack-only"
+  echo "== 5/6 build.sh (patches, npm ci, prepack, packing)  $(date)"
+  ./build.sh
+fi
 
 echo "== 6/6 prepare_assets.sh (installer)  $(date)"
 ./prepare_assets.sh

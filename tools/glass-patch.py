@@ -1,10 +1,13 @@
 """Generate fork/patches/drydock-glass.patch against a prepared VS Code tree.
 
-The glass look needs three small source changes that no theme can make:
-  1. windows.ts       the BrowserWindow gets Windows 11 acrylic behind a transparent background
-  2. workbench.ts     the workbench root and <body> get a class when the setting is on
-  3. style.css        that class makes them transparent, so the acrylic shows through the
-                      alpha-coloured chrome of the Drydock Glass theme. The editor stays opaque.
+The glass look needs a few small source changes that no theme can make (a file may carry several hunks):
+  1. windows.ts              the BrowserWindow gets Windows 11 acrylic behind a transparent background
+  2. workbench.ts            the workbench root and <body> get a class when the setting is on, and follow it live
+  3. themeMainServiceImpl.ts the splash repaint must not make a glass window opaque; and when the setting
+                             changes, every open window swaps its backdrop, so the theme switch is live
+  4. titlebarPart.ts (x2)    the two-row header (drydock.stackedHeader) reports its extra height
+  5. style.css               the class makes the root transparent, so the acrylic shows through the
+                             alpha-coloured chrome of the Drydock Glass theme. The editor stays opaque.
 All gated on the setting `drydock.glass`, which the extension flips when the Glass theme is chosen.
 
 Usage: python tools/glass-patch.py <path-to-vscode-checkout>
@@ -16,6 +19,7 @@ import os, subprocess, sys
 IDE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(IDE, "fork", "patches", "drydock-glass.patch")
 
+# file -> (anchor, replacement) or a list of them; anchor None appends
 FILES = {
     "src/vs/platform/windows/electron-main/windows.ts": (
         "\tif (isWindows) {\n\t\tlet borderSetting = windowSettings?.border || 'default';",
@@ -27,7 +31,20 @@ FILES = {
         "\t}\n\n"
         "\tif (isWindows) {\n\t\tlet borderSetting = windowSettings?.border || 'default';",
     ),
-    "src/vs/workbench/browser/workbench.ts": (
+    "src/vs/workbench/browser/workbench.ts": [(
+        "\t\t\tif (e.affectsConfiguration('workbench.experimental.fontSize')) {\n"
+        "\t\t\t\tthis.updateFontSize(configurationService);\n"
+        "\t\t\t}\n",
+        "\t\t\tif (e.affectsConfiguration('workbench.experimental.fontSize')) {\n"
+        "\t\t\t\tthis.updateFontSize(configurationService);\n"
+        "\t\t\t}\n"
+        "\t\t\t// Drydock: the Glass theme flips drydock.glass; follow it live (the main process swaps the acrylic)\n"
+        "\t\t\tif (e.affectsConfiguration('drydock.glass')) {\n"
+        "\t\t\t\tconst glass = configurationService.getValue<boolean>('drydock.glass') === true;\n"
+        "\t\t\t\tthis.mainContainer.classList.toggle('drydock-glass', glass);\n"
+        "\t\t\t\tthis.mainContainer.ownerDocument.body.classList.toggle('drydock-glass', glass);\n"
+        "\t\t\t}\n",
+    ), (
         "\t\tthis.mainContainer.classList.add(...workbenchClasses);\n",
         "\t\tthis.mainContainer.classList.add(...workbenchClasses);\n\n"
         "\t\t// Drydock: glass chrome marks the root so style.css can make it transparent\n"
@@ -39,7 +56,7 @@ FILES = {
         "\t\tif (configurationService.getValue<boolean>('drydock.stackedHeader') === true) {\n"
         "\t\t\tthis.mainContainer.classList.add('drydock-stacked');\n"
         "\t\t}\n",
-    ),
+    )],
     "src/vs/workbench/browser/parts/titlebar/titlebarPart.ts": (
         "\t\tlet value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;\n",
         "\t\tlet value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;\n"
@@ -48,7 +65,22 @@ FILES = {
         "\t\t\tvalue += 26;\n"
         "\t\t}\n",
     ),
-    "src/vs/platform/theme/electron-main/themeMainServiceImpl.ts": (
+    "src/vs/platform/theme/electron-main/themeMainServiceImpl.ts": [(
+        "\t\tthis.updateSystemColorTheme();\n\t\tthis.logThemeSettings();\n\n\t\t// Color Scheme changes\n",
+        "\t\tthis.updateSystemColorTheme();\n\t\tthis.logThemeSettings();\n\n"
+        "\t\t// Drydock: glass follows the setting live. Windows 11 can swap the backdrop of an existing window;\n"
+        "\t\t// the workbench toggles its transparency class on the same change.\n"
+        "\t\tthis._register(this.configurationService.onDidChangeConfiguration(e => {\n"
+        "\t\t\tif (e.affectsConfiguration('drydock.glass') && process.platform === 'win32') {\n"
+        "\t\t\t\tconst glass = this.configurationService.getValue<boolean>('drydock.glass') === true;\n"
+        "\t\t\t\tfor (const window of electron.BrowserWindow.getAllWindows()) {\n"
+        "\t\t\t\t\twindow.setBackgroundMaterial(glass ? 'acrylic' : 'none');\n"
+        "\t\t\t\t\twindow.setBackgroundColor(glass ? '#00000000' : this.getBackgroundColor());\n"
+        "\t\t\t\t}\n"
+        "\t\t\t}\n"
+        "\t\t}));\n\n"
+        "\t\t// Color Scheme changes\n",
+    ), (
         "\t\t\tif (window.id === windowId) {\n\t\t\t\twindow.setBackgroundColor(splash.colorInfo.background);\n",
         "\t\t\tif (window.id === windowId) {\n"
         "\t\t\t\t// Drydock: a glass window keeps its transparent background; the splash colour would paint it opaque\n"
@@ -56,7 +88,7 @@ FILES = {
         "\t\t\t\t\tbreak;\n"
         "\t\t\t\t}\n"
         "\t\t\t\twindow.setBackgroundColor(splash.colorInfo.background);\n",
-    ),
+    )],
     "src/vs/workbench/electron-browser/parts/titlebar/titlebarPart.ts": (
         "\t\t\tconst newHeight = Math.round(height * getZoomFactor(getWindow(this.element)));\n",
         "\t\t\t// Drydock: with the stacked header the window controls belong to the first row, not the whole bar\n"
@@ -89,19 +121,20 @@ def main(root):
         sys.exit("the tree already has the Drydock patch applied; revert it first: git apply -R fork/patches/drydock-glass.patch")
     git(root, "add", "--", *paths)  # index = the tree as VSCodium left it
     try:
-        for rel, (anchor, replacement) in FILES.items():
+        for rel, hunks in FILES.items():
             p = os.path.join(root, rel)
             text = open(p, encoding="utf-8", newline="").read()
             nl = "\r\n" if "\r\n" in text else "\n"          # the checkout may be CRLF on Windows
-            replacement = replacement.replace("\n", nl)
-            if anchor is None:
-                new = text.rstrip("\r\n") + nl + replacement
-            else:
-                anchor = anchor.replace("\n", nl)
-                if text.count(anchor) != 1:
-                    sys.exit(f"anchor not found exactly once in {rel} (found {text.count(anchor)}); upstream moved, update glass-patch.py")
-                new = text.replace(anchor, replacement)
-            open(p, "w", encoding="utf-8", newline="").write(new)
+            for anchor, replacement in (hunks if isinstance(hunks, list) else [hunks]):
+                replacement = replacement.replace("\n", nl)
+                if anchor is None:
+                    text = text.rstrip("\r\n") + nl + replacement
+                else:
+                    anchor = anchor.replace("\n", nl)
+                    if text.count(anchor) != 1:
+                        sys.exit(f"anchor not found exactly once in {rel} (found {text.count(anchor)}); upstream moved, update glass-patch.py")
+                    text = text.replace(anchor, replacement)
+            open(p, "w", encoding="utf-8", newline="").write(text)
         diff = git(root, "diff", "--", *paths)
     finally:
         git(root, "checkout", "--", *paths)   # back to VSCodium's state

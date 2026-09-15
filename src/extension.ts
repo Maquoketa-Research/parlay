@@ -197,19 +197,13 @@ class SelectionLens implements vscode.CodeLensProvider {
 
 // ---- glass --------------------------------------------------------------------------------------
 
-// drydock.glass is read by the main process when a window is created (fork/patches/drydock-glass.patch),
-// so a change shows in the next window, not this one.
+// drydock.glass is what the fork reads (fork/patches/drydock-glass.patch): the main process swaps the window's
+// acrylic and the workbench its transparency class as soon as the setting changes, so the theme switch is live.
 async function syncGlass() {
 	const cfg = vscode.workspace.getConfiguration();
 	const want = cfg.get<string>("workbench.colorTheme") === GLASS_THEME;
-	const has = cfg.get<boolean>("drydock.glass") === true;
-	if (want === has) return;
+	if (want === (cfg.get<boolean>("drydock.glass") === true)) return;
 	await cfg.update("drydock.glass", want, vscode.ConfigurationTarget.Global);
-	if (process.platform !== "win32") return;
-	const pick = await vscode.window.showInformationMessage(
-		want ? "Glass is on for windows opened from now on." : "Glass is off for windows opened from now on.",
-		"New Window");
-	if (pick) void vscode.commands.executeCommand("workbench.action.newWindow");
 }
 
 // ---- the panel views (Aqua, Sonar) --------------------------------------------------------------

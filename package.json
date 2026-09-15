@@ -2,7 +2,7 @@
   "name": "drydock-ide",
   "displayName": "Drydock IDE",
   "description": "Roblox game development with Claude inside the editor: right-click actions on your code, Script Sync awareness, Aqua and Sonar on the right, three looks (Dark, Paper, Glass).",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "maquoketa",
   "private": true,
   "license": "MIT",
@@ -254,8 +254,8 @@
         },
         "drydock.meshyPolycount": {
           "type": "number",
-          "default": 10000,
-          "description": "Target triangle count for Meshy remeshing. Roblox MeshParts are happiest well under 20000."
+          "default": 20000,
+          "description": "Triangle cap for the Meshy mesh (remeshed to this count). Roblox MeshParts want about 20000 or fewer."
         },
         "drydock.stackedHeader": {
           "type": "boolean",
@@ -264,8 +264,8 @@
         },
         "drydock.imageModel": {
           "type": "string",
-          "default": "gpt-image-1",
-          "description": "OpenAI image model used to draft concept images for Meshy (gpt-image-1, gpt-image-1-mini, or a newer gpt-image model)."
+          "default": "gpt-image-2.5-sunburst",
+          "description": "OpenAI image model for the concept drafts and for painting the six views of the mesh (gpt-image-2.5-sunburst for precision, gpt-image-2.5-flare for speed, or gpt-image-1)."
         },
         "drydock.referenceDir": {
           "type": "string",
@@ -297,11 +297,11 @@
       "workbench.secondarySideBar.defaultVisibility": "visible",
       "window.titleSeparator": "  ·  ",
       "drydock.stackedHeader": true,
-    "luau-lsp.sourcemap.autogenerate": false
+      "luau-lsp.sourcemap.autogenerate": false
     }
   },
   "scripts": {
-    "compile": "tsc -p .",
+    "compile": "node tools/vendor-three.mjs && tsc -p .",
     "check": "node tools/check.mjs",
     "package": "vsce package --no-dependencies"
   },
@@ -309,6 +309,7 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.0.0",
+    "three": "^0.186.0",
     "typescript": "^5.5.0"
   }
 }

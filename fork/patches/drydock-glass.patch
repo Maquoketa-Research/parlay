@@ -1,8 +1,27 @@
 diff --git a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
-index 0009eb39..a4ffba51 100644
+index 0009eb39..857f86db 100644
 --- a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
 +++ b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
-@@ -329,6 +329,10 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
+@@ -94,6 +94,18 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
+ 		this.updateSystemColorTheme();
+ 		this.logThemeSettings();
+ 
++		// Drydock: glass follows the setting live. Windows 11 can swap the backdrop of an existing window;
++		// the workbench toggles its transparency class on the same change.
++		this._register(this.configurationService.onDidChangeConfiguration(e => {
++			if (e.affectsConfiguration('drydock.glass') && process.platform === 'win32') {
++				const glass = this.configurationService.getValue<boolean>('drydock.glass') === true;
++				for (const window of electron.BrowserWindow.getAllWindows()) {
++					window.setBackgroundMaterial(glass ? 'acrylic' : 'none');
++					window.setBackgroundColor(glass ? '#00000000' : this.getBackgroundColor());
++				}
++			}
++		}));
++
+ 		// Color Scheme changes
+ 		this._register(Event.fromNodeEventEmitter(electron.nativeTheme, 'updated')(() => {
+ 			this.logThemeSettings();
+@@ -329,6 +341,10 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
  	private updateBackgroundColor(windowId: number, splash: IPartsSplash): void {
  		for (const window of getAllWindowsExcludingOffscreen()) {
  			if (window.id === windowId) {
@@ -193,10 +212,23 @@ index 9d2e8a85..6b7f517b 100644
  			value = Math.max(value, getWCOTitlebarAreaRect(getWindow(this.element))?.height ?? 0);
  		}
 diff --git a/src/vs/workbench/browser/workbench.ts b/src/vs/workbench/browser/workbench.ts
-index 47f28faa..6af2e6a7 100644
+index 47f28faa..01a336e7 100644
 --- a/src/vs/workbench/browser/workbench.ts
 +++ b/src/vs/workbench/browser/workbench.ts
-@@ -374,6 +374,16 @@ export class Workbench extends Layout {
+@@ -242,6 +242,12 @@ export class Workbench extends Layout {
+ 			if (e.affectsConfiguration('workbench.experimental.fontSize')) {
+ 				this.updateFontSize(configurationService);
+ 			}
++			// Drydock: the Glass theme flips drydock.glass; follow it live (the main process swaps the acrylic)
++			if (e.affectsConfiguration('drydock.glass')) {
++				const glass = configurationService.getValue<boolean>('drydock.glass') === true;
++				this.mainContainer.classList.toggle('drydock-glass', glass);
++				this.mainContainer.ownerDocument.body.classList.toggle('drydock-glass', glass);
++			}
+ 		}));
+ 
+ 		// Font Info
+@@ -374,6 +380,16 @@ export class Workbench extends Layout {
  
  		this.mainContainer.classList.add(...workbenchClasses);
  
