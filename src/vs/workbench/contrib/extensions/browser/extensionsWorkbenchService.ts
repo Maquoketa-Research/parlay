@@ -486,7 +486,7 @@ export class Extension implements IExtension {
 
 		if (this.type === ExtensionType.System) {
 			return Promise.resolve(`# ${this.displayName || this.name}
-**Notice:** This extension is bundled with Drydock. It can be disabled but not uninstalled.
+**Notice:** This extension is bundled with Parlay. It can be disabled but not uninstalled.
 ## Features
 ${this.description}
 `);

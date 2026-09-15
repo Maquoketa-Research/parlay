@@ -50,7 +50,7 @@ registerAction2(class extends Action2 {
 				order: 1,
 			},
 			metadata: {
-				description: localize2('minWelcomeDescription', 'Opens a Walkthrough to help you get started in Drydock.')
+				description: localize2('minWelcomeDescription', 'Opens a Walkthrough to help you get started in Parlay.')
 			}
 		});
 	}

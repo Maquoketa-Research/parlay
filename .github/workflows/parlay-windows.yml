@@ -1,0 +1,44 @@
+# Parlay, Windows x64: the same steps as build/parlay/build-win32.sh on a hosted runner. Output: the
+# user installer as a workflow artifact. Around two hours.
+name: Parlay (Windows x64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: parlay-windows
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python for node-gyp
+        run: |
+          pip install setuptools
+          echo "npm_config_python=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: bash build/parlay/build-win32.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ParlayUserSetup-x64
+          path: .build/parlay/*.exe
+          if-no-files-found: error

@@ -97,8 +97,8 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 		// Parlay: glass follows the setting live. Windows 11 can swap the backdrop of an existing window;
 		// the workbench toggles its transparency class on the same change.
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
-			if (e.affectsConfiguration('drydock.glass') && process.platform === 'win32') {
-				const glass = this.configurationService.getValue<boolean>('drydock.glass') === true;
+			if (e.affectsConfiguration('parlay.glass') && process.platform === 'win32') {
+				const glass = this.configurationService.getValue<boolean>('parlay.glass') === true;
 				for (const window of electron.BrowserWindow.getAllWindows()) {
 					window.setBackgroundMaterial(glass ? 'acrylic' : 'none');
 					window.setBackgroundColor(glass ? '#00000000' : this.getBackgroundColor());
@@ -342,7 +342,7 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 		for (const window of getAllWindowsExcludingOffscreen()) {
 			if (window.id === windowId) {
 				// Parlay: a glass window keeps its transparent background; the splash colour would paint it opaque
-				if (this.configurationService.getValue<boolean>('drydock.glass') === true) {
+				if (this.configurationService.getValue<boolean>('parlay.glass') === true) {
 					break;
 				}
 				window.setBackgroundColor(splash.colorInfo.background);

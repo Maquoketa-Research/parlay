@@ -234,8 +234,8 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 	get minimumHeight(): number {
 		const wcoEnabled = isWeb && isWCOEnabled();
 		let value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;
-		// Parlay: a second row for the menu when the header is stacked (drydock.css lays it out)
-		if (!this.isAuxiliary && this.configurationService.getValue<boolean>('drydock.stackedHeader') === true) {
+		// Parlay: a second row for the menu when the header is stacked (parlay.css lays it out)
+		if (!this.isAuxiliary && this.configurationService.getValue<boolean>('parlay.stackedHeader') === true) {
 			value += 26;
 		}
 		if (wcoEnabled) {

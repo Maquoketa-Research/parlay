@@ -334,7 +334,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 		let productJsonContents: string;
 		const productJsonStream = gulp.src(['product.json'], { base: '.' })
 			.pipe(jsonEditor((json: Record<string, unknown>) => {
-				json.serverDownloadUrlTemplate = 'https://github.com/Maquoketa-Research/drydock-ide/releases/download/1.135.06208/drydock-reh-${os}-${arch}-1.135.06208.tar.gz';
+				json.serverDownloadUrlTemplate = 'https://github.com/Maquoketa-Research/parlay-ide/releases/download/1.135.06208/parlay-reh-${os}-${arch}-1.135.06208.tar.gz';
 				json.commit = commit;
 				json.date = readISODate(out);
 				json.checksums = checksums;

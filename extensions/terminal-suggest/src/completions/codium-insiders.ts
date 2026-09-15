@@ -2,7 +2,7 @@ import code from './code';
 
 const codiumInsidersCompletionSpec: Fig.Spec = {
 	...code,
-	name: 'drydock-insiders',
+	name: 'parlay-insiders',
 	description: 'Parlay Insiders',
 };
 

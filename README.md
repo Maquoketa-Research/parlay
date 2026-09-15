@@ -12,9 +12,9 @@ Three looks, one setting: **Parlay Dark** (default), **Parlay Glass** (real Wind
 | Path | What |
 | --- | --- |
 | everything else | Visual Studio Code at the upstream tag in `package.json`, with [VSCodium](https://github.com/VSCodium/vscodium)'s build patches applied (telemetry out, Open VSX as the gallery, update feed off, the app renamed) and Parlay's own changes on top: glass chrome, the two-row header, the look (`src/vs/workbench/browser/media/style.css`), `product.json`, the icons under `resources/win32` |
-| `extensions/drydock-ide/` | the Parlay extension, built in like `git` or `emmet`: the Claude right-click actions and skills, the Aqua, Meshy and Sonar sidebars, the themes, the Script Sync helpers ([its README](extensions/drydock-ide/README.md)) |
-| `build/drydock/` | the fork's build: `build-win32.sh` (app and installer), `fetch-builtins.sh` (luau-lsp and StyLua from Open VSX, Selene built from source), `icons.py` and `logo.png` (the mark), `shots.ps1` (theme captures) |
-| `.github/workflows/drydock-windows.yml` | the same build on a hosted Windows runner; the installer is the artifact |
+| `extensions/parlay-ide/` | the Parlay extension, built in like `git` or `emmet`: the Claude right-click actions and skills, the Aqua, Meshy and Sonar sidebars, the themes, the Script Sync helpers ([its README](extensions/parlay-ide/README.md)) |
+| `build/parlay/` | the fork's build: `build-win32.sh` (app and installer), `fetch-builtins.sh` (luau-lsp and StyLua from Open VSX, Selene built from source), `icons.py` and `logo.png` (the mark), `shots.ps1` (theme captures) |
+| `.github/workflows/parlay-windows.yml` | the same build on a hosted Windows runner; the installer is the artifact |
 
 Bundled Roblox tooling: luau-lsp, StyLua, Selene.
 
@@ -24,14 +24,14 @@ Needs node per `.nvmrc`, Python 3 with setuptools, Visual Studio Build Tools wit
 libraries, and about 15 minutes after the first `npm ci`.
 
 ```
-bash build/drydock/build-win32.sh
+bash build/parlay/build-win32.sh
 ```
 
 App folder: `../VSCode-win32-x64/Parlay.exe`. Installer: `.build/parlay/ParlayUserSetup-x64-<version>.exe`.
-The version is upstream's plus a build stamp; `RELEASE_VERSION=... bash build/drydock/build-win32.sh` pins it.
+The version is upstream's plus a build stamp; `RELEASE_VERSION=... bash build/parlay/build-win32.sh` pins it.
 
-To work on the extension alone: `npm run compile-extension:drydock-ide` from the root, and
-`node tools/check.mjs` inside `extensions/drydock-ide`. `bash extensions/drydock-ide/tools/baketest/run.sh`
+To work on the extension alone: `npm run compile-extension:parlay-ide` from the root, and
+`node tools/check.mjs` inside `extensions/parlay-ide`. `bash extensions/parlay-ide/tools/baketest/run.sh`
 checks the Meshy paint bake headless in Edge.
 
 ## Keeping up with upstream
@@ -42,4 +42,4 @@ where hunks moved (their `patches/` directory is the reference), rebuild.
 ## Licence
 
 Visual Studio Code is MIT, Microsoft Corporation (`LICENSE.txt`). VSCodium's patches are MIT. Parlay's
-changes and the extension are MIT, Maquoketa Research (`extensions/drydock-ide/LICENSE.txt`).
+changes and the extension are MIT, Maquoketa Research (`extensions/parlay-ide/LICENSE.txt`).

@@ -167,8 +167,8 @@ export function defaultBrowserWindowOptions(accessor: ServicesAccessor, windowSt
 	};
 
 	// Parlay: glass chrome. Windows 11 draws acrylic behind the window; the window itself is transparent
-	// so the alpha-coloured parts of the Parlay Glass theme let it through. Gated on drydock.glass.
-	if (isWindows && configurationService.getValue<boolean>('drydock.glass') === true) {
+	// so the alpha-coloured parts of the Parlay Glass theme let it through. Gated on parlay.glass.
+	if (isWindows && configurationService.getValue<boolean>('parlay.glass') === true) {
 		options.backgroundMaterial = 'acrylic';
 		options.backgroundColor = '#00000000';
 	}

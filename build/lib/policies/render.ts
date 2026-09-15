@@ -190,11 +190,11 @@ export function renderProfileManifest(appName: string, bundleIdentifier: string,
 <plist version="1.0">
 <dict>
     <key>pfm_app_url</key>
-    <string>https://github.com/Maquoketa-Research/drydock-ide</string>
+    <string>https://github.com/Maquoketa-Research/parlay-ide</string>
     <key>pfm_description</key>
     <string>${appName} Managed Settings</string>
     <key>pfm_documentation_url</key>
-    <string>https://github.com/Maquoketa-Research/drydock-ide</string>
+    <string>https://github.com/Maquoketa-Research/parlay-ide</string>
     <key>pfm_domain</key>
     <string>${bundleIdentifier}</string>
     <key>pfm_format_version</key>
@@ -260,7 +260,7 @@ ${policyEntries}
 			</dict>
 		</array>
 		<key>PayloadDescription</key>
-		<string>This profile manages ${appName}. For more information see https://github.com/Maquoketa-Research/drydock-ide</string>
+		<string>This profile manages ${appName}. For more information see https://github.com/Maquoketa-Research/parlay-ide</string>
 		<key>PayloadDisplayName</key>
 		<string>${appName}</string>
 		<key>PayloadIdentifier</key>

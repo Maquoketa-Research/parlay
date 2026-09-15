@@ -245,7 +245,7 @@
 	"typescript.preferences.preferTypeOnlyAutoImports": "Include the `type` keyword in auto-imports whenever possible. Requires using TypeScript 5.3+ in the workspace.",
 	"typescript.workspaceSymbols.excludeLibrarySymbols": "Exclude symbols that come from library files in `Go to Symbol in Workspace` results. Requires using TypeScript 5.3+ in the workspace.",
 	"configuration.workspaceSymbols.excludeLibrarySymbols.unifiedDeprecationMessage": "This setting is deprecated. Use `#js/ts.workspaceSymbols.excludeLibrarySymbols#` instead.",
-	"typescript.updateImportsOnFileMove.enabled": "Enable/disable automatic updating of import paths when you rename or move a file in Drydock.",
+	"typescript.updateImportsOnFileMove.enabled": "Enable/disable automatic updating of import paths when you rename or move a file in Parlay.",
 	"typescript.updateImportsOnFileMove.enabled.prompt": "Prompt on each rename.",
 	"typescript.updateImportsOnFileMove.enabled.always": "Always update paths automatically.",
 	"typescript.updateImportsOnFileMove.enabled.never": "Never rename paths and don't prompt.",
@@ -333,8 +333,8 @@
 	"walkthroughs.nodejsWelcome.makeJsFile.description": "Let's write our first JavaScript file. We'll have to create a new file and save it with the ``.js`` extension at the end of the file name.\n[Create a JavaScript File](command:javascript-walkthrough.commands.createJsFile)",
 	"walkthroughs.nodejsWelcome.debugJsFile.title": "Run and Debug your JavaScript",
 	"walkthroughs.nodejsWelcome.debugJsFile.description": "Once you've installed Node.js, you can run JavaScript programs at a terminal by entering ``node your-file-name.js``\nAnother easy way to run Node.js programs is by using Parlay's debugger which lets you run your code, pause at different points, and help you understand what's going on step-by-step.\n[Start Debugging](command:javascript-walkthrough.commands.debugJsFile)",
-	"walkthroughs.nodejsWelcome.debugJsFile.altText": "Debug and run your JavaScript code in Node.js with Drydock.",
+	"walkthroughs.nodejsWelcome.debugJsFile.altText": "Debug and run your JavaScript code in Node.js with Parlay.",
 	"walkthroughs.nodejsWelcome.learnMoreAboutJs.title": "Explore More",
 	"walkthroughs.nodejsWelcome.learnMoreAboutJs.description": "Want to get more comfortable with JavaScript, Node.js, and Parlay? Be sure to check out our docs!\nWe've got lots of resources for learning [JavaScript](https://code.visualstudio.com/docs/nodejs/working-with-javascript) and [Node.js](https://code.visualstudio.com/docs/nodejs/nodejs-tutorial).\n\n[Learn More](https://code.visualstudio.com/docs/nodejs/nodejs-tutorial)",
-	"walkthroughs.nodejsWelcome.learnMoreAboutJs.altText": "Learn more about JavaScript and Node.js in Drydock."
+	"walkthroughs.nodejsWelcome.learnMoreAboutJs.altText": "Learn more about JavaScript and Node.js in Parlay."
 }

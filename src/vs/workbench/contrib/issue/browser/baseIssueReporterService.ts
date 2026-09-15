@@ -853,7 +853,7 @@ export class BaseIssueReporterService extends Disposable {
 
 	public searchVSCodeIssues(title: string, issueDescription?: string): void {
 		if (title) {
-			this.searchGitHub('Maquoketa-Research/drydock-ide', title);
+			this.searchGitHub('Maquoketa-Research/parlay-ide', title);
 		} else {
 			this.clearSearchResults();
 		}
