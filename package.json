@@ -266,7 +266,6 @@
       },
       "drydock.glass": false,
       "workbench.activityBar.location": "bottom",
-      "window.menuBarVisibility": "compact",
       "window.commandCenter": false,
       "workbench.layoutControl.enabled": false,
       "editor.minimap.enabled": false,
@@ -276,8 +275,7 @@
       "workbench.tree.indent": 14,
       "workbench.editor.tabSizing": "shrink",
       "workbench.startupEditor": "none",
-      "window.titleBarStyle": "custom",
-      "window.menuStyle": "custom"
+      "workbench.secondarySideBar.defaultVisibility": "hidden"
     }
   },
   "scripts": {

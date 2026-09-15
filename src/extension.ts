@@ -40,9 +40,9 @@ export function activate(ctx: vscode.ExtensionContext) {
 		send(`/drydock-insert-asset ${clean(id.trim())}`);
 	}));
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("drydock.sonar", new UrlView("sonarUrl", "Sonar")));
-	if (!ctx.globalState.get("panelShown")) {
-		void ctx.globalState.update("panelShown", true);
-		void vscode.commands.executeCommand("drydock.aqua.focus");
+	if (!ctx.globalState.get("firstRunDone")) {
+		void ctx.globalState.update("firstRunDone", true);
+		void firstRun();
 	}
 
 	// The lens over the selection: Explain · Fix · Validate, without a right-click.
@@ -60,6 +60,27 @@ export function activate(ctx: vscode.ExtensionContext) {
 	void refreshStatus(status);
 	const timer = setInterval(() => void refreshStatus(status), 30_000);
 	ctx.subscriptions.push({ dispose: () => clearInterval(timer) });
+}
+
+// ---- first run ----------------------------------------------------------------------------------
+
+// The look that configurationDefaults cannot give us: VS Code refuses extension defaults for application-scoped
+// settings (window.*), and the panel position is layout state, not a setting. Written once to the user's
+// settings, so they can change any of it afterwards.
+async function firstRun() {
+	const cfg = vscode.workspace.getConfiguration();
+	const want: Record<string, unknown> = {
+		"window.menuBarVisibility": "compact",   // the menu folds into a hamburger in the activity bar
+		"window.menuStyle": "custom",             // menus drawn by the theme, not by Windows
+		"window.titleBarStyle": "custom",
+		"editor.minimap.enabled": false,
+	};
+	for (const [k, v] of Object.entries(want)) {
+		if (cfg.inspect(k)?.globalValue === undefined) await cfg.update(k, v, vscode.ConfigurationTarget.Global);
+	}
+	await vscode.commands.executeCommand("workbench.action.positionPanelRight");
+	await vscode.commands.executeCommand("workbench.action.closeAuxiliaryBar");
+	await vscode.commands.executeCommand("drydock.aqua.focus");
 }
 
 // ---- the actions --------------------------------------------------------------------------------

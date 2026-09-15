@@ -32,7 +32,7 @@ index 7c4f02ef..0b9a7c9a 100644
  		let borderSetting = windowSettings?.border || 'default';
  		if (borderSetting === 'system') {
 diff --git a/src/vs/workbench/browser/media/style.css b/src/vs/workbench/browser/media/style.css
-index 8c7a7a5f..bc585b7d 100644
+index 8c7a7a5f..e729bf6a 100644
 --- a/src/vs/workbench/browser/media/style.css
 +++ b/src/vs/workbench/browser/media/style.css
 @@ -394,4 +394,85 @@ body {
@@ -55,7 +55,7 @@ index 8c7a7a5f..bc585b7d 100644
 +   Layout is untouched: the gaps are clip-paths, so nothing moves and nothing breaks when upstream changes. */
 +
 +.monaco-workbench {
-+	--drydock-radius: 12px;
++	--drydock-radius: 14px;
 +	--drydock-edge: rgba(255, 255, 255, 0.08);
 +	font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
 +}
@@ -65,7 +65,7 @@ index 8c7a7a5f..bc585b7d 100644
 +.monaco-workbench .part.sidebar,
 +.monaco-workbench .part.auxiliarybar,
 +.monaco-workbench .part.panel {
-+	clip-path: inset(4px round var(--drydock-radius));
++	clip-path: inset(6px round var(--drydock-radius));
 +}
 +.monaco-workbench .part.sidebar > .content,
 +.monaco-workbench .part.auxiliarybar > .content,
