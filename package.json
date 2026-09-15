@@ -156,31 +156,15 @@
     },
     "viewsContainers": {
       "secondarySidebar": [
-        {
-          "id": "drydock",
-          "title": "Drydock",
-          "icon": "media/drydock.svg"
-        }
+        { "id": "drydock-aqua", "title": "Aqua", "icon": "media/aqua.svg" },
+        { "id": "drydock-meshy", "title": "Meshy", "icon": "media/meshy.svg" },
+        { "id": "drydock-sonar", "title": "Sonar", "icon": "media/sonar.svg" }
       ]
     },
     "views": {
-      "drydock": [
-        {
-          "type": "webview",
-          "id": "drydock.aqua",
-          "name": "Aqua"
-        },
-        {
-          "type": "webview",
-          "id": "drydock.meshy",
-          "name": "Meshy"
-        },
-        {
-          "type": "webview",
-          "id": "drydock.sonar",
-          "name": "Sonar"
-        }
-      ]
+      "drydock-aqua": [ { "type": "webview", "id": "drydock.aqua", "name": "Aqua" } ],
+      "drydock-meshy": [ { "type": "webview", "id": "drydock.meshy", "name": "Meshy" } ],
+      "drydock-sonar": [ { "type": "webview", "id": "drydock.sonar", "name": "Sonar" } ]
     },
     "themes": [
       {
