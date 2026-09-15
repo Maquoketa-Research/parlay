@@ -93,7 +93,7 @@ glass_colors.update({
     "editorSuggestWidget.background": "#2A2E36", "editorHoverWidget.background": "#2A2E36", "editorHoverWidget.border": "#FFFFFF33",
     "notifications.background": "#2A2E36", "notifications.border": "#FFFFFF33",
     "input.background": "#FFFFFF0A", "input.border": "#FFFFFF22", "widget.shadow": "#00000066",
-    "terminal.background": "#111317",
+    "terminal.background": "#111317",   # xterm ignores alpha unless terminal images are on; keep it opaque like the editor
 })
 
 paper_colors = chrome(

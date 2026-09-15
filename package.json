@@ -296,7 +296,8 @@
       "workbench.startupEditor": "none",
       "workbench.secondarySideBar.defaultVisibility": "visible",
       "window.titleSeparator": "  ·  ",
-      "drydock.stackedHeader": true
+      "drydock.stackedHeader": true,
+    "luau-lsp.sourcemap.autogenerate": false
     }
   },
   "scripts": {

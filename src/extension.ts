@@ -48,6 +48,9 @@ export function activate(ctx: vscode.ExtensionContext) {
 	}
 	// The workbench reads this before extension defaults are registered, so it has to live in user settings.
 	void ensureUserSetting("drydock.stackedHeader", true);
+	// Windows draws the glass acrylic in the OS colour mode; a light-mode desktop turns a dark theme to grey mud.
+	// "auto" makes the native tint follow the colour theme (dark for Dark/Glass/Aqua, light for Paper).
+	void ensureUserSetting("window.systemColorTheme", "auto");
 	// Layout v2: Drydock is its own container in the right sidebar; the terminal panel goes back to the bottom.
 	if (!ctx.globalState.get("layoutV2Done")) {
 		void ctx.globalState.update("layoutV2Done", true);
@@ -88,12 +91,8 @@ async function ensureUserSetting(key: string, value: unknown) {
 // settings, so they can change any of it afterwards.
 async function firstRun() {
 	const cfg = vscode.workspace.getConfiguration();
-	const want: Record<string, unknown> = {
-		"editor.minimap.enabled": false,
-		// Script Sync folders have no Rojo project; stop luau-lsp asking for one. The Studio companion plugin
-		// can supply the DataModel later (luau-lsp's own "Setup Plugin" flow).
-		"luau-lsp.sourcemap.autogenerate": false,
-	};
+	// (luau-lsp.sourcemap.autogenerate lives in configurationDefaults: it has to be off before luau-lsp starts)
+	const want: Record<string, unknown> = { "editor.minimap.enabled": false };
 	for (const [k, v] of Object.entries(want)) {
 		if (cfg.inspect(k)?.globalValue === undefined) await cfg.update(k, v, vscode.ConfigurationTarget.Global);
 	}

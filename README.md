@@ -5,7 +5,7 @@ to act on a selection, and keep Aqua, Sonar and the terminal on the right. Three
 **Drydock Dark** (default), **Drydock Paper**, **Drydock Glass**.
 
 This repo is a VS Code extension plus the fork configuration under `fork/`. The extension runs in plain
-VS Code today; the fork (`fork/README.md`) turns it into the standalone **M | Drydock IDE** app.
+VS Code today; the fork (`fork/README.md`) turns it into the standalone **Drydock IDE** app.
 
 ## What it does
 
