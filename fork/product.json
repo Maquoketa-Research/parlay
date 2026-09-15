@@ -1,0 +1,37 @@
+{
+  "nameShort": "Drydock IDE",
+  "nameLong": "Drydock IDE",
+  "applicationName": "drydock-ide",
+  "dataFolderName": ".drydock-ide",
+  "win32MutexName": "drydockide",
+  "win32DirName": "Drydock IDE",
+  "win32NameVersion": "Drydock IDE",
+  "win32RegValueName": "DrydockIDE",
+  "win32AppUserModelId": "Maquoketa.DrydockIDE",
+  "win32ShellNameShort": "Drydock IDE",
+  "licenseName": "MIT",
+  "licenseUrl": "https://github.com/Maquoketa-Research/drydock-ide/blob/main/LICENSE",
+  "extensionsGallery": {
+    "serviceUrl": "https://open-vsx.org/vscode/gallery",
+    "itemUrl": "https://open-vsx.org/vscode/item",
+    "resourceUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}",
+    "controlUrl": "",
+    "recommendationsUrl": ""
+  },
+  "linkProtectionTrustedDomains": ["https://open-vsx.org", "https://create.roblox.com", "https://devforum.roblox.com"],
+  "extensionRecommendations": {},
+  "builtInExtensions": [
+    { "name": "JohnnyMorganz.luau-lsp", "version": "1.69.0", "repo": "https://github.com/JohnnyMorganz/luau-lsp", "metadata": { "id": "luau-lsp", "publisherId": { "publisherName": "JohnnyMorganz" } } },
+    { "name": "JohnnyMorganz.stylua", "version": "1.7.2", "repo": "https://github.com/JohnnyMorganz/StyLua", "metadata": { "id": "stylua", "publisherId": { "publisherName": "JohnnyMorganz" } } },
+    { "name": "Anthropic.claude-code", "version": "2.1.270", "repo": "https://github.com/anthropics/claude-code", "metadata": { "id": "claude-code", "publisherId": { "publisherName": "Anthropic" } } }
+  ],
+  "configurationDefaults": {
+    "workbench.colorTheme": "Drydock Dark",
+    "workbench.panel.defaultLocation": "right",
+    "window.titleBarStyle": "custom",
+    "window.title": "M | Drydock IDE${separator}${dirty}${activeEditorShort}${separator}${rootName}",
+    "telemetry.telemetryLevel": "off",
+    "update.mode": "manual",
+    "extensions.autoUpdate": true
+  }
+}

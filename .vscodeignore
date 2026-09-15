@@ -1,0 +1,6 @@
+src/**
+tools/**
+fork/**
+node_modules/**
+tsconfig.json
+.gitignore
