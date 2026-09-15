@@ -13,7 +13,7 @@ Three looks, one setting: **Parlay Dark** (default), **Parlay Glass** (real Wind
 | --- | --- |
 | everything else | Visual Studio Code at the upstream tag in `package.json`, with [VSCodium](https://github.com/VSCodium/vscodium)'s build patches applied (telemetry out, Open VSX as the gallery, update feed off, the app renamed) and Parlay's own changes on top: glass chrome, the two-row header, the look (`src/vs/workbench/browser/media/style.css`), `product.json`, the icons under `resources/win32` |
 | `extensions/parlay-ide/` | the Parlay extension, built in like `git` or `emmet`: the Claude right-click actions and skills, the Aqua, Meshy and Sonar sidebars, the themes, the Script Sync helpers ([its README](extensions/parlay-ide/README.md)) |
-| `build/parlay/` | the fork's build: `build-win32.sh` (app and installer), `fetch-builtins.sh` (luau-lsp and StyLua from Open VSX, Selene built from source), `icons.py` and `logo.png` (the mark), `shots.ps1` (theme captures) |
+| `build/parlay/` | the fork's build: `build-win32.sh` (app and installer), `fetch-builtins.sh` (luau-lsp and StyLua from Open VSX, Selene built from source), `icons.py` and `logo.png` (the spade, every icon), `shots.ps1` (theme captures) |
 | `.github/workflows/parlay-windows.yml` | the same build on a hosted Windows runner; the installer is the artifact |
 
 Bundled Roblox tooling: luau-lsp, StyLua, Selene.
