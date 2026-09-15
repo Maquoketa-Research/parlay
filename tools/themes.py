@@ -77,15 +77,18 @@ dark_colors = chrome(
 )
 dark_tokens = tokens("#9FB3C8", "#A3B99A", "#E6E8EB", "#C9B27C", "#7B8290", "#D7DAE0", "#B3A3C8")
 
+# Glass chrome: dark tints with alpha over the window's acrylic, so the desktop shows through but light text
+# stays readable over a bright backdrop too. Alpha A6 = 65%, 8C = 55%, B3 = 70%.
 glass_colors = dict(dark_colors)
 glass_colors.update({
-    "sideBar.background": "#FFFFFF12", "sideBar.border": "#FFFFFF22", "sideBarSectionHeader.background": "#FFFFFF00",
-    "activityBar.background": "#FFFFFF0A", "activityBar.border": "#FFFFFF22",
-    "titleBar.activeBackground": "#FFFFFF12", "titleBar.inactiveBackground": "#FFFFFF0C", "titleBar.border": "#FFFFFF22",
-    "statusBar.background": "#FFFFFF12", "statusBar.border": "#FFFFFF22", "statusBar.noFolderBackground": "#FFFFFF12",
-    "panel.background": "#FFFFFF0C", "panel.border": "#FFFFFF22",
-    "tab.inactiveBackground": "#FFFFFF08", "tab.border": "#FFFFFF1A",
-    "editorGroupHeader.tabsBackground": "#FFFFFF0C", "editorGroupHeader.tabsBorder": "#FFFFFF22",
+    "sideBar.background": "#0E1013A6", "sideBar.border": "#FFFFFF1F", "sideBarSectionHeader.background": "#00000000",
+    "activityBar.background": "#0B0D10B3", "activityBar.border": "#FFFFFF1F",
+    "titleBar.activeBackground": "#0E1013A6", "titleBar.inactiveBackground": "#0E10138C", "titleBar.border": "#FFFFFF1F",
+    "statusBar.background": "#0E1013A6", "statusBar.border": "#FFFFFF1F", "statusBar.noFolderBackground": "#0E1013A6",
+    "panel.background": "#0E10138C", "panel.border": "#FFFFFF1F",
+    "tab.inactiveBackground": "#0E10138C", "tab.border": "#FFFFFF14",
+    "editorGroupHeader.tabsBackground": "#0E10138C", "editorGroupHeader.tabsBorder": "#FFFFFF1F",
+    "editorGroup.emptyBackground": "#0E10138C",
     "menu.background": "#2A2E36", "menu.border": "#FFFFFF33", "editorWidget.background": "#2A2E36", "editorWidget.border": "#FFFFFF33",
     "editorSuggestWidget.background": "#2A2E36", "editorHoverWidget.background": "#2A2E36", "editorHoverWidget.border": "#FFFFFF33",
     "notifications.background": "#2A2E36", "notifications.border": "#FFFFFF33",

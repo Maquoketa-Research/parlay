@@ -17,10 +17,15 @@ Follow `Documents/ide-designs-2026-09-14/research/01-vscode-fork.md` for the sou
    and never list the absent marketplace ID (squat risk). This repo's own extension is bundled the same way.
 4. Updates: ride VSCodium's static `latest.json` patch and publish installers to GitHub Releases. Rebase on
    upstream monthly; skip the weekly builds.
-5. **Glass window (later):** the Glass theme's alpha chrome only becomes real glass when the Electron window
-   is created with `backgroundMaterial: "acrylic"` (Windows 11) and a transparent background. That is one
-   patch in `src/vs/platform/windows/electron-main/windowImpl.ts`, gated on a setting. Do it after the first
-   plain build ships; a wrong patch there is a blank window.
+5. **Glass window:** `patches/drydock-glass.patch`, applied by the harness after VSCodium's own patches
+   (`patches/user/`). Gated on the setting `drydock.glass`, which the extension turns on when the Drydock Glass
+   theme is chosen. Three hunks: `windows.ts` gives the BrowserWindow `backgroundMaterial: "acrylic"` and a
+   transparent background (Windows 11 22H2+), `workbench.ts` adds a `drydock-glass` class to the root and body,
+   `style.css` makes that root transparent so the theme's alpha chrome shows the acrylic. The editor keeps its
+   opaque background. Regenerate with `python tools/glass-patch.py <vscode-checkout>` when upstream moves an
+   anchor; the script fails loudly rather than guessing.
+6. **Bundled tooling:** luau-lsp (win32-x64) and StyLua are downloaded from Open VSX at build time and shipped
+   as `vsix` built-ins beside our own extension, so a fresh install opens `.luau` with language support.
 
 CI: `.github/workflows/fork-windows.yml`, one windows-2022 job. `tools/build-local.sh` runs the same steps on a
 developer machine (first local build 2026-09-15: about 10 minutes to the app bundle on a 64-core box, then the

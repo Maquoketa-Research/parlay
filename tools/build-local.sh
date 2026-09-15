@@ -43,7 +43,7 @@ if [[ ! -d vscode/.git ]]; then
 else
   echo "== 2/6 upstream source already present, reusing vscode/ (delete it for a fresh fetch)"
   # get_repo.sh exports these; recompute the same way it does when the checkout is reused
-  export MS_TAG="$(jq -r .tag upstream/stable.json)" MS_COMMIT="$(jq -r .commit upstream/stable.json)"
+  export MS_TAG="$(jq -r .tag upstream/stable.json | tr -d '\r')" MS_COMMIT="$(jq -r .commit upstream/stable.json | tr -d '\r')"
   export RELEASE_VERSION="${RELEASE_VERSION:-${MS_TAG}$(printf "%04d" $(( $(date +%-j) * 24 + $(date +%-H) )))}"
 fi
 echo "== MS_TAG=${MS_TAG:-?} MS_COMMIT=${MS_COMMIT:-?} RELEASE_VERSION=${RELEASE_VERSION:-?}"
@@ -62,7 +62,7 @@ fetch "https://open-vsx.org/api/JohnnyMorganz/stylua/1.7.2/file/JohnnyMorganz.st
 cp "$CACHE/luau-lsp-1.69.0-win32-x64.vsix" vscode/build/builtin/luau-lsp.vsix
 cp "$CACHE/stylua-1.7.2.vsix" vscode/build/builtin/stylua.vsix
 # every vsix built-in carries the hash of the file it points at
-for f in $(jq -r '.builtInExtensions[] | select(.vsix) | .vsix' product.json); do
+for f in $(jq -r '.builtInExtensions[] | select(.vsix) | .vsix' product.json | tr -d '\r'); do   # Windows jq prints CRLF
   SHA="$(sha256sum "vscode/$f" | cut -d' ' -f1)"
   jq --arg f "$f" --arg sha "$SHA" '(.builtInExtensions[] | select(.vsix == $f) | .sha256) = $sha' product.json > product.tmp && mv product.tmp product.json
 done

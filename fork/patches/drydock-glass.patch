@@ -1,3 +1,18 @@
+diff --git a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
+index 0009eb39..a4ffba51 100644
+--- a/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
++++ b/src/vs/platform/theme/electron-main/themeMainServiceImpl.ts
+@@ -329,6 +329,10 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
+ 	private updateBackgroundColor(windowId: number, splash: IPartsSplash): void {
+ 		for (const window of getAllWindowsExcludingOffscreen()) {
+ 			if (window.id === windowId) {
++				// Drydock: a glass window keeps its transparent background; the splash colour would paint it opaque
++				if (this.configurationService.getValue<boolean>('drydock.glass') === true) {
++					break;
++				}
+ 				window.setBackgroundColor(splash.colorInfo.background);
+ 				break;
+ 			}
 diff --git a/src/vs/platform/windows/electron-main/windows.ts b/src/vs/platform/windows/electron-main/windows.ts
 index 7c4f02ef..0b9a7c9a 100644
 --- a/src/vs/platform/windows/electron-main/windows.ts

@@ -36,6 +36,15 @@ FILES = {
         "\t\t\tthis.mainContainer.ownerDocument.body.classList.add('drydock-glass');\n"
         "\t\t}\n",
     ),
+    "src/vs/platform/theme/electron-main/themeMainServiceImpl.ts": (
+        "\t\t\tif (window.id === windowId) {\n\t\t\t\twindow.setBackgroundColor(splash.colorInfo.background);\n",
+        "\t\t\tif (window.id === windowId) {\n"
+        "\t\t\t\t// Drydock: a glass window keeps its transparent background; the splash colour would paint it opaque\n"
+        "\t\t\t\tif (this.configurationService.getValue<boolean>('drydock.glass') === true) {\n"
+        "\t\t\t\t\tbreak;\n"
+        "\t\t\t\t}\n"
+        "\t\t\t\twindow.setBackgroundColor(splash.colorInfo.background);\n",
+    ),
     "src/vs/workbench/browser/media/style.css": (
         None,  # append
         "\n/* Drydock: glass chrome (setting drydock.glass). The root is transparent so the window's acrylic\n"
