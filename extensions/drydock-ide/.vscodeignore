@@ -1,6 +1,9 @@
 src/**
 tools/**
-fork/**
+out/**
+tsconfig*.json
+**/*.tsbuildinfo
+esbuild*.mts
+package-lock.json
 node_modules/**
-tsconfig.json
 .gitignore
