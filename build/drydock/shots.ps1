@@ -1,9 +1,9 @@
 # Launch the built Parlay once per theme on the sample workspace and capture each window to PNG.
-#   powershell -File tools\shots.ps1 [-App <path\to\Parlay.exe>] [-Workspace <folder>] [-Out <folder>]
+#   powershell -File build\drydock\shots.ps1 [-App <path\to\Parlay.exe>] [-Workspace <folder>] [-Out <folder>]
 # Each theme gets its own temporary user-data-dir, so the captures show first-run defaults. Other Drydock windows
 # (yours) are left alone: only the instance this script launches is captured and closed.
 param(
-  [string]$App = "$env:USERPROFILE\dd\harness\VSCode-win32-x64\Parlay.exe",
+  [string]$App = "$env:USERPROFILE\Documents\GitHub\VSCode-win32-x64\Parlay.exe",
   [string]$Workspace = "$env:USERPROFILE\Documents\drydock-ide-sample",
   [string]$Out = "$env:USERPROFILE\dd\shots",
   [string[]]$Themes = @("Parlay Dark", "Parlay Glass", "Parlay Paper", "Parlay Aqua")
