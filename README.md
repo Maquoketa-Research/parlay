@@ -14,15 +14,20 @@ VS Code today; the fork (`fork/README.md`) turns it into the standalone **M | Dr
   The same menu sits on the editor title, and a lens appears over any multi-line selection (Explain, Fix,
   Validate, Ask). Each is a Claude Code skill (`skills/drydock-*/SKILL.md`) run in a terminal named Claude,
   on the file and line range you selected. The code lands in the file; with Script Sync on, it lands in Studio.
-- **Drydock panel** on the right, beside Terminal:
+- **Drydock sidebar** on the right (the secondary side bar, its own container, open by default, no hide button):
   - **Aqua**: the patch queue (`drydock.aquaUrl`). When the server is down the view shows a Start button that
     runs `uv run aqua serve --worker` from `drydock.aquaRepo` (or a sibling folder named aqua) and waits for it.
-  - **Meshy**: a prompt or a reference image goes to Meshy (text-to-3D preview, then Refine for textures, or
-    image-to-3D), the model lands in `assets/meshy/`, **Upload to Roblox** sends it through the Open Cloud
-    Assets API as a Model under `drydock.robloxCreatorId`, and **Insert in Studio** runs the
-    `drydock-insert-asset` skill in the open Studio. Keys: **Drydock: Set Meshy API key** and **Set Roblox
-    Open Cloud API key** (SecretStorage, never settings files).
+  - **Meshy**, as a workflow. Describe a prop ("an axe"). Screenshots of the game set the style: everything in
+    `assets/reference/` plus one live Studio capture through Roblox's Studio MCP when nothing else holds it.
+    An OpenAI image model (`drydock.imageModel`) drafts three concepts in that look; pick one. Meshy turns it
+    into a textured 3D model; a four-view turntable is the review. Approve, and the model uploads to Roblox
+    through the Open Cloud Assets API under `drydock.robloxCreatorId` and the `drydock-insert-asset` skill
+    places it in the open Studio. Files land in `assets/meshy/<slug>/`. Keys: **Drydock: Set OpenAI API key**
+    (or `OPENAI_API_KEY`), **Set Meshy API key**, **Set Roblox Open Cloud API key**; SecretStorage, never
+    settings files.
   - **Sonar**: the market instrument (`drydock.sonarUrl`).
+- **Header**: the mark, "Drydock IDE" and the file on the first row, the menu bar on the second
+  (`drydock.stackedHeader`; a fork patch adds the height, the stylesheet lays it out).
 - **Match assets to a Studio screenshot** (command): the `drydock-match-assets` skill finds six Creator Store
   candidates that fit the frame's look and lines them up in Studio for you to pick.
 - **Script Sync light** in the status bar: on when Studio syncs the open folder.
