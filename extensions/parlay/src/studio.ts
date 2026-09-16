@@ -52,7 +52,29 @@ export function toolText(result: any): string {
 	return content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") || JSON.stringify(result?.result ?? {});
 }
 
+// Open places, best source first: the Studio MCP server (names and placeIds), else the Studio windows themselves
+// (titles are "Place - Roblox Studio"; no placeId, but no seat needed). The MCP seat is exclusive per machine, so
+// while Claude Code is connected to Studio the first source fails and the second carries.
 export async function listStudios(): Promise<Studio[]> {
+	try {
+		const viaMcp = await listStudiosViaMcp();
+		if (viaMcp.length) return viaMcp;
+	} catch { /* seat taken or server down: fall through */ }
+	return listStudiosViaWindows();
+}
+
+async function listStudiosViaWindows(): Promise<Studio[]> {
+	if (process.platform !== "win32") return [];
+	const out = await new Promise<string>((res) => execFile("powershell", ["-NoProfile", "-Command",
+		"Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.MainWindowTitle }"],
+		{ windowsHide: true }, (_e, o) => res(String(o ?? ""))));
+	return out.split(/\r?\n/).map((t) => t.trim()).filter(Boolean)
+		.map((t) => t.replace(/\s*-\s*Roblox Studio.*$/i, "").replace(/^\*\s*/, "").trim())
+		.filter((n, i, a) => n && a.indexOf(n) === i)
+		.map((name) => ({ id: "", name, placeId: "" }));
+}
+
+async function listStudiosViaMcp(): Promise<Studio[]> {
 	return studioSession(async (call) => {
 		const r = await call("tools/call", { name: "list_roblox_studios", arguments: {} });
 		if (r?.error) throw new Error(String(r.error.message ?? JSON.stringify(r.error)));
@@ -130,20 +152,23 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		chosen = { id: "", name, placeId: "" };
 	}
 
-	// the folder Studio already syncs to, or a fresh one
+	// the folder Studio already syncs to, else the one Parlay made for this place before, else a fresh one
+	const home = path.join(cfg("projectsDir", "") || path.join(os.homedir(), "Documents", "Parlay"), slug(chosen.name));
 	let folder = await syncFolderFor(chosen.placeId);
-	const fresh = !folder;
-	if (!folder) {
-		folder = path.join(cfg("projectsDir", "") || path.join(os.homedir(), "Documents", "Parlay"), slug(chosen.name));
-		fs.mkdirSync(folder, { recursive: true });
-	}
+	const synced = !!folder;
+	if (!folder) { folder = home; fs.mkdirSync(folder, { recursive: true }); }
 	const gitNote = await wireGit(folder, chosen.name);
 	await ctx.globalState.update(`studioProject:${chosen.placeId || slug(chosen.name)}`, { folder, name: chosen.name, placeId: chosen.placeId, added: Date.now() });
 
-	if (fresh) {
+	if (!synced) {
 		await vscode.env.clipboard.writeText(folder);
+		// when Studio is reachable, leave the script containers selected so the right-click lands on the right thing
+		const selected = chosen.id ? await selectScriptContainers(chosen.id).catch(() => false) : false;
 		const how = await vscode.window.showInformationMessage(
-			`Parlay made ${folder} for "${chosen.name}" (path copied). ${gitNote}. In Studio: File, Script Sync, choose that folder; then right-click ServerScriptService, ReplicatedStorage and StarterPlayer and pick Sync to file. Scripts appear here as they sync.`,
+			`"${chosen.name}" is not syncing yet. Parlay made ${folder} (path on your clipboard; ${gitNote}). `
+			+ (selected ? "The script containers are selected in Studio's Explorer: right-click them, Sync to…, paste the path, Save."
+				: "In Studio's Explorer select ServerScriptService, ReplicatedStorage and StarterPlayer, right-click, Sync to…, paste the path, Save.")
+			+ " Scripts appear here as they sync, and Studio resumes the sync every time the place opens.",
 			{ modal: true }, "Open the folder", "How Script Sync works");
 		if (how === "How Script Sync works") void vscode.env.openExternal(vscode.Uri.parse("https://create.roblox.com/docs/scripting/sync"));
 		if (!how) return;
@@ -151,4 +176,13 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		void vscode.window.showInformationMessage(`Parlay: "${chosen.name}" syncs to ${folder}. ${gitNote}.`);
 	}
 	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(folder), { forceNewWindow: false });
+}
+
+// Studio's Explorer selection, set through the MCP server's Luau runner (Edit DataModel). True when it worked.
+async function selectScriptContainers(studioId: string): Promise<boolean> {
+	const code = "local s = game:GetService('Selection'); local t = {}; for _, n in ipairs({'ServerScriptService','ReplicatedStorage','StarterPlayer','ServerStorage','StarterGui'}) do local ok, svc = pcall(game.GetService, game, n); if ok and svc then table.insert(t, svc) end end; s:Set(t); return #t";
+	return studioSession(async (call) => {
+		const r = await call("tools/call", { name: "execute_luau", arguments: { studio_id: studioId, datamodel_type: "Edit", code } });
+		return !r?.error && !r?.result?.isError;
+	}, 15000);
 }
