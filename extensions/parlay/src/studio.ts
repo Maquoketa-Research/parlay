@@ -254,10 +254,15 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		await writeSyncRecord(slot, folder, keep, missing, starters, real);
 		log.appendLine(`wrote ${slot}: kept ${keep.length}, added ${[...missing, ...starters].join(", ")}; universe ${universe ?? "unknown"}`);
 		if (universe) openStudio(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`);
-		void vscode.window.showInformationMessage((universe
+		const head = universe
 			? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
-			: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`)
-			+ (starters.length ? ` Also syncing ${starters.join(", ")}.` : ` ${MANUAL_CONTAINERS} cannot be set up from outside Studio without a place file or an Open Cloud key: if they hold scripts, right-click them there, Sync to…, and pick the same folder.`));
+			: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`;
+		if (starters.length) { void vscode.window.showInformationMessage(`${head} Also syncing ${starters.join(", ")}.`); }
+		else {
+			// the Starter containers need their real ids, which only a place file or Open Cloud can give; offer the key here
+			void vscode.window.showInformationMessage(`${head} ${MANUAL_CONTAINERS} need an Open Cloud API key (or a saved place file) to sync automatically; with the key set, run Add Roblox Studio Project once more and they join. Until then, right-click them in Studio, Sync to…, same folder.`, "Set Open Cloud key")
+				.then((pick) => { if (pick) void vscode.commands.executeCommand("parlay.roblox.setKey"); });
+		}
 	} else if (!synced) {
 		{
 			await vscode.env.clipboard.writeText(folder);

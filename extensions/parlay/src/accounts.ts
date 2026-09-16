@@ -9,11 +9,16 @@ import { execFile } from "child_process";
 import { SCOPES as ROBLOX_SCOPES } from "./roblox-auth";
 
 type Msg = { cmd: string } | { clear: string } | { shell: string };
-interface Row { title: string; status: string; ok: boolean; note?: string; avatar?: string; actions: { label: string; msg: Msg; quiet?: boolean }[] }
+// icon: a codicon for the header menu; brand: a mark in media/brands for the page (CC0 from simpleicons, Meshy's favicon)
+interface Row { title: string; status: string; ok: boolean; note?: string; avatar?: string; icon: string; brand?: string; actions: { label: string; msg: Msg; quiet?: boolean }[] }
 
 export function registerAccounts(ctx: vscode.ExtensionContext) {
 	let panel: vscode.WebviewPanel | undefined;
-	const render = async () => { if (panel) { panel.webview.html = html(await rows(ctx), panel.webview.cspSource); } };
+	const render = async () => {
+		if (!panel) return;
+		const brand = (f: string) => panel!.webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, "media", "brands", f)).toString();
+		panel.webview.html = html(await rows(ctx), panel.webview.cspSource, brand);
+	};
 	ctx.subscriptions.push(vscode.authentication.onDidChangeSessions(() => void render()), ctx.secrets.onDidChange(() => void render()));
 	// one action, from the page or from the header menu
 	const act = async (m: Msg) => {
@@ -56,7 +61,7 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 		: [{ label: "Set key", msg: { cmd } }];
 	return [
 		{
-			title: "Roblox", status: roblox ? roblox.account.label : "Not signed in", ok: !!roblox, avatar: avatar(roblox),
+			title: "Roblox", status: roblox ? roblox.account.label : "Not signed in", ok: !!roblox, avatar: avatar(roblox), icon: "game", brand: "roblox.svg",
 			note: robloxKey ? "Open Cloud key set: Starter containers sync too." : "Open Cloud key not set: StarterPlayerScripts and StarterCharacterScripts stay a right-click in Studio.",
 			actions: [
 				roblox ? { label: "Sign out", msg: { cmd: "parlay.roblox.signOut" }, quiet: true } : { label: "Sign in", msg: { cmd: "parlay.roblox.signIn" } },
@@ -64,21 +69,21 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 			],
 		},
 		{
-			title: "Discord", status: discord ? discord.account.label : "Not linked", ok: !!discord, avatar: avatar(discord),
+			title: "Discord", status: discord ? discord.account.label : "Not linked", ok: !!discord, avatar: avatar(discord), icon: "comment-discussion", brand: "discord.svg",
 			actions: [discord ? { label: "Unlink", msg: { cmd: "parlay.discord.signOut" }, quiet: true } : { label: "Link Discord", msg: { cmd: "parlay.discord.signIn" } }],
 		},
 		{
-			title: "Meshy", status: meshyKey ? "API key set" : "No API key", ok: meshyKey, note: "Turns approved concept images into meshes.",
+			title: "Meshy", status: meshyKey ? "API key set" : "No API key", ok: meshyKey, note: "Turns approved concept images into meshes.", icon: "package", brand: "meshy.ico",
 			actions: keyActions("parlay.meshyApiKey", "parlay.meshy.setKey", meshyKey),
 		},
 		{
-			title: "Claude", status: claude.status, ok: claude.ok, note: "Claude Code, the agent behind every Parlay action.",
+			title: "Claude", status: claude.status, ok: claude.ok, note: "Claude Code, the agent behind every Parlay action.", icon: "sparkle", brand: "claude.svg",
 			actions: claude.ok
 				? [{ label: "Log out", msg: { shell: `${claudeCmd} auth logout` }, quiet: true }]
 				: [{ label: claude.installed ? "Log in" : "Install Claude Code", msg: claude.installed ? { shell: `${claudeCmd} auth login` } : { shell: "npm install -g @anthropic-ai/claude-code" } }],
 		},
 		{
-			title: "GPT", status: codex.status, ok: codex.ok, note: openaiKey ? "OpenAI API key set: concept drafts and texture painting." : "OpenAI API key not set: concept drafts and texture painting need one.",
+			title: "GPT", status: codex.status, ok: codex.ok, icon: "hubot", note: openaiKey ? "OpenAI API key set: concept drafts and texture painting." : "OpenAI API key not set: concept drafts and texture painting need one.",
 			actions: [
 				codex.ok ? { label: "Log out of Codex", msg: { shell: "codex logout" }, quiet: true }
 					: { label: codex.installed ? "Log in to Codex" : "Install Codex", msg: codex.installed ? { shell: "codex login" } : { shell: "npm install -g @openai/codex" } },
@@ -116,11 +121,17 @@ async function codexStatus(): Promise<{ ok: boolean; status: string; installed: 
 
 // ---- the page --------------------------------------------------------------------------------------------
 
-function html(rows: Row[], csp: string): string {
+function html(rows: Row[], csp: string, brand: (file: string) => string): string {
 	const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!));
 	const nonce = Math.random().toString(36).slice(2);
+	// the mark: the brand; when signed in, the avatar with the brand as a small badge; a monogram when there is no mark
+	const mark = (r: Row) => {
+		const b = r.brand ? `<img class="brand" src="${esc(brand(r.brand))}" alt="">` : "";
+		if (r.avatar) return `<div class="av-wrap"><img class="av" src="${esc(r.avatar)}" alt="">${b ? `<span class="badge">${b}</span>` : ""}</div>`;
+		return b ? `<div class="av brandbox">${b}</div>` : `<div class="av mono">${esc(r.title)}</div>`;
+	};
 	const row = (r: Row) => `<section class="${r.ok ? "ok" : ""}">
-	${r.avatar ? `<img class="av" src="${esc(r.avatar)}" alt="">` : `<div class="av mono">${esc(r.title[0])}</div>`}
+	${mark(r)}
 	<div class="body"><h2>${esc(r.title)}</h2><div class="status">${esc(r.status)}</div>${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}</div>
 	<div class="actions">${r.actions.map((a) => `<button class="${a.quiet ? "quiet" : ""}" data-msg='${esc(JSON.stringify(a.msg))}'>${esc(a.label)}</button>`).join("")}</div>
 </section>`;
@@ -133,7 +144,12 @@ p.lead{margin:0 0 22px;color:var(--vscode-descriptionForeground)}
 section{display:flex;align-items:center;gap:16px;padding:14px 0;border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.25))}
 section:last-of-type{border-bottom:1px solid var(--vscode-widget-border,rgba(128,128,128,.25))}
 .av{width:40px;height:40px;border-radius:50%;flex:0 0 40px;object-fit:cover;background:var(--vscode-toolbar-hoverBackground)}
-.av.mono{display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:var(--vscode-descriptionForeground)}
+.av.mono{display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:.02em;color:var(--vscode-descriptionForeground)}
+.av.brandbox{display:flex;align-items:center;justify-content:center;border-radius:12px}
+.av.brandbox img.brand{width:22px;height:22px;object-fit:contain}
+.av-wrap{position:relative;flex:0 0 40px;width:40px;height:40px}
+.badge{position:absolute;right:-5px;bottom:-5px;width:20px;height:20px;border-radius:50%;background:var(--vscode-editor-background,#1e1e1e);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--vscode-widget-border,rgba(128,128,128,.35))}
+.badge img.brand{width:12px;height:12px;object-fit:contain}
 section.ok .av.mono{color:var(--vscode-button-foreground);background:var(--vscode-button-background)}
 .body{flex:1 1 auto;min-width:0}
 h2{font-size:14px;font-weight:600;margin:0}

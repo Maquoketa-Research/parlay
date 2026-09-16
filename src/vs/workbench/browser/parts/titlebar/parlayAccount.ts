@@ -19,7 +19,7 @@ import { AuthenticationSession, IAuthenticationService } from '../../../services
 const PROVIDER = 'roblox';
 
 // what the extension's 'parlay.accounts.summary' returns: one row per integration
-interface AccountRow { title: string; status: string; ok: boolean; actions: { label: string; msg: unknown }[] }
+interface AccountRow { title: string; status: string; ok: boolean; icon?: string; actions: { label: string; msg: unknown }[] }
 
 export class ParlayAccountWidget extends Disposable {
 
@@ -56,7 +56,8 @@ export class ParlayAccountWidget extends Disposable {
 		}
 		const run = (id: string, ...args: unknown[]) => { this.commandService.executeCommand(id, ...args); };
 		const actions: IAction[] = rows.map((row, i) => new SubmenuAction(`parlay.account.${i}`, `${row.title}  ·  ${row.status}`,
-			row.actions.map((a, j) => toAction({ id: `parlay.account.${i}.${j}`, label: a.label, run: () => run('parlay.accounts.do', a.msg) }))));
+			row.actions.map((a, j) => toAction({ id: `parlay.account.${i}.${j}`, label: a.label, run: () => run('parlay.accounts.do', a.msg) })),
+			row.icon ? `codicon codicon-${row.icon}` : undefined));
 		if (!actions.length) {
 			actions.push(toAction({ id: 'parlay.account.signIn', label: localize('parlaySignInRoblox', "Sign in to Roblox"), run: () => run('parlay.roblox.signIn') }));
 		}

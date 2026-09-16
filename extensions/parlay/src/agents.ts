@@ -17,12 +17,16 @@ const ICON: Record<Agent, string> = { claude: "sparkle", gpt: "hubot" };
 const COLOR: Record<Agent, string> = { claude: "terminal.ansiYellow", gpt: "terminal.ansiGreen" };
 
 let ctx: vscode.ExtensionContext;
-let term: vscode.Terminal | undefined;   // the one agent terminal
+let term: vscode.Terminal | undefined;   // the agent terminal: the newest live one named Claude or GPT
 let status: vscode.StatusBarItem;
+
+const isAgent = (t: vscode.Terminal) => t.name === NAMES.claude || t.name === NAMES.gpt;
+const agentOf = (t: vscode.Terminal): Agent => t.name === NAMES.gpt ? "gpt" : "claude";
+// the model in use is whatever the live tab says, not what was saved: the saved state is for resuming
+const active = (): Agent => term ? agentOf(term) : state().agent;
 
 export function registerAgents(c: vscode.ExtensionContext) {
 	ctx = c;
-	term = vscode.window.terminals.find((t) => t.name === NAMES.claude || t.name === NAMES.gpt);   // survived a window reload
 	status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
 	status.command = "parlay.agents.switch";
 	ctx.subscriptions.push(
@@ -30,15 +34,26 @@ export function registerAgents(c: vscode.ExtensionContext) {
 		vscode.commands.registerCommand("parlay.agents.open", () => term ? term.show(true) : void use(state().agent)),
 		vscode.commands.registerCommand("parlay.agents.useClaude", () => use("claude")),
 		vscode.commands.registerCommand("parlay.agents.useGpt", () => use("gpt")),
-		vscode.commands.registerCommand("parlay.agents.switch", () => use(other(state().agent))),
-		vscode.window.onDidCloseTerminal((t) => { if (t === term) term = undefined; }),
+		vscode.commands.registerCommand("parlay.agents.switch", () => use(other(active()))),
+		vscode.window.onDidCloseTerminal((t) => { if (t === term) { term = vscode.window.terminals.filter(isAgent).filter((x) => x !== t).pop(); refresh(); } }),
 		// "Claude" is the default terminal profile (extension.ts sets it): the >_ in the sidebar, Ctrl+`, and the +
 		// button all start Claude, and whatever they start becomes the agent terminal
 		vscode.window.registerTerminalProfileProvider("parlay.claude", {
 			provideTerminalProfile: async () => { const s = state(); const o = options(s, "claude"); await ctx.workspaceState.update("agents", s); return new vscode.TerminalProfile(o); },
 		}),
-		vscode.window.onDidOpenTerminal((t) => { if (!term && (t.name === NAMES.claude || t.name === NAMES.gpt)) { term = t; refresh(); } }),
+		vscode.window.onDidOpenTerminal((t) => { if (isAgent(t)) { term = t; refresh(); } }),
 	);
+	void adoptSurvivors();
+	refresh();
+}
+
+// After a window reload, agent tabs come back with their history. One whose CLI is still alive (persistent
+// sessions) is adopted; a dead one is only a transcript and would catch the switch instead of the live tab,
+// so it goes.
+async function adoptSurvivors() {
+	for (const t of vscode.window.terminals.filter(isAgent)) {
+		if (await t.processId) term = t; else t.dispose();
+	}
 	refresh();
 }
 
@@ -46,7 +61,7 @@ export function registerAgents(c: vscode.ExtensionContext) {
 // running: Claude starts on it. GPT running: the skills are Claude's, so the tab swaps to Claude cold (no note;
 // the skill names its own target) and GPT's session stays resumable through the switch.
 export function send(line: string) {
-	if (term && state().agent === "gpt") void vscode.window.showInformationMessage("Parlay skills run in Claude: the agent terminal is switching to Claude. GPT's session is kept; switch back to resume it.");
+	if (term && active() === "gpt") void vscode.window.showInformationMessage("Parlay skills run in Claude: the agent terminal is switching to Claude. GPT's session is kept; switch back to resume it.");
 	void use("claude", line, false);
 }
 
@@ -56,10 +71,10 @@ const cfg = (k: string, d: string) => vscode.workspace.getConfiguration("parlay"
 const argsOf = (a: Agent) => cfg(a === "claude" ? "claudeArgs" : "codexArgs", DEFAULT_ARGS[a]).split(/\s+/).filter(Boolean);
 
 function refresh() {
-	const a = state().agent;
+	const a = active();
 	void vscode.commands.executeCommand("setContext", "parlay.agent", a);
-	status.text = `$(sparkle) ${NAMES[a]}`;
-	status.tooltip = `Agent terminal: ${NAMES[a]}. Click to continue in ${NAMES[other(a)]} (Ctrl+Alt+S).`;
+	status.text = `$(${ICON[a]}) ${NAMES[a]}`;
+	status.tooltip = `Agent terminal: ${NAMES[a]}${term ? "" : " (not running)"}. Click to swap to ${NAMES[other(a)]} (Ctrl+Alt+S).`;
 	status.show();
 }
 
@@ -119,7 +134,9 @@ function options(s: State, a: Agent, prompt?: string): vscode.TerminalOptions {
 		shellArgs = [...args, ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id, ...tail];
 		s.claude = { id };
 	} else {
-		shellArgs = resume ? ["resume", ...args, old!.id, ...tail] : [...args, ...tail];
+		// the same brief for GPT, as Codex's developer instructions (a TOML string on -c: one argument, no raw newlines)
+		const brief = ["-c", `developer_instructions=${JSON.stringify(BRIEF_CORE)}`];
+		shellArgs = resume ? ["resume", ...brief, ...args, old!.id, ...tail] : [...brief, ...args, ...tail];
 	}
 	s.agent = a; s.since = Date.now();
 	return { name: NAMES[a], cwd: ws, shellPath: exe(a), shellArgs, iconPath: new vscode.ThemeIcon(ICON[a]), color: new vscode.ThemeColor(COLOR[a]) };
@@ -158,7 +175,7 @@ function writeBrief(): string | undefined {
 	} catch { return undefined; }
 }
 
-const BRIEF = `# Parlay
+const BRIEF_CORE = `# Parlay
 
 You are running inside Parlay, Maquoketa Research's editor for Roblox game development (a VS Code fork). The user is a game developer working on a live Roblox place.
 
@@ -176,7 +193,10 @@ You are running inside Parlay, Maquoketa Research's editor for Roblox game devel
 - Keep \`--!strict\` where a file has it; typed signatures; no globals.
 - Server authority: validate every RemoteEvent and RemoteFunction argument on the server; never trust the client for money, inventory or position.
 - DataStore calls in pcall with retry, never per frame.
-- Minimal, local changes in the file's existing style; no new frameworks.
+- Minimal, local changes in the file's existing style; no new frameworks.`;
+
+// Claude also has the Parlay skills; GPT gets the core brief alone (JSON.stringify makes a valid TOML basic string)
+const BRIEF = BRIEF_CORE + `
 
 ## Parlay skills
 /parlay-explain, /parlay-fix, /parlay-validate, /parlay-pcall, /parlay-extract, /parlay-test, /parlay-ab, /parlay-insert-asset, /parlay-match-assets. Parlay types these in from the editor; run them as written.`;

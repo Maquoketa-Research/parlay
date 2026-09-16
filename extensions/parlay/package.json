@@ -150,8 +150,9 @@
       },
       {
         "command": "parlay.agents.switch",
-        "title": "Continue in the other agent",
-        "category": "Parlay"
+        "title": "Swap model",
+        "category": "Parlay",
+        "icon": "$(arrow-swap)"
       }
     ],
     "keybindings": [
@@ -239,13 +240,8 @@
       ],
       "view/title": [
         {
-          "command": "parlay.agents.useGpt",
-          "when": "view == terminal && parlay.agent == claude",
-          "group": "navigation@1"
-        },
-        {
-          "command": "parlay.agents.useClaude",
-          "when": "view == terminal && parlay.agent == gpt",
+          "command": "parlay.agents.switch",
+          "when": "view == terminal",
           "group": "navigation@1"
         }
       ]
