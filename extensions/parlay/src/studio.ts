@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { readPlaceIds } from "./rbxl";
 
 export interface Studio { id: string; name: string; placeId: string; detail?: string; universeId?: string }
 
@@ -224,13 +225,17 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		await new Promise((r) => setTimeout(r, 1500));   // Studio finishes writing its record just after the window goes
 		const slot = record ?? await syncRecordName(chosen.placeId);
 		if (!slot) { void vscode.window.showWarningMessage(`Studio left no sync record for "${chosen.name}"; open it and use Sync to… once, then run this again.`); return; }
-		await writeSyncRecord(slot, folder, record ? existing : await readSyncRecord(slot), missing);
 		const universe = chosen.universeId ?? await universeIdFor(chosen.placeId).catch(() => undefined);
+		// the Starter containers only resume with their real ids: a place file on this machine or Open Cloud has them
+		const real = await starterIds(ctx, chosen, slot, universe).catch(() => new Map<string, string>());
+		const keep = record ? existing : await readSyncRecord(slot);
+		const starters = Array.from(real.keys()).filter((c) => !keep.some((e) => e.className === c));
+		await writeSyncRecord(slot, folder, keep, missing, starters, real);
 		if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
 		void vscode.window.showInformationMessage((universe
 			? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
 			: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`)
-			+ ` ${MANUAL_CONTAINERS} cannot be set up from outside Studio: if they hold scripts, right-click them there, Sync to…, and pick the same folder.`);
+			+ (starters.length ? ` Also syncing ${starters.join(", ")}.` : ` ${MANUAL_CONTAINERS} cannot be set up from outside Studio without a place file or an Open Cloud key: if they hold scripts, right-click them there, Sync to…, and pick the same folder.`));
 	} else if (!synced) {
 		{
 			await vscode.env.clipboard.writeText(folder);
@@ -281,17 +286,74 @@ async function readSyncRecord(record: string): Promise<SyncEntry[]> {
 	try { const v = JSON.parse(out); return Array.isArray(v) ? v.filter((e) => e && e.className && e.filePath && e.scriptId) : []; } catch { return []; }
 }
 
-async function writeSyncRecord(record: string, folder: string, keep: SyncEntry[], services: string[]) {
+async function writeSyncRecord(record: string, folder: string, keep: SyncEntry[], services: string[], starters: string[] = [], realIds = new Map<string, string>()) {
 	// Studio writes paths as "C:/Users\\name\\..." (forward slash after the drive, backslashes after); mimic it
 	const studioPath = (p: string) => p.replace(/\//g, "\\").replace(/^([A-Za-z]:)\\/, "$1/");
-	const entries: SyncEntry[] = [...keep, ...services.map((className) => ({ className, filePath: studioPath(path.join(folder, className)), scriptId: randomUUID(), status: "Syncing" }))];
-	for (const s of services) fs.mkdirSync(path.join(folder, s), { recursive: true });   // Studio reads the folder as it resumes
+	const entry = (className: string, scriptId: string): SyncEntry => ({ className, filePath: studioPath(path.join(folder, className)), scriptId, status: "Syncing" });
+	const entries: SyncEntry[] = [...keep, ...services.map((c) => entry(c, randomUUID())), ...starters.map((c) => entry(c, realIds.get(c)!))];
+	for (const s of [...services, ...starters]) fs.mkdirSync(path.join(folder, s), { recursive: true });   // Studio reads the folder as it resumes
 	const b64 = Buffer.from(JSON.stringify(entries, null, 4), "utf8").toString("base64");
 	await powershell(`$k = '${STUDIO_KEY}'; $n = '${record}'
 $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}'))
 Set-ItemProperty -Path $k -Name $n -Value $json -Type String
 Set-ItemProperty -Path $k -Name ($n + '_lastUsedDir') -Value '${folder.replace(/\\/g, "/")}' -Type String
 Set-ItemProperty -Path $k -Name ($n + '_timeLastUsed') -Value ([int64]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())) -Type QWord`);
+}
+
+// ---- real ids for the Starter containers ---------------------------------------------------------------------
+// Studio resumes StarterPlayerScripts, StarterCharacterScripts and StarterGui only by their real UniqueIds, which
+// plugins cannot read. Three places have them: the place file itself when the window is a local .rbxl, Studio's
+// Auto-Recovery file for the place (matched by the Workspace id, which is also the record slot's guid), and the
+// Open Cloud Instances API when a key with the universe-place-instances scope is stored.
+
+const STARTERS = ["StarterPlayerScripts", "StarterCharacterScripts", "StarterGui"];
+
+async function starterIds(ctx: vscode.ExtensionContext, studio: Studio, slot: string, universe?: string): Promise<Map<string, string>> {
+	const slotGuid = slot.split(":")[2]?.toLowerCase();
+	const fromFile = (file: string) => {
+		const ids = readPlaceIds(file);
+		const out = new Map<string, string>();
+		for (const c of STARTERS) { const id = ids.byClass.get(c)?.[0]; if (id) out.set(c, id); }
+		return { out, workspace: ids.workspace?.toLowerCase() };
+	};
+	// a local place: the window title is the file
+	if (/\.rbxlx?$/i.test(studio.name) && fs.existsSync(studio.name)) { const r = fromFile(studio.name); if (r.out.size) return r.out; }
+	// Studio's Auto-Recovery copies, newest first, the one whose Workspace is this place's slot guid
+	const dir = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "RobloxStudio", "AutoSaves");
+	if (fs.existsSync(dir) && slotGuid) {
+		const files = fs.readdirSync(dir).filter((f) => /_AutoRecovery_\d+\.rbxlx?$/i.test(f)).map((f) => path.join(dir, f))
+			.map((f) => ({ f, t: fs.statSync(f).mtimeMs })).sort((a, b) => b.t - a.t).slice(0, 12);
+		for (const { f } of files) {
+			try { const r = fromFile(f); if (r.workspace === slotGuid && r.out.size) return r.out; } catch { /* not a place file we can read */ }
+		}
+	}
+	// Open Cloud, when the user stored a key
+	const key = await ctx.secrets.get("parlay.robloxApiKey");
+	if (key && universe && studio.placeId) return openCloudStarterIds(key, universe, studio.placeId);
+	return new Map();
+}
+
+async function openCloudStarterIds(key: string, universe: string, place: string): Promise<Map<string, string>> {
+	const base = `https://apis.roblox.com/cloud/v2`;
+	const children = async (instanceId: string): Promise<{ Id: string; Name: string; Details: Record<string, unknown> }[]> => {
+		const op = await fetch(`${base}/universes/${universe}/places/${place}/instances/${instanceId}:listChildren`, { method: "POST", headers: { "x-api-key": key, "Content-Type": "application/json" }, body: "{}" });
+		if (!op.ok) throw new Error(`Open Cloud ${op.status}`);
+		let j = (await op.json()) as { path?: string; done?: boolean; response?: { instances?: { engineInstance: { Id: string; Name: string; Details: Record<string, unknown> } }[] } };
+		for (let i = 0; i < 20 && !j.done && j.path; i++) {
+			await new Promise((r) => setTimeout(r, 1000));
+			const poll = await fetch(`${base}/${j.path}`, { headers: { "x-api-key": key } });
+			if (!poll.ok) throw new Error(`Open Cloud ${poll.status}`);
+			j = (await poll.json()) as typeof j;
+		}
+		return (j.response?.instances ?? []).map((i) => i.engineInstance);
+	};
+	const out = new Map<string, string>();
+	const root = await children("root");
+	const cls = (e: { Details: Record<string, unknown> }) => Object.keys(e.Details ?? {})[0] ?? "";
+	const gui = root.find((e) => cls(e) === "StarterGui" || e.Name === "StarterGui"); if (gui) out.set("StarterGui", gui.Id);
+	const sp = root.find((e) => cls(e) === "StarterPlayer" || e.Name === "StarterPlayer");
+	if (sp) for (const c of await children(sp.Id)) { const k = cls(c) || c.Name; if (STARTERS.includes(k)) out.set(k, c.Id); }
+	return out;
 }
 
 // true when no Studio window carries the place name any more (polled), false on cancel or after ten minutes
