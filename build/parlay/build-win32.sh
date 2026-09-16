@@ -19,7 +19,7 @@ cd "$ROOT"
 export APP_NAME=Parlay BINARY_NAME=parlay ORG_NAME=Maquoketa-Research
 export GH_REPO_PATH=Maquoketa-Research/parlay ASSETS_REPOSITORY=Maquoketa-Research/parlay
 export OS_NAME=windows VSCODE_ARCH="${VSCODE_ARCH:-x64}" VSCODE_QUALITY=stable
-export DISABLE_UPDATE=yes VSCODE_SKIP_NODE_VERSION_CHECK=yes VSCODE_PUBLISH_COUNTER=1
+export VSCODE_SKIP_NODE_VERSION_CHECK=yes VSCODE_PUBLISH_COUNTER=1
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}" npm_config_arch="$VSCODE_ARCH" npm_config_target_arch="$VSCODE_ARCH"
 # node-gyp wants a Python with setuptools; Dave's box has 3.14 at this path, CI sets npm_config_python itself
 DEFAULT_PY="C:/Users/$USERNAME/AppData/Local/Python/pythoncore-3.14-64/python.exe"
@@ -68,6 +68,10 @@ bash build/parlay/license-rtf.sh
 npm run gulp "vscode-win32-${VSCODE_ARCH}-inno-updater"
 npm run gulp "vscode-win32-${VSCODE_ARCH}-user-setup"
 mkdir -p .build/parlay
-mv ".build/win32-${VSCODE_ARCH}/user-setup/VSCodeSetup.exe" ".build/parlay/ParlayUserSetup-${VSCODE_ARCH}-${RELEASE_VERSION}.exe"
+SETUP=".build/parlay/ParlayUserSetup-${VSCODE_ARCH}-${RELEASE_VERSION}"
+mv ".build/win32-${VSCODE_ARCH}/user-setup/VSCodeSetup.exe" "$SETUP.exe"
+# sidecar for release.sh: what the installer's own product.json says it is (gulp stamped commit, version and
+# target there) plus the build time, which becomes the update manifest's timestamp
+node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('.build/win32-${VSCODE_ARCH}/user-setup/product.json','utf8'));fs.writeFileSync(process.argv[1],JSON.stringify({commit:p.commit,productVersion:p.version,quality:p.quality,target:p.target,arch:'${VSCODE_ARCH}',timestamp:Date.now()})+'\n')" "$SETUP.json"
 ls -la .build/parlay
 echo "== done  $(date)   app: $(cd .. && pwd)/VSCode-win32-${VSCODE_ARCH}/Parlay.exe"
