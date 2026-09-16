@@ -57,11 +57,16 @@ export function toolText(result: any): string {
 // (titles are "Place - Roblox Studio"; no placeId, but no seat needed). The MCP seat is exclusive per machine, so
 // while Claude Code is connected to Studio the first source fails and the second carries.
 export async function listStudios(): Promise<Studio[]> {
-	try {
-		const viaMcp = await listStudiosViaMcp();
-		if (viaMcp.length) return viaMcp;
-	} catch { /* seat taken or server down: fall through */ }
-	return listStudiosViaWindows();
+	// the MCP server is the source of truth (instance id and place id straight from Studio); the windows and
+	// their logs are the backup, and fill in any window the server did not report
+	let studios: Studio[] = [];
+	try { studios = await listStudiosViaMcp(); } catch { /* seat taken or server down */ }
+	const viaWindows = await listStudiosViaWindows().catch(() => [] as Studio[]);
+	for (const w of viaWindows) {
+		const known = studios.some((s) => (w.placeId && s.placeId === w.placeId) || s.name.toLowerCase() === w.name.toLowerCase());
+		if (!known) studios.push(w);
+	}
+	return studios;
 }
 
 // Each Studio window is a process; its log in %LOCALAPPDATA%\Roblox\logs is named with the process start time
