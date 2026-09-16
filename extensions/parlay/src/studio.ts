@@ -108,9 +108,11 @@ function studioLogs(): { started: number; placeId: string; universeId?: string }
 		if (!m || !f.endsWith(".log")) continue;
 		const started = stampToMs(m[1]);
 		if (started < dayAgo) continue;
-		const head = fs.readFileSync(path.join(dir, f), { encoding: "utf8" }).slice(0, 400_000);
-		const placeId = /placeid:\s*(\d{6,})/i.exec(head)?.[1];
-		if (placeId) out.push({ started, placeId, universeId: /universeid:\s*(\d{6,})/i.exec(head)?.[1] });
+		// one window can load several places in a row (File, Open from Roblox): the LAST ids are the current place
+		const text = fs.readFileSync(path.join(dir, f), { encoding: "utf8" });
+		const last = (re: RegExp) => { let m: RegExpExecArray | null, v: string | undefined; while ((m = re.exec(text))) v = m[1]; return v; };
+		const placeId = last(/placeid:\s*(\d{6,})/gi);
+		if (placeId) out.push({ started, placeId, universeId: last(/universeid:\s*(\d{6,})/gi) });
 	}
 	return out;
 }
