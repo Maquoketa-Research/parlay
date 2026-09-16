@@ -275,7 +275,7 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
 
 		if (useWindowControlsOverlay(this.configurationService)) {
 			// Parlay: with the stacked header the window controls belong to the first row, not the whole bar
-			const parlayMenuRow = this.configurationService.getValue<boolean>('parlay.stackedHeader') === true ? 26 : 0;
+			const parlayMenuRow = this.configurationService.getValue<boolean>('parlay.stackedHeader') !== false ? 26 : 0;
 			const newHeight = Math.round((height - parlayMenuRow) * getZoomFactor(getWindow(this.element)));
 			if (newHeight !== this.cachedWindowControlHeight) {
 				this.cachedWindowControlHeight = newHeight;

@@ -248,6 +248,11 @@ export class Workbench extends Layout {
 				this.mainContainer.classList.toggle('parlay-glass', glass);
 				this.mainContainer.ownerDocument.body.classList.toggle('parlay-glass', glass);
 			}
+			// Parlay: the two-row header is the default; follow the setting live and relayout
+			if (e.affectsConfiguration('parlay.stackedHeader')) {
+				this.mainContainer.classList.toggle('parlay-stacked', configurationService.getValue<boolean>('parlay.stackedHeader') !== false);
+				this.layout();
+			}
 		}));
 
 		// Font Info
@@ -386,7 +391,7 @@ export class Workbench extends Layout {
 			this.mainContainer.ownerDocument.body.classList.add('parlay-glass');
 		}
 		// Parlay: two-row header (mark and title above the menu); the title bar reports the extra height
-		if (configurationService.getValue<boolean>('parlay.stackedHeader') === true) {
+		if (configurationService.getValue<boolean>('parlay.stackedHeader') !== false) {
 			this.mainContainer.classList.add('parlay-stacked');
 		}
 

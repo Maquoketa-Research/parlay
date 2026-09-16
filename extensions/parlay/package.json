@@ -274,7 +274,7 @@
         "parlay.stackedHeader": {
           "type": "boolean",
           "default": true,
-          "description": "Two-row header: the mark and Parlay above the menu bar. Needs the Parlay build; a change applies to new windows."
+          "description": "Two-row header: the mark and Parlay above the menu bar. On by default in Parlay; a change applies at once."
         },
         "parlay.imageModel": {
           "type": "string",

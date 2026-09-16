@@ -235,7 +235,7 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 		const wcoEnabled = isWeb && isWCOEnabled();
 		let value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;
 		// Parlay: a second row for the menu when the header is stacked (parlay.css lays it out)
-		if (!this.isAuxiliary && this.configurationService.getValue<boolean>('parlay.stackedHeader') === true) {
+		if (!this.isAuxiliary && this.configurationService.getValue<boolean>('parlay.stackedHeader') !== false) {
 			value += 26;
 		}
 		if (wcoEnabled) {

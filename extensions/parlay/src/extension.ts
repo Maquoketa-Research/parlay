@@ -46,8 +46,6 @@ export function activate(ctx: vscode.ExtensionContext) {
 		void ctx.globalState.update("firstRunDone", true);
 		void firstRun();
 	}
-	// The workbench reads this before extension defaults are registered, so it has to live in user settings.
-	void ensureUserSetting("parlay.stackedHeader", true);
 	// Windows draws the glass acrylic in the OS colour mode; a light-mode desktop turns a dark theme to grey mud.
 	// "auto" makes the native tint follow the colour theme (dark for Dark/Glass/Aqua, light for Paper).
 	void ensureUserSetting("window.systemColorTheme", "auto");
