@@ -205,7 +205,8 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	await ctx.globalState.update(`studioProject:${chosen.placeId || slug(chosen.name)}`, { folder, name: chosen.name, placeId: chosen.placeId, added: Date.now() });
 
 	const record = chosen.placeId ? await syncRecordName(chosen.placeId) : undefined;
-	const existing = record ? await readSyncRecord(record) : [];
+	// entries whose folder is gone (the user deleted the project to start over) are stale: rewrite them
+	const existing = (record ? await readSyncRecord(record) : []).filter((e) => fs.existsSync(path.dirname(e.filePath.replace(/\//g, "\\").replace(/\\+/g, "\\"))));
 	const missing = SCRIPT_CONTAINERS.filter((c) => !existing.some((e) => e.className === c));
 	if (chosen.placeId && missing.length) {
 		// The zero-click path. Studio keeps a per-place record of what it syncs and resumes it when the place
@@ -279,6 +280,7 @@ async function writeSyncRecord(record: string, folder: string, keep: SyncEntry[]
 	// Studio writes paths as "C:/Users\\name\\..." (forward slash after the drive, backslashes after); mimic it
 	const studioPath = (p: string) => p.replace(/\//g, "\\").replace(/^([A-Za-z]:)\\/, "$1/");
 	const entries: SyncEntry[] = [...keep, ...services.map((className) => ({ className, filePath: studioPath(path.join(folder, className)), scriptId: randomUUID(), status: "Syncing" }))];
+	for (const s of services) fs.mkdirSync(path.join(folder, s), { recursive: true });   // Studio reads the folder as it resumes
 	const b64 = Buffer.from(JSON.stringify(entries, null, 4), "utf8").toString("base64");
 	await powershell(`$k = '${STUDIO_KEY}'; $n = '${record}'
 $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}'))
