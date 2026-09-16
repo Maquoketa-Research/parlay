@@ -366,6 +366,16 @@ MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
 	when: ContextKeyExpr.and(OpenFolderWorkspaceSupportContext.toNegated(), WorkbenchStateContext.isEqualTo('workspace'))
 });
 
+// Parlay: start from an open Roblox Studio (the Parlay extension's command; disabled until it activates)
+MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
+	group: '2_open',
+	command: {
+		id: 'parlay.studio.add',
+		title: localize({ key: 'miAddStudioProject', comment: ['&& denotes a mnemonic'] }, "Add Roblox &&Studio Project...")
+	},
+	order: 2.5
+});
+
 MenuRegistry.appendMenuItem(MenuId.MenubarFileMenu, {
 	group: '2_open',
 	command: {

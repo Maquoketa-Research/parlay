@@ -6,6 +6,8 @@
 #   bash build/parlay/build-win32.sh                  (Git Bash; node per .nvmrc, Python 3 with setuptools,
 #                                                       VS Build Tools with the Spectre-mitigated libs)
 #   RELEASE_VERSION=1.135.0100 bash build/parlay/build-win32.sh   to pin the version stamp
+#   bash build/parlay/build-win32.sh --pack-only     re-package and re-install from the compiled tree (no npm ci,
+#                                                    no compile): for when the app folder was in use at packing time
 #
 # About 15 minutes on a big machine after the first npm ci. Close a running Parlay started from the output
 # folder first: packing deletes and rewrites it.
@@ -39,11 +41,18 @@ node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json
 echo "== built-in extensions"
 bash build/parlay/fetch-builtins.sh
 
-echo "== npm ci  $(date)"
-npm ci --no-audit --no-fund
+if [[ "${1:-}" != "--pack-only" ]]; then
+  echo "== npm ci  $(date)"
+  npm ci --no-audit --no-fund
 
-echo "== compile and minify  $(date)"
-npm run gulp vscode-min-prepack
+  echo "== compile and minify  $(date)"
+  npm run gulp vscode-min-prepack
+fi
+
+if tasklist 2>/dev/null | grep -q "^Parlay.exe"; then
+  echo "!! Parlay is running from the output folder; packing would fail with EBUSY. Close it and re-run with --pack-only."
+  exit 2
+fi
 
 echo "== package  $(date)"
 npm run copy-policy-dto --prefix build

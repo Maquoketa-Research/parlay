@@ -55,9 +55,13 @@ export function toolText(result: any): string {
 export async function listStudios(): Promise<Studio[]> {
 	return studioSession(async (call) => {
 		const r = await call("tools/call", { name: "list_roblox_studios", arguments: {} });
+		if (r?.error) throw new Error(String(r.error.message ?? JSON.stringify(r.error)));
 		const text = toolText(r);
-		let parsed: any; try { parsed = JSON.parse(text); } catch { parsed = {}; }
-		const list: any[] = parsed.studios ?? parsed ?? [];
+		// the server answers {"studios":[{id,name}]} as text; take any array of {id,name} it gives, or scan for pairs
+		let parsed: any; try { parsed = JSON.parse(text); } catch { parsed = undefined; }
+		let list: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.studios) ? parsed.studios : [];
+		if (!list.length) list = Array.from(text.matchAll(/"id"\s*:\s*"([^"]+)"\s*,\s*"name"\s*:\s*"([^"]*)"/g), (m) => ({ id: m[1], name: m[2] }));
+		if (!list.length && /error|not connected|no studio|failed/i.test(text)) throw new Error(text.slice(0, 160));
 		return list.map((s) => {
 			const m = /^(.*?)\s*\(placeId:\s*(\d+)\)\s*$/.exec(String(s.name ?? ""));
 			return { id: String(s.id), name: m ? m[1] : String(s.name ?? s.id), placeId: m ? m[2] : "" };
