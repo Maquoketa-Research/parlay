@@ -46,7 +46,17 @@ function build(dir: string, root: string, name: string, className: string): Node
 }
 
 export function generateSourcemap(root: string): string {
-	return JSON.stringify(build(root, root, "game", "DataModel"));
+	const game = build(root, root, "game", "DataModel");
+	// Script Sync writes StarterPlayerScripts and StarterCharacterScripts as top-level folders; in the DataModel
+	// they live under StarterPlayer, and that is where luau-lsp must find them for game.StarterPlayer.X to resolve
+	const starters = (game.children ?? []).filter((c) => STARTER.has(c.name));
+	if (starters.length) {
+		game.children = game.children!.filter((c) => !STARTER.has(c.name));
+		let sp = game.children.find((c) => c.name === "StarterPlayer");
+		if (!sp) { sp = { name: "StarterPlayer", className: "StarterPlayer" }; game.children.push(sp); }
+		sp.children = [...(sp.children ?? []).filter((c) => !STARTER.has(c.name)), ...starters];
+	}
+	return JSON.stringify(game);
 }
 
 // Keep sourcemap.json current for Roblox-shaped workspaces that are not Rojo projects (Rojo makes its own).

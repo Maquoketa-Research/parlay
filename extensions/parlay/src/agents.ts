@@ -115,7 +115,8 @@ function options(s: State, a: Agent, prompt?: string): vscode.TerminalOptions {
 	let shellArgs: string[];
 	if (a === "claude") {
 		const id = resume ? old!.id : crypto.randomUUID();
-		shellArgs = [...args, resume ? "--resume" : "--session-id", id, ...tail];
+		const brief = writeBrief();
+		shellArgs = [...args, ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id, ...tail];
 		s.claude = { id };
 	} else {
 		shellArgs = resume ? ["resume", ...args, old!.id, ...tail] : [...args, ...tail];
@@ -133,6 +134,52 @@ function end(t: vscode.Terminal, a: Agent) {
 		type(t, a === "claude" ? "/exit" : "/quit", 2);
 	});
 }
+
+// The system prompt Parlay appends to every Claude it starts: what this folder is (a live Script Sync mirror),
+// how to see and test the game (the Studio MCP), the house rules, the skills, and the two modes the user keeps
+// on. Ponytail full: its plugin's SessionStart hook reads ~/.claude/.ponytail-active, so that file is set to
+// "full" when the plugin is installed. Caveman lite: the skill text is inlined with the level pinned (it has
+// no persistence of its own). Written fresh on each launch into Parlay's global storage.
+function writeBrief(): string | undefined {
+	try {
+		const claude = path.join(os.homedir(), ".claude");
+		const read = (f: string) => { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } };
+		const parts = [BRIEF];
+		const caveman = read(path.join(claude, "skills", "caveman", "SKILL.md")).replace(/^---[\s\S]*?---\s*/, "");
+		if (caveman) parts.push("# Caveman mode is ON at level lite for this whole session\n\nParlay turned it on for the user, as if `/caveman lite` had been run. The level is lite, not the skill's default.\n\n" + caveman);
+		if (fs.existsSync(path.join(claude, "plugins", "cache", "ponytail"))) {
+			const active = path.join(claude, ".ponytail-active");
+			if (read(active).trim() !== "full") fs.writeFileSync(active, "full");
+		}
+		const dir = ctx.globalStorageUri.fsPath, file = path.join(dir, "claude-brief.md");
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(file, parts.join("\n\n"));
+		return file;
+	} catch { return undefined; }
+}
+
+const BRIEF = `# Parlay
+
+You are running inside Parlay, Maquoketa Research's editor for Roblox game development (a VS Code fork). The user is a game developer working on a live Roblox place.
+
+## This folder is a live mirror of the place
+- It is Roblox Studio's Script Sync folder. Each top-level folder is a service (ReplicatedStorage, ServerScriptService, ReplicatedFirst, ServerStorage, StarterGui, StarterPlayerScripts, StarterCharacterScripts); folders below are Folders, or scripts with children.
+- Files: \`Name.server.luau\` is a Script, \`Name.client.luau\` a LocalScript, \`Name.luau\` a ModuleScript; \`init.*.luau\` makes its folder that script. Non-script instances (Parts, RemoteEvents, Folders holding none) are not on disk.
+- Saving a file changes the running place in Studio within a second. Deleting, moving or renaming a file does the same to the instance: never do that unless asked. Workspace scripts are not synced here.
+- \`sourcemap.json\` is generated from this folder for luau-lsp; do not edit it.
+
+## How to see and test the game
+- The \`Roblox_Studio\` MCP tools talk to the open Studio: \`list_roblox_studios\` first, then \`search_game_tree\` / \`inspect_instance\` for what is not on disk, \`execute_luau\` to read or set up state, \`start_stop_play\` and \`get_console_output\` to run and read errors, \`screen_capture\` to look. Verify in Studio rather than guess.
+- One MCP client holds Studio at a time. If the tools say Studio is unreachable, say so once and work from the files.
+
+## Luau house rules
+- Keep \`--!strict\` where a file has it; typed signatures; no globals.
+- Server authority: validate every RemoteEvent and RemoteFunction argument on the server; never trust the client for money, inventory or position.
+- DataStore calls in pcall with retry, never per frame.
+- Minimal, local changes in the file's existing style; no new frameworks.
+
+## Parlay skills
+/parlay-explain, /parlay-fix, /parlay-validate, /parlay-pcall, /parlay-extract, /parlay-test, /parlay-ab, /parlay-insert-asset, /parlay-match-assets. Parlay types these in from the editor; run them as written.`;
 
 // Typing into a running CLI. sendText puts the Enter in the same write as the text, and the TUIs read that
 // burst as a paste and keep the newline inside it; Enter on its own a beat later submits. A slash command
