@@ -21,6 +21,15 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "terminal": {
+      "profiles": [
+        {
+          "id": "parlay.claude",
+          "title": "Claude",
+          "icon": "sparkle"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "parlay.claude.explain",

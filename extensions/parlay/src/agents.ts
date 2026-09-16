@@ -32,6 +32,12 @@ export function registerAgents(c: vscode.ExtensionContext) {
 		vscode.commands.registerCommand("parlay.agents.useGpt", () => use("gpt")),
 		vscode.commands.registerCommand("parlay.agents.switch", () => use(other(state().agent))),
 		vscode.window.onDidCloseTerminal((t) => { if (t === term) term = undefined; }),
+		// "Claude" is the default terminal profile (extension.ts sets it): the >_ in the sidebar, Ctrl+`, and the +
+		// button all start Claude, and whatever they start becomes the agent terminal
+		vscode.window.registerTerminalProfileProvider("parlay.claude", {
+			provideTerminalProfile: async () => { const s = state(); const o = options(s, "claude"); await ctx.workspaceState.update("agents", s); return new vscode.TerminalProfile(o); },
+		}),
+		vscode.window.onDidOpenTerminal((t) => { if (!term && (t.name === NAMES.claude || t.name === NAMES.gpt)) { term = t; refresh(); } }),
 	);
 	refresh();
 }
@@ -91,31 +97,31 @@ async function session(s: State): Promise<Session | undefined> {
 	return s.claude;
 }
 
-// Start `a` in the agent terminal, resuming its remembered session when the transcript is still there.
+// Start `a` in the agent terminal.
 async function start(s: State, a: Agent, prompt?: string) {
-	const ws = cwd()!, old = s[a], args = argsOf(a), tail = prompt ? [prompt] : [];
-	const resume = !!old && !!(a === "claude" ? claudeTranscript(ws, old.id) : old.file && fs.existsSync(old.file));
-	if (a === "claude") {
-		const id = resume ? old!.id : crypto.randomUUID();
-		term = launch(a, [...args, resume ? "--resume" : "--session-id", id, ...tail]);
-		s.claude = { id };
-	} else {
-		term = launch(a, resume ? ["resume", ...args, old!.id, ...tail] : [...args, ...tail]);
-	}
-	s.agent = a; s.since = Date.now();
+	term = vscode.window.createTerminal(options(s, a, prompt));
+	term.show(true);
 	await ctx.workspaceState.update("agents", s);
 	refresh();
 }
 
-// The CLI is the terminal's process, no shell in between: nothing to quote, and the terminal closing is the
-// exact signal that the CLI has ended. (When the CLI exits on its own the tab goes with it; Ctrl+Alt+A brings it back.)
-function launch(a: Agent, args: string[]): vscode.Terminal {
-	const t = vscode.window.createTerminal({
-		name: NAMES[a], cwd: cwd(), shellPath: exe(a), shellArgs: args,
-		iconPath: new vscode.ThemeIcon(ICON[a]), color: new vscode.ThemeColor(COLOR[a]),
-	});
-	t.show(true);
-	return t;
+// The terminal for `a`, resuming its remembered session when the transcript is still there; `s` is marked as
+// running `a` from now (the caller persists it). The CLI is the terminal's process, no shell in between:
+// nothing to quote, and the terminal closing is the exact signal that the CLI has ended. (When the CLI exits
+// on its own the tab goes with it; Ctrl+Alt+A or the >_ brings it back.)
+function options(s: State, a: Agent, prompt?: string): vscode.TerminalOptions {
+	const ws = cwd(), old = s[a], args = argsOf(a), tail = prompt ? [prompt] : [];
+	const resume = !!old && !!(a === "claude" ? ws && claudeTranscript(ws, old.id) : old.file && fs.existsSync(old.file));
+	let shellArgs: string[];
+	if (a === "claude") {
+		const id = resume ? old!.id : crypto.randomUUID();
+		shellArgs = [...args, resume ? "--resume" : "--session-id", id, ...tail];
+		s.claude = { id };
+	} else {
+		shellArgs = resume ? ["resume", ...args, old!.id, ...tail] : [...args, ...tail];
+	}
+	s.agent = a; s.since = Date.now();
+	return { name: NAMES[a], cwd: ws, shellPath: exe(a), shellArgs, iconPath: new vscode.ThemeIcon(ICON[a]), color: new vscode.ThemeColor(COLOR[a]) };
 }
 
 // Ask the CLI to quit (both TUIs take a slash command) and give it a few seconds before pulling the plug.

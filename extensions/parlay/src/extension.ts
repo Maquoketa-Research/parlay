@@ -68,6 +68,8 @@ export function activate(ctx: vscode.ExtensionContext) {
 	// The folders Parlay opens are the user's own Script Sync folders; Restricted Mode would only switch Parlay off
 	// in them (and did, before the extension declared untrustedWorkspaces support). Application scope: user settings.
 	void ensureUserSetting("security.workspace.trust.enabled", false);
+	// The terminal is the agent: the >_ in the sidebar, Ctrl+` and + all start Claude (the profile agents.ts provides)
+	void ensureUserSetting("terminal.integrated.defaultProfile.windows", "Claude");
 	// Layout v2: Parlay is its own container in the right sidebar; the terminal panel goes back to the bottom.
 	if (!ctx.globalState.get("layoutV2Done")) {
 		void ctx.globalState.update("layoutV2Done", true);
