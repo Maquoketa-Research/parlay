@@ -121,6 +121,38 @@
         "command": "parlay.discord.signOut",
         "title": "Sign out of Discord",
         "category": "Parlay"
+      },
+      {
+        "command": "parlay.agents.open",
+        "title": "Open the agent terminal",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.agents.useClaude",
+        "title": "Continue in Claude",
+        "category": "Parlay",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "parlay.agents.useGpt",
+        "title": "Continue in GPT",
+        "category": "Parlay",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "parlay.agents.switch",
+        "title": "Continue in the other agent",
+        "category": "Parlay"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "parlay.agents.open",
+        "key": "ctrl+alt+a"
+      },
+      {
+        "command": "parlay.agents.switch",
+        "key": "ctrl+alt+s"
       }
     ],
     "authentication": [
@@ -194,6 +226,18 @@
         {
           "submenu": "parlay.claudeMenu",
           "group": "1_parlay"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "parlay.agents.useGpt",
+          "when": "view == terminal && parlay.agent == claude",
+          "group": "navigation@1"
+        },
+        {
+          "command": "parlay.agents.useClaude",
+          "when": "view == terminal && parlay.agent == gpt",
+          "group": "navigation@1"
         }
       ]
     },
@@ -277,7 +321,22 @@
         "parlay.claudeCommand": {
           "type": "string",
           "default": "claude",
-          "description": "Command used to start Claude Code in the terminal."
+          "description": "Command used to start Claude Code in the agent terminal."
+        },
+        "parlay.claudeArgs": {
+          "type": "string",
+          "default": "--permission-mode acceptEdits",
+          "description": "Arguments Claude Code starts with in the agent terminal (the permission mode: acceptEdits, auto, plan, bypassPermissions…)."
+        },
+        "parlay.codexCommand": {
+          "type": "string",
+          "default": "codex",
+          "description": "Command used to start Codex (GPT) in the agent terminal. When it is not on PATH, the newest codex.exe the Codex desktop app installed under %LOCALAPPDATA%\\OpenAI\\Codex\\bin is used."
+        },
+        "parlay.codexArgs": {
+          "type": "string",
+          "default": "-a on-request -s workspace-write",
+          "description": "Arguments Codex starts with in the agent terminal (approval policy and sandbox; add --no-alt-screen to keep scrollback)."
         },
         "parlay.glass": {
           "type": "boolean",
@@ -387,7 +446,7 @@
   "scripts": {
     "compile": "gulp compile-extension:parlay-ide",
     "watch": "gulp watch-extension:parlay-ide",
-    "check": "node tools/check.mjs"
+    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs"
   },
   "devDependencies": {
     "@types/node": "24.x",

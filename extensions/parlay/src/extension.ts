@@ -1,8 +1,9 @@
 // Parlay: Claude actions on the code under your cursor (right-click, editor title, and a lens over the
 // selection), Aqua and Sonar in the right-hand panel with a Start button when they are down, a Script Sync
 // status light, the asset matcher, and the switch that turns the Glass theme into real glass.
-// Every action is a Claude Code skill (skills/*/SKILL.md) run in a terminal, so the code Claude writes
-// lands in the Script Sync folder and shows up in the editor live.
+// Every action is a Claude Code skill (skills/*/SKILL.md) run in the agent terminal (agents.ts: Claude Code or
+// Codex in the Terminal view, one tab that swaps with a handoff note), so the code Claude writes lands in the
+// Script Sync folder and shows up in the editor live.
 import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as fs from "fs";
@@ -16,14 +17,14 @@ import { registerRobloxAuth } from "./roblox-auth";
 import { startSourcemap } from "./sourcemap";
 import { addStudioProject } from "./studio";
 import { registerAccounts } from "./accounts";
+import { registerAgents, send } from "./agents";
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
 const GLASS_THEME = "Parlay Glass";
 const LUAU = [{ language: "luau" }, { language: "lua" }, { pattern: "**/*.luau" }];
 
-let claudeTerminal: vscode.Terminal | undefined; // the one terminal Claude Code runs in
-
 export function activate(ctx: vscode.ExtensionContext) {
+	registerAgents(ctx);   // the agent terminal every send() below types into
 	for (const key of ACTIONS) {
 		ctx.subscriptions.push(vscode.commands.registerCommand(`parlay.claude.${key}`, (range?: vscode.Range) => runSkill(ctx, key, range)));
 	}
@@ -32,7 +33,6 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.installSkills", () => installSkills(ctx, true)));
 	// Start from Studio: pick an open place, get its sync folder (or a new one, wired to git), open it here.
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.studio.add", () => addStudioProject(ctx)));
-	ctx.subscriptions.push(vscode.window.onDidCloseTerminal((t) => { if (t === claudeTerminal) claudeTerminal = undefined; }));
 
 	// The right-hand panel: Aqua (with a Start button when it is down), Meshy, and Sonar.
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", new UrlView("aquaUrl", "Aqua", startAqua)));
@@ -169,17 +169,6 @@ async function matchAssets(ctx: vscode.ExtensionContext) {
 }
 
 const clean = (s: string) => s.replace(/["\r\n]/g, "'");
-
-// One terminal, one Claude Code session. The first send starts claude with the slash command; later
-// sends type into the running session. ponytail: if the user exits claude in that terminal, the next
-// send goes to the shell and fails visibly; close the terminal and try again. A pty check can come later.
-function send(line: string) {
-	const cmd = vscode.workspace.getConfiguration("parlay").get<string>("claudeCommand", "claude");
-	const fresh = !claudeTerminal;
-	claudeTerminal ??= vscode.window.createTerminal({ name: "Claude", cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
-	claudeTerminal.show(true);
-	claudeTerminal.sendText(fresh ? `${cmd} "${line}"` : line, true);
-}
 
 // The skills ship with the extension and are installed user-wide (~/.claude/skills/parlay-*), so every
 // workspace has them and no project folder is written to. Re-copied only when the extension version changes.
