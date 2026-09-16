@@ -9,6 +9,9 @@
   "engines": {
     "vscode": "^1.90.0"
   },
+  "enabledApiProposals": [
+    "authSessionAccountIcon"
+  ],
   "categories": [
     "Themes",
     "Other"
@@ -108,12 +111,26 @@
         "command": "parlay.roblox.signOut",
         "title": "Sign out of Roblox",
         "category": "Parlay"
+      },
+      {
+        "command": "parlay.discord.signIn",
+        "title": "Sign in to Discord",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.discord.signOut",
+        "title": "Sign out of Discord",
+        "category": "Parlay"
       }
     ],
     "authentication": [
       {
         "id": "roblox",
         "label": "Roblox"
+      },
+      {
+        "id": "discord",
+        "label": "Discord"
       }
     ],
     "submenus": [
@@ -277,6 +294,11 @@
           "type": "string",
           "default": "3251110438441385889",
           "description": "Client ID of the Roblox OAuth 2.0 app Parlay signs in as; the default is Parlay's own app. Only change it to use an app you registered yourself (Creator Dashboard → Open Cloud → OAuth 2.0 Apps) for Parlay: Sign in to Roblox. Register both redirect URLs http://localhost:53682/callback and http://localhost:53683/callback. Empty: the sign-in command walks you through the setup."
+        },
+        "parlay.discordClientId": {
+          "type": "string",
+          "default": "",
+          "description": "Client ID of the Discord application Parlay signs in as (Discord Developer Portal → Applications → OAuth2) for Parlay: Sign in to Discord. Register both redirect URLs http://localhost:53682/callback and http://localhost:53683/callback. Empty: the sign-in command walks you through the setup."
         },
         "parlay.robloxCreatorId": {
           "type": "string",

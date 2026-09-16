@@ -10,6 +10,7 @@ import * as http from "http";
 import * as https from "https";
 import * as os from "os";
 import * as path from "path";
+import { registerDiscordAuth } from "./discord-auth";
 import { MeshyView } from "./meshy";
 import { registerRobloxAuth } from "./roblox-auth";
 import { startSourcemap } from "./sourcemap";
@@ -44,6 +45,10 @@ export function activate(ctx: vscode.ExtensionContext) {
 	const roblox = registerRobloxAuth(ctx);
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.roblox.signIn", () => roblox.signIn()));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.roblox.signOut", () => roblox.signOut()));
+	// Log in with Discord: identity only (who you are, with avatar), for the Accounts menu and the Accounts page.
+	const discord = registerDiscordAuth(ctx);
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.discord.signIn", () => discord.signIn()));
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.discord.signOut", () => discord.signOut()));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.claude.insert-asset", async () => {
 		const id = await vscode.window.showInputBox({ prompt: "Roblox asset id to insert into the open Studio", placeHolder: "1234567890" });
 		if (!id?.trim()) return;
