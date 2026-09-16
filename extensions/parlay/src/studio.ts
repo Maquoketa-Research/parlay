@@ -61,56 +61,52 @@ export async function listStudios(): Promise<Studio[]> {
 		const viaMcp = await listStudiosViaMcp();
 		if (viaMcp.length) return viaMcp;
 	} catch { /* seat taken or server down: fall through */ }
-	// window titles give names; Studio's logs give the ids of the running instances; Roblox's public games API
-	// gives the universe names that tie the two together
-	const studios = await listStudiosViaWindows();
-	if (studios.length) {
-		const places = await placesFromLogs().catch(() => [] as LogPlace[]);
-		for (const s of studios) {
-			const hit = places.find((p) => p.name.toLowerCase() === s.name.toLowerCase()) ?? (studios.length === 1 && places.length === 1 ? places[0] : undefined);
-			if (hit) { s.placeId = hit.placeId; s.universeId = hit.universeId; }
-		}
+	return listStudiosViaWindows();
+}
+
+// Each Studio window is a process; its log in %LOCALAPPDATA%\Roblox\logs is named with the process start time
+// (…_20260916T011322Z_Studio_XXXXX_last.log) and carries "placeid: N" and "universeid: N" near the top. So a
+// window title plus a start time gives the place id, offline, for published and unpublished places alike.
+async function listStudiosViaWindows(): Promise<Studio[]> {
+	if (process.platform !== "win32") return [];
+	const out = await powershell("Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.MainWindowTitle + '|' + $_.StartTime.ToUniversalTime().ToString('yyyyMMddTHHmmss') }");
+	const logs = studioLogs();
+	const seen = new Set<string>();
+	const studios: Studio[] = [];
+	for (const line of out.split(/\r?\n/).map((t) => t.trim()).filter(Boolean)) {
+		const bar = line.lastIndexOf("|");
+		const title = line.slice(0, bar), started = stampToMs(line.slice(bar + 1));
+		// "100 Fogs Draft - World - Roblox Studio": the experience first, then the place within it
+		const label = title.replace(/\s*-\s*Roblox Studio.*$/i, "").replace(/^\*\s*/, "").trim();
+		if (!label || seen.has(label)) continue;
+		seen.add(label);
+		const [name, ...rest] = label.split(/\s+-\s+/);
+		const log = logs.find((l) => Math.abs(l.started - started) <= 3000);
+		studios.push({ id: "", name, placeId: log?.placeId ?? "", universeId: log?.universeId, detail: rest.join(" - ") });
 	}
 	return studios;
 }
 
-interface LogPlace { placeId: string; universeId: string; name: string }
-
-// Each running Studio writes %LOCALAPPDATA%\Roblox\logs\*_Studio_*.log with "placeid: N" and "universeid: N"
-// near the top; the ones touched in the last few minutes belong to the instances that are open now.
-async function placesFromLogs(): Promise<LogPlace[]> {
-	const dir = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "logs");
-	if (!fs.existsSync(dir)) return [];
-	const recent = Date.now() - 10 * 60_000;
-	const found = new Map<string, LogPlace>();
-	for (const f of fs.readdirSync(dir)) {
-		if (!/_Studio_.*\.log$/i.test(f)) continue;
-		const full = path.join(dir, f);
-		if (fs.statSync(full).mtimeMs < recent) continue;
-		const head = fs.readFileSync(full, { encoding: "utf8", flag: "r" }).slice(0, 400_000);
-		const place = /placeid:\s*(\d{6,})/i.exec(head)?.[1], universe = /universeid:\s*(\d{6,})/i.exec(head)?.[1];
-		if (place && universe && !found.has(place)) found.set(place, { placeId: place, universeId: universe, name: "" });
-	}
-	const list = Array.from(found.values());
-	if (!list.length) return [];
-	const r = await fetch(`https://games.roblox.com/v1/games?universeIds=${list.map((p) => p.universeId).join(",")}`);
-	if (r.ok) {
-		const j = (await r.json()) as { data?: { id: number | string; name: string }[] };
-		for (const g of j.data ?? []) for (const p of list) if (String(g.id) === p.universeId) p.name = g.name;
-	}
-	return list.filter((p) => p.name);
+function stampToMs(s: string): number {
+	const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/.exec(s.trim());
+	return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : NaN;
 }
 
-async function listStudiosViaWindows(): Promise<Studio[]> {
-	if (process.platform !== "win32") return [];
-	const out = await new Promise<string>((res) => execFile("powershell", ["-NoProfile", "-Command",
-		"Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.MainWindowTitle }"],
-		{ windowsHide: true }, (_e, o) => res(String(o ?? ""))));
-	// "100 Fogs Draft - World - Roblox Studio": the experience first, then the place within it
-	return out.split(/\r?\n/).map((t) => t.trim()).filter(Boolean)
-		.map((t) => t.replace(/\s*-\s*Roblox Studio.*$/i, "").replace(/^\*\s*/, "").trim())
-		.filter((n, i, a) => n && a.indexOf(n) === i)
-		.map((label) => { const [name, ...rest] = label.split(/\s+-\s+/); return { id: "", name, placeId: "", detail: rest.join(" - ") }; });
+function studioLogs(): { started: number; placeId: string; universeId?: string }[] {
+	const dir = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "logs");
+	if (!fs.existsSync(dir)) return [];
+	const dayAgo = Date.now() - 24 * 3600_000;
+	const out: { started: number; placeId: string; universeId?: string }[] = [];
+	for (const f of fs.readdirSync(dir)) {
+		const m = /_(\d{8}T\d{6})Z_Studio_/i.exec(f);
+		if (!m || !f.endsWith(".log")) continue;
+		const started = stampToMs(m[1]);
+		if (started < dayAgo) continue;
+		const head = fs.readFileSync(path.join(dir, f), { encoding: "utf8" }).slice(0, 400_000);
+		const placeId = /placeid:\s*(\d{6,})/i.exec(head)?.[1];
+		if (placeId) out.push({ started, placeId, universeId: /universeid:\s*(\d{6,})/i.exec(head)?.[1] });
+	}
+	return out;
 }
 
 async function listStudiosViaMcp(): Promise<Studio[]> {
@@ -235,7 +231,6 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 				+ " Scripts appear here as they sync, and Studio resumes the sync every time the place opens.",
 				{ modal: true }, "Open the folder", "How Script Sync works");
 			if (how === "How Script Sync works") void vscode.env.openExternal(vscode.Uri.parse("https://create.roblox.com/docs/scripting/sync"));
-			if (!how) return;
 		}
 	} else {
 		void vscode.window.showInformationMessage(`Parlay: "${chosen.name}" syncs to ${folder}. ${gitNote}.`);
