@@ -11,6 +11,7 @@ import * as https from "https";
 import * as os from "os";
 import * as path from "path";
 import { MeshyView } from "./meshy";
+import { registerRobloxAuth } from "./roblox-auth";
 import { startSourcemap } from "./sourcemap";
 import { addStudioProject } from "./studio";
 
@@ -38,6 +39,10 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.meshy.setKey", () => meshy.setKey("meshy")));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.roblox.setKey", () => meshy.setKey("roblox")));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.openai.setKey", () => meshy.setKey("openai")));
+	// Log in with Roblox: the account in the Accounts menu; Open Cloud calls try it before the stored API key.
+	const roblox = registerRobloxAuth(ctx);
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.roblox.signIn", () => roblox.signIn()));
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.roblox.signOut", () => roblox.signOut()));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.claude.insert-asset", async () => {
 		const id = await vscode.window.showInputBox({ prompt: "Roblox asset id to insert into the open Studio", placeHolder: "1234567890" });
 		if (!id?.trim()) return;

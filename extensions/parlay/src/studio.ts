@@ -11,6 +11,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { readPlaceIds } from "./rbxl";
+import { SCOPES as ROBLOX_SCOPES } from "./roblox-auth";
 
 export interface Studio { id: string; name: string; placeId: string; detail?: string; universeId?: string }
 
@@ -353,23 +354,42 @@ async function starterIds(ctx: vscode.ExtensionContext, studio: Studio, slot: st
 			try { const r = fromFile(f); if (r.workspace === slotGuid && r.out.size) return r.out; } catch { /* not a place file we can read */ }
 		}
 	}
-	// Open Cloud, when the user stored a key
-	const key = await ctx.secrets.get("parlay.robloxApiKey");
-	if (key && universe && studio.placeId) return openCloudStarterIds(key, universe, studio.placeId);
+	// Open Cloud, as the signed-in Roblox account or with a stored key
+	const auth = await cloudAuth(ctx);
+	if (auth.length && universe && studio.placeId) return openCloudStarterIds(auth, universe, studio.placeId);
 	return new Map();
 }
 
-async function openCloudStarterIds(key: string, universe: string, place: string): Promise<Map<string, string>> {
+// Open Cloud credentials in the order to try them: the signed-in Roblox account (OAuth bearer), then the stored API
+// key. The Instance resource lists API Key (and HttpService) only, no OAuth 2.0, as of 2026-09-15
+// (https://create.roblox.com/docs/cloud/reference/Instance), so today the bearer comes back 401 and the key carries;
+// the retry in openCloudStarterIds makes the switch automatic the day Roblox adds an instance scope.
+async function cloudAuth(ctx: vscode.ExtensionContext): Promise<Record<string, string>[]> {
+	const out: Record<string, string>[] = [];
+	const s = await vscode.authentication.getSession("roblox", ROBLOX_SCOPES, { silent: true }).then((x) => x, () => undefined);
+	if (s) out.push({ Authorization: `Bearer ${s.accessToken}` });
+	const key = await ctx.secrets.get("parlay.robloxApiKey");
+	if (key) out.push({ "x-api-key": key });
+	return out;
+}
+
+async function openCloudStarterIds(auth: Record<string, string>[], universe: string, place: string): Promise<Map<string, string>> {
 	const base = `https://apis.roblox.com/cloud/v2`;
+	let a = 0;   // the credential that worked last; 401/403 moves on to the next, anything else is the answer
+	const call = async (p: string, init: RequestInit = {}): Promise<any> => {
+		for (; a < auth.length; a++) {
+			const r = await fetch(`${base}/${p}`, { ...init, headers: { ...auth[a], "Content-Type": "application/json" } });
+			if ((r.status === 401 || r.status === 403) && a + 1 < auth.length) continue;
+			if (!r.ok) throw new Error(`Open Cloud ${r.status}`);
+			return r.json();
+		}
+		throw new Error("Open Cloud: no credential");
+	};
 	const children = async (instanceId: string): Promise<{ Id: string; Name: string; Details: Record<string, unknown> }[]> => {
-		const op = await fetch(`${base}/universes/${universe}/places/${place}/instances/${instanceId}:listChildren`, { method: "POST", headers: { "x-api-key": key, "Content-Type": "application/json" }, body: "{}" });
-		if (!op.ok) throw new Error(`Open Cloud ${op.status}`);
-		let j = (await op.json()) as { path?: string; done?: boolean; response?: { instances?: { engineInstance: { Id: string; Name: string; Details: Record<string, unknown> } }[] } };
+		let j = (await call(`universes/${universe}/places/${place}/instances/${instanceId}:listChildren`, { method: "POST", body: "{}" })) as { path?: string; done?: boolean; response?: { instances?: { engineInstance: { Id: string; Name: string; Details: Record<string, unknown> } }[] } };
 		for (let i = 0; i < 20 && !j.done && j.path; i++) {
 			await new Promise((r) => setTimeout(r, 1000));
-			const poll = await fetch(`${base}/${j.path}`, { headers: { "x-api-key": key } });
-			if (!poll.ok) throw new Error(`Open Cloud ${poll.status}`);
-			j = (await poll.json()) as typeof j;
+			j = (await call(j.path)) as typeof j;
 		}
 		return (j.response?.instances ?? []).map((i) => i.engineInstance);
 	};

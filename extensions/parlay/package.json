@@ -93,6 +93,22 @@
         "command": "parlay.studio.add",
         "title": "Add Roblox Studio project",
         "category": "Parlay"
+      },
+      {
+        "command": "parlay.roblox.signIn",
+        "title": "Sign in to Roblox",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.roblox.signOut",
+        "title": "Sign out of Roblox",
+        "category": "Parlay"
+      }
+    ],
+    "authentication": [
+      {
+        "id": "roblox",
+        "label": "Roblox"
       }
     ],
     "submenus": [
@@ -251,6 +267,11 @@
           "type": "string",
           "default": "",
           "description": "Folder of the aqua checkout (has pyproject.toml). Used by the Start button in the Aqua panel. Empty: a sibling of the workspace named aqua, or ~/Documents/GitHub/aqua."
+        },
+        "parlay.robloxClientId": {
+          "type": "string",
+          "default": "",
+          "description": "Client ID of your Roblox OAuth 2.0 app (Creator Dashboard → Open Cloud → OAuth 2.0 Apps) for Parlay: Sign in to Roblox. Register both redirect URLs http://localhost:53682/callback and http://localhost:53683/callback. Empty: the sign-in command walks you through the setup."
         },
         "parlay.robloxCreatorId": {
           "type": "string",

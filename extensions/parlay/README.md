@@ -29,7 +29,9 @@ VS Code today; the fork (`fork/README.md`) turns it into the standalone **Parlay
     `parlay-insert-asset` skill places it in the open Studio. Files land in `assets/meshy/<slug>/`: `mesh.glb`,
     `views.png`, `paint.png`, `texture.png`, `model.glb`. Keys: **Parlay: Set OpenAI API key** (or
     `OPENAI_API_KEY`), **Set Meshy API key**, **Set Roblox Open Cloud API key**; SecretStorage, never settings
-    files. three.js renders the viewport and the bake (vendored into `media/three` at compile time).
+    files. Or **Parlay: Sign in to Roblox** (OAuth 2.0 with PKCE, the account shows in the Accounts menu; needs
+    `parlay.robloxClientId` from an OAuth app registered with redirect URLs `http://localhost:53682/callback` and
+    `http://localhost:53683/callback`). three.js renders the viewport and the bake (vendored into `media/three` at compile time).
   - **Sonar**: the market instrument (`parlay.sonarUrl`).
 - **Header**: the mark, "Parlay" and the file on the first row, the menu bar on the second
   (`parlay.stackedHeader`; a fork patch adds the height, the stylesheet lays it out).
