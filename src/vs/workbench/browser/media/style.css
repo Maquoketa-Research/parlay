@@ -521,7 +521,8 @@ body.parlay-glass,
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item .action-label { height: auto !important; line-height: normal !important; margin: 0 !important; padding: 0 6px !important; }
 
 /* the Roblox account in the header (parlayAccount.ts): avatar and name, or Sign in; click opens Accounts */
-.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .parlay-account-container { display: flex; align-items: center; height: 100%; -webkit-app-region: no-drag; }
+/* above the drag region like the toolbar (position + z-index), or the cursor and clicks flicker between the two */
+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .parlay-account-container { display: flex; align-items: center; height: 100%; position: relative; z-index: 2500; -webkit-app-region: no-drag; }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .parlay-account-container { height: 30px !important; }
 .monaco-workbench .part.titlebar .parlay-account {
 	display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px 0 5px; margin: 0 6px 0 2px; border-radius: 11px; cursor: pointer;
