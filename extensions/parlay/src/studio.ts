@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-export interface Studio { id: string; name: string; placeId: string; detail?: string }
+export interface Studio { id: string; name: string; placeId: string; detail?: string; universeId?: string }
 
 const cfg = <T>(k: string, d: T): T => vscode.workspace.getConfiguration("parlay").get<T>(k, d);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "place";
@@ -61,7 +61,44 @@ export async function listStudios(): Promise<Studio[]> {
 		const viaMcp = await listStudiosViaMcp();
 		if (viaMcp.length) return viaMcp;
 	} catch { /* seat taken or server down: fall through */ }
-	return listStudiosViaWindows();
+	// window titles give names; Studio's logs give the ids of the running instances; Roblox's public games API
+	// gives the universe names that tie the two together
+	const studios = await listStudiosViaWindows();
+	if (studios.length) {
+		const places = await placesFromLogs().catch(() => [] as LogPlace[]);
+		for (const s of studios) {
+			const hit = places.find((p) => p.name.toLowerCase() === s.name.toLowerCase()) ?? (studios.length === 1 && places.length === 1 ? places[0] : undefined);
+			if (hit) { s.placeId = hit.placeId; s.universeId = hit.universeId; }
+		}
+	}
+	return studios;
+}
+
+interface LogPlace { placeId: string; universeId: string; name: string }
+
+// Each running Studio writes %LOCALAPPDATA%\Roblox\logs\*_Studio_*.log with "placeid: N" and "universeid: N"
+// near the top; the ones touched in the last few minutes belong to the instances that are open now.
+async function placesFromLogs(): Promise<LogPlace[]> {
+	const dir = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "logs");
+	if (!fs.existsSync(dir)) return [];
+	const recent = Date.now() - 10 * 60_000;
+	const found = new Map<string, LogPlace>();
+	for (const f of fs.readdirSync(dir)) {
+		if (!/_Studio_.*\.log$/i.test(f)) continue;
+		const full = path.join(dir, f);
+		if (fs.statSync(full).mtimeMs < recent) continue;
+		const head = fs.readFileSync(full, { encoding: "utf8", flag: "r" }).slice(0, 400_000);
+		const place = /placeid:\s*(\d{6,})/i.exec(head)?.[1], universe = /universeid:\s*(\d{6,})/i.exec(head)?.[1];
+		if (place && universe && !found.has(place)) found.set(place, { placeId: place, universeId: universe, name: "" });
+	}
+	const list = Array.from(found.values());
+	if (!list.length) return [];
+	const r = await fetch(`https://games.roblox.com/v1/games?universeIds=${list.map((p) => p.universeId).join(",")}`);
+	if (r.ok) {
+		const j = (await r.json()) as { data?: { id: number | string; name: string }[] };
+		for (const g of j.data ?? []) for (const p of list) if (String(g.id) === p.universeId) p.name = g.name;
+	}
+	return list.filter((p) => p.name);
 }
 
 async function listStudiosViaWindows(): Promise<Studio[]> {
@@ -162,27 +199,29 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	const gitNote = await wireGit(folder, chosen.name);
 	await ctx.globalState.update(`studioProject:${chosen.placeId || slug(chosen.name)}`, { folder, name: chosen.name, placeId: chosen.placeId, added: Date.now() });
 
-	if (!synced) {
-		const record = chosen.placeId ? await syncRecordName(chosen.placeId) : undefined;
-		if (record) {
-			// The zero-click path. Studio keeps a per-place record of what it syncs and resumes it when the place
-			// opens; it accepts entries we write (any id, the service by class name). It rewrites the record when
-			// the place closes, so: the user closes the place, Parlay writes, Parlay reopens the place through
-			// Studio's own link, Studio writes every script into the folder.
-			const go = await vscode.window.showInformationMessage(
-				`Parlay will set Studio up to sync ${SCRIPT_CONTAINERS.join(", ")} of "${chosen.name}" into ${folder} (${gitNote}). Close that place in Studio when you are ready; Parlay finishes the moment it closes and reopens the place syncing.`,
-				{ modal: true }, "I'll close it now");
-			if (!go) return;
-			const closed = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Waiting for "${chosen.name}" to close in Studio…`, cancellable: true },
-				(_p, token) => waitForPlaceClose(chosen!.name, token));
-			if (!closed) return;
-			await writeSyncRecord(record, folder!, SCRIPT_CONTAINERS);
-			const universe = await universeIdFor(chosen.placeId).catch(() => undefined);
-			if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
-			void vscode.window.showInformationMessage(universe
-				? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
-				: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`);
-		} else {
+	const record = chosen.placeId ? await syncRecordName(chosen.placeId) : undefined;
+	const existing = record ? await readSyncRecord(record) : [];
+	const missing = SCRIPT_CONTAINERS.filter((c) => !existing.some((e) => e.className === c));
+	if (record && missing.length) {
+		// The zero-click path. Studio keeps a per-place record of what it syncs and resumes it when the place
+		// opens; it accepts entries we write (any id, the service by class name). It rewrites the record when
+		// the place closes, so: the user closes the place, Parlay writes, Parlay reopens the place through
+		// Studio's own link, Studio writes every script into the folder. Entries Studio already has stay.
+		const go = await vscode.window.showInformationMessage(
+			`Parlay will set Studio up to sync ${missing.join(", ")} of "${chosen.name}" into ${folder} (${gitNote}). Close that place in Studio when you are ready; Parlay finishes the moment it closes and reopens the place syncing.`,
+			{ modal: true }, "I'll close it now");
+		if (!go) return;
+		const closed = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Waiting for "${chosen.name}" to close in Studio…`, cancellable: true },
+			(_p, token) => waitForPlaceClose(chosen!.name, token));
+		if (!closed) return;
+		await writeSyncRecord(record, folder, existing, missing);
+		const universe = chosen.universeId ?? await universeIdFor(chosen.placeId).catch(() => undefined);
+		if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
+		void vscode.window.showInformationMessage(universe
+			? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
+			: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`);
+	} else if (!synced) {
+		{
 			await vscode.env.clipboard.writeText(folder);
 			const selected = chosen.id ? await selectScriptContainers(chosen.id).catch(() => false) : false;
 			const how = await vscode.window.showInformationMessage(
@@ -220,10 +259,18 @@ async function syncRecordName(placeId: string): Promise<string | undefined> {
 	return out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
 }
 
-async function writeSyncRecord(record: string, folder: string, services: string[]) {
+interface SyncEntry { className: string; filePath: string; scriptId?: string; status: string }
+
+async function readSyncRecord(record: string): Promise<SyncEntry[]> {
+	const out = await powershell(`(Get-ItemProperty '${STUDIO_KEY}').'${record}'`);
+	// entries without a scriptId are ones Studio ignores; treat them as absent so they get rewritten with one
+	try { const v = JSON.parse(out); return Array.isArray(v) ? v.filter((e) => e && e.className && e.filePath && e.scriptId) : []; } catch { return []; }
+}
+
+async function writeSyncRecord(record: string, folder: string, keep: SyncEntry[], services: string[]) {
 	// Studio writes paths as "C:/Users\\name\\..." (forward slash after the drive, backslashes after); mimic it
 	const studioPath = (p: string) => p.replace(/\//g, "\\").replace(/^([A-Za-z]:)\\/, "$1/");
-	const entries = services.map((className) => ({ className, filePath: studioPath(path.join(folder, className)), scriptId: randomUUID(), status: "Syncing" }));
+	const entries: SyncEntry[] = [...keep, ...services.map((className) => ({ className, filePath: studioPath(path.join(folder, className)), scriptId: randomUUID(), status: "Syncing" }))];
 	const b64 = Buffer.from(JSON.stringify(entries, null, 4), "utf8").toString("base64");
 	await powershell(`$k = '${STUDIO_KEY}'; $n = '${record}'
 $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}'))
