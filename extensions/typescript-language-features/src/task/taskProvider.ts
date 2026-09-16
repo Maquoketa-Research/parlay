@@ -6,7 +6,6 @@
 import * as jsonc from 'jsonc-parser';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { wait } from '../test/testUtils';
 import { ITypeScriptServiceClient, ServerResponse } from '../typescriptService';
 import { coalesce } from '../utils/arrays';
 import { readUnifiedConfig } from '../utils/configuration';
@@ -16,6 +15,8 @@ import { isTsConfigFileName } from '../configuration/languageDescription';
 import { Lazy } from '../utils/lazy';
 import { isImplicitProjectConfigFile } from '../tsconfig';
 import { TSConfig, TsConfigProvider } from './tsconfigProvider';
+
+const wait = (ms: number) => new Promise<void>(resolve => setTimeout(() => resolve(), ms));
 
 
 enum AutoDetect {

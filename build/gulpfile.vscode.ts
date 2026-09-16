@@ -191,15 +191,6 @@ const minifyVSCodeTask = task.define('minify-vscode', task.series(
 ));
 task.task(minifyVSCodeTask);
 
-task.task(task.define('core-ci-old', task.series(
-	task.task('compile-build-with-mangling') as task.Task,
-	task.parallel(
-		task.task('minify-vscode') as task.Task,
-		task.task('minify-vscode-reh') as task.Task,
-		task.task('minify-vscode-reh-web') as task.Task,
-	)
-)));
-
 task.task(task.define('core-ci', task.series(
 	copyCodiconsTask,
 	compileNonNativeExtensionsBuildTask,
@@ -212,8 +203,6 @@ task.task(task.define('core-ci', task.series(
 	// Then bundle for shipping (bundles also write NLS files to out-build)
 	task.parallel(
 		task.define('esbuild-vscode-min', () => runEsbuildBundle('out-vscode-min', true, true, 'desktop', `${sourceMappingURLBase}/core`)),
-		task.define('esbuild-vscode-reh-min', () => runEsbuildBundle('out-vscode-reh-min', true, true, 'server', `${sourceMappingURLBase}/core`)),
-		task.define('esbuild-vscode-reh-web-min', () => runEsbuildBundle('out-vscode-reh-web-min', true, true, 'server-web', `${sourceMappingURLBase}/core`)),
 	)
 )));
 

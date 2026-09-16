@@ -21,12 +21,9 @@ export const all = Object.freeze<string[]>([
 	'extensions/**/*',
 	'scripts/**/*',
 	'src/**/*',
-	'test/**/*',
-	'!cli/**/*',
 	'!out*/**',
 	'!extensions/**/out*/**',
 	'!extensions/**/*-out/**',
-	'!test/**/out/**',
 	'!**/node_modules/**',
 	'!**/*.js.map',
 	'!**/*.tsbuildinfo',
@@ -52,23 +49,13 @@ export const unicodeFilter = Object.freeze<string[]>([
 	'!build/win32/**',
 	'!extensions/markdown-language-features/notebook-out/*.js',
 	'!extensions/markdown-language-features/markdown-editor-out/*.js',
-	'!extensions/markdown-math/notebook-out/**',
-	'!extensions/mermaid-markdown-features/chat-webview-out/**',
-	'!extensions/ipynb/notebook-out/**',
-	'!extensions/notebook-renderers/renderer-out/**',
-	'!extensions/php-language-features/src/features/phpGlobalFunctions.ts',
 	'!extensions/terminal-suggest/src/completions/upstream/**',
-	'!extensions/typescript-language-features/test-workspace/**',
-	'!extensions/vscode-api-tests/testWorkspace/**',
-	'!extensions/vscode-api-tests/testWorkspace2/**',
 	'!extensions/**/dist/**',
 	'!extensions/**/out/**',
 	'!extensions/**/snippets/**',
 	'!extensions/**/colorize-fixtures/**',
 	'!extensions/terminal-suggest/src/shell/fishBuiltinsCache.ts',
 
-	// extensions/copilot has its own code style
-	'!extensions/copilot/**',
 
 	'!src/vs/base/browser/dompurify/**',
 	'!src/vs/workbench/services/keybinding/browser/keyboardLayouts/**',
@@ -97,28 +84,17 @@ export const indentationFilter = Object.freeze<string[]>([
 	'!src/vs/base/node/cpuUsage.sh',
 	'!src/vs/editor/common/languages/highlights/*.scm',
 	'!src/vs/editor/common/languages/injections/*.scm',
-	'!test/unit/assert.js',
-	'!resources/linux/snap/electron-launch',
 	'!build/ext.js',
-	'!build/darwin/patch-dmg.py',
 	'!build/npm/gyp/patches/gyp_spectre_mitigation_support.patch',
 	'!product.overrides.json',
 	'!src/vs/platform/endpoint/common/licenseAgreement.ts',
 
 	// except specific folders
-	'!test/automation/out/**',
-	'!test/monaco/out/**',
-	'!test/smoke/out/**',
 	'!extensions/terminal-suggest/src/shell/zshBuiltinsCache.ts',
 	'!extensions/terminal-suggest/src/shell/fishBuiltinsCache.ts',
 	'!extensions/terminal-suggest/src/completions/upstream/**',
-	'!extensions/typescript-language-features/test-workspace/**',
 	'!extensions/typescript-language-features/resources/walkthroughs/**',
 	'!extensions/typescript-language-features/package-manager/node-maintainer/**',
-	'!extensions/markdown-math/notebook-out/**',
-	'!extensions/ipynb/notebook-out/**',
-	'!extensions/vscode-api-tests/testWorkspace/**',
-	'!extensions/vscode-api-tests/testWorkspace2/**',
 	'!build/monaco/**',
 	'!build/win32/**',
 	'!build/checker/**',
@@ -139,8 +115,6 @@ export const indentationFilter = Object.freeze<string[]>([
 	'!extensions/**/themes/**',
 	'!extensions/**/colorize-fixtures/**',
 
-	// extensions/copilot has its own code style
-	'!extensions/copilot/**',
 
 	// except specific file types
 	'!src/vs/*/**/*.d.ts',
@@ -159,15 +133,9 @@ export const indentationFilter = Object.freeze<string[]>([
 	'!**/*.tiff',
 
 	// except for built files
-	'!extensions/mermaid-markdown-features/chat-webview-out/*.js',
-	'!extensions/mermaid-markdown-features/markdown-preview-out/*.js',
-	'!extensions/mermaid-markdown-features/notebook-out/*.js',
 	'!extensions/markdown-language-features/media/*.js',
 	'!extensions/markdown-language-features/markdown-editor-out/*.js',
 	'!extensions/markdown-language-features/notebook-out/*.js',
-	'!extensions/markdown-math/notebook-out/*.js',
-	'!extensions/ipynb/notebook-out/**',
-	'!extensions/notebook-renderers/renderer-out/*.js',
 	'!extensions/simple-browser/media/*.js',
 ]);
 
@@ -201,16 +169,11 @@ export const copyrightFilter = Object.freeze<string[]>([
 	'!**/*.tiff',
 	'!**/*.provisionprofile',
 	'!build/**/*.init',
-	'!build/darwin/patch-dmg.py',
-	'!build/linux/libcxx-fetcher.*',
 	'!build/npm/gyp/custom-headers/**',
-	'!resources/linux/snap/snapcraft.yaml',
 	'!resources/win32/bin/code.js',
 	'!resources/completions/**',
 	'!extensions/configuration-editing/build/inline-allOf.ts',
 	'!extensions/markdown-language-features/media/highlight.css',
-	'!extensions/markdown-math/notebook-out/**',
-	'!extensions/ipynb/notebook-out/**',
 	'!extensions/simple-browser/media/codicon.css',
 	'!extensions/terminal-suggest/src/completions/upstream/**',
 	'!extensions/typescript-language-features/node-maintainer/**',
@@ -218,21 +181,15 @@ export const copyrightFilter = Object.freeze<string[]>([
 	'!extensions/*/server/bin/*',
 	'!src/vs/platform/agentHost/node/codex/protocol/generated/**',
 	'!src/vs/workbench/contrib/terminal/common/scripts/psreadline/**',
-	'!extensions/mermaid-markdown-features/chat-webview-out/**',
-	'!extensions/mermaid-markdown-features/markdown-preview-out/**',
-	'!extensions/mermaid-markdown-features/notebook-out/**',
 
 	// vendored third-party libraries
 	'!src/vs/base/common/lit-html/**',
 	'!src/vs/base/common/signals-core/**',
 
-	// extensions/copilot has its own code style
-	'!extensions/copilot/**',
 ]);
 
 export const tsFormattingFilter = Object.freeze<string[]>([
 	'src/**/*.ts',
-	'test/**/*.ts',
 	'extensions/**/*.ts',
 	'!src/vs/*/**/*.d.ts',
 	'!src/typings/**/*.d.ts',
@@ -241,16 +198,12 @@ export const tsFormattingFilter = Object.freeze<string[]>([
 	'!**/typings/**',
 	'!**/node_modules/**',
 	'!extensions/**/colorize-fixtures/**',
-	'!extensions/vscode-api-tests/testWorkspace/**',
-	'!extensions/vscode-api-tests/testWorkspace2/**',
 	'!extensions/**/*.test.ts',
 	'!extensions/html-language-features/server/lib/jquery.d.ts',
 	'!extensions/terminal-suggest/src/shell/zshBuiltinsCache.ts',
 	'!extensions/terminal-suggest/src/shell/fishBuiltinsCache.ts',
 	'!src/vs/platform/agentHost/node/codex/protocol/generated/**',
 
-	// extensions/copilot has its own code style
-	'!extensions/copilot/**',
 ]);
 
 export const eslintFilter = Object.freeze<string[]>([
