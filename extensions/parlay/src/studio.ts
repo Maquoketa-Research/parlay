@@ -207,11 +207,12 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	const record = chosen.placeId ? await syncRecordName(chosen.placeId) : undefined;
 	const existing = record ? await readSyncRecord(record) : [];
 	const missing = SCRIPT_CONTAINERS.filter((c) => !existing.some((e) => e.className === c));
-	if (record && missing.length) {
+	if (chosen.placeId && missing.length) {
 		// The zero-click path. Studio keeps a per-place record of what it syncs and resumes it when the place
-		// opens; it accepts entries we write (any id, the service by class name). It rewrites the record when
-		// the place closes, so: the user closes the place, Parlay writes, Parlay reopens the place through
-		// Studio's own link, Studio writes every script into the folder. Entries Studio already has stay.
+		// opens; it accepts entries we write (any id, the service by class name) but only in the slot it named
+		// itself, and it (re)writes that slot when the place closes. So: the user closes the place, Parlay writes
+		// into the slot (which now exists even for a brand-new place), Parlay reopens the place through Studio's
+		// own link, Studio writes every script into the folder. Entries Studio already has stay.
 		const go = await vscode.window.showInformationMessage(
 			`Parlay will set Studio up to sync ${missing.join(", ")} of "${chosen.name}" into ${folder} (${gitNote}). Close that place in Studio when you are ready; Parlay finishes the moment it closes and reopens the place syncing.`,
 			{ modal: true }, "I'll close it now");
@@ -219,7 +220,10 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		const closed = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Waiting for "${chosen.name}" to close in Studio…`, cancellable: true },
 			(_p, token) => waitForPlaceClose(chosen!.name, token));
 		if (!closed) return;
-		await writeSyncRecord(record, folder, existing, missing);
+		await new Promise((r) => setTimeout(r, 1500));   // Studio finishes writing its record just after the window goes
+		const slot = record ?? await syncRecordName(chosen.placeId);
+		if (!slot) { void vscode.window.showWarningMessage(`Studio left no sync record for "${chosen.name}"; open it and use Sync to… once, then run this again.`); return; }
+		await writeSyncRecord(slot, folder, record ? existing : await readSyncRecord(slot), missing);
 		const universe = chosen.universeId ?? await universeIdFor(chosen.placeId).catch(() => undefined);
 		if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
 		void vscode.window.showInformationMessage(universe
