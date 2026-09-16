@@ -344,5 +344,12 @@
   "devDependencies": {
     "@types/node": "24.x",
     "three": "0.186.0"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "Parlay works on the folders it makes; nothing in it needs a trusted workspace."
+    },
+    "virtualWorkspaces": false
   }
 }

@@ -52,6 +52,9 @@ export function activate(ctx: vscode.ExtensionContext) {
 	// Windows draws the glass acrylic in the OS colour mode; a light-mode desktop turns a dark theme to grey mud.
 	// "auto" makes the native tint follow the colour theme (dark for Dark/Glass/Aqua, light for Paper).
 	void ensureUserSetting("window.systemColorTheme", "auto");
+	// The folders Parlay opens are the user's own Script Sync folders; Restricted Mode would only switch Parlay off
+	// in them (and did, before the extension declared untrustedWorkspaces support). Application scope: user settings.
+	void ensureUserSetting("security.workspace.trust.enabled", false);
 	// Layout v2: Parlay is its own container in the right sidebar; the terminal panel goes back to the bottom.
 	if (!ctx.globalState.get("layoutV2Done")) {
 		void ctx.globalState.update("layoutV2Done", true);
