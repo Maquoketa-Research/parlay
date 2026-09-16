@@ -14,10 +14,10 @@
 // so PKCE rides on top of the app's client secret, kept in SecretStorage (parlay.robloxClientSecret), never in
 // settings. The redirect must match a registered URL exactly and localhost http is allowed
 // (https://create.roblox.com/docs/cloud/auth/oauth2-registration), hence a callback served on one of two fixed ports.
-// Scopes: openid and profile are identity scopes; the Open Cloud ones are documented per API: asset:read and
-// asset:write (https://create.roblox.com/docs/cloud/open-cloud/usage-assets), universe-messaging-service:publish
-// (https://create.roblox.com/docs/cloud/guides/usage-messaging). The Instance resource lists API Key only, no OAuth
-// 2.0 (https://create.roblox.com/docs/cloud/reference/Instance), which is why studio.ts keeps its key path.
+// Scopes: openid and profile are identity scopes; asset:read and asset:write are what the Meshy tab's uploads use
+// (https://create.roblox.com/docs/cloud/open-cloud/usage-assets). Nothing else is asked for: the Instance resource
+// lists API Key only, no OAuth 2.0 (https://create.roblox.com/docs/cloud/reference/Instance), which is why
+// studio.ts keeps its key path.
 import * as vscode from "vscode";
 import { randomBytes } from "crypto";
 import * as http from "http";
@@ -27,7 +27,7 @@ const OAUTH = "https://apis.roblox.com/oauth/v1";
 const PORTS = [53682, 53683];   // both registered as redirect URLs: http://localhost:<port>/callback
 const DASHBOARD = "https://create.roblox.com/dashboard/credentials?activeTab=OAuthTab";
 const STORE = "parlay.robloxSession", SECRET = "parlay.robloxClientSecret";
-export const SCOPES = ["openid", "profile", "asset:read", "asset:write", "universe-messaging-service:publish"];
+export const SCOPES = ["openid", "profile", "asset:read", "asset:write"];
 
 interface Stored { accessToken: string; refreshToken: string; expiresAt: number; scopes: string[]; user: { id: string; name: string; displayName: string } }
 interface Tok { access_token: string; refresh_token: string; expires_in: number; scope?: string }

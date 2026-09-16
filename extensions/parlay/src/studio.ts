@@ -364,7 +364,7 @@ async function starterIds(ctx: vscode.ExtensionContext, studio: Studio, slot: st
 // key. The Instance resource lists API Key (and HttpService) only, no OAuth 2.0, as of 2026-09-15
 // (https://create.roblox.com/docs/cloud/reference/Instance), so today the bearer comes back 401 and the key carries;
 // the retry in openCloudStarterIds makes the switch automatic the day Roblox adds an instance scope.
-async function cloudAuth(ctx: vscode.ExtensionContext): Promise<Record<string, string>[]> {
+export async function cloudAuth(ctx: vscode.ExtensionContext): Promise<Record<string, string>[]> {
 	const out: Record<string, string>[] = [];
 	const s = await vscode.authentication.getSession("roblox", ROBLOX_SCOPES, { silent: true }).then((x) => x, () => undefined);
 	if (s) out.push({ Authorization: `Bearer ${s.accessToken}` });

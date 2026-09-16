@@ -7,7 +7,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { listStudios, studioSession } from "./studio";
+import { cloudAuth, listStudios, studioSession } from "./studio";
 
 const MESHY = "https://api.meshy.ai";
 const ROBLOX = "https://apis.roblox.com/assets/v1";
@@ -284,11 +284,16 @@ export class MeshyView implements vscode.WebviewViewProvider {
 
 	// ---- step 4: upload ----------------------------------------------------------------------------
 
+	// as the signed-in Roblox account, else with the stored Open Cloud key (the Assets API takes both)
 	private async roblox(method: string, p: string, body?: FormData): Promise<any> {
-		const key = await this.key("roblox");
-		if (!key) throw new Error("no Roblox Open Cloud key (Parlay: Set Roblox Open Cloud API key)");
-		const r = await fetch(ROBLOX + p, { method, headers: { "x-api-key": key }, body });
-		const text = await r.text();
+		const auth = await cloudAuth(this.ctx);
+		if (!auth.length) throw new Error("not signed in to Roblox and no Open Cloud key (Parlay: Sign in to Roblox, or Set Roblox Open Cloud API key)");
+		let r!: Response, text = "";
+		for (let i = 0; i < auth.length; i++) {
+			r = await fetch(ROBLOX + p, { method, headers: auth[i], body });
+			text = await r.text();
+			if (r.ok || !(r.status === 401 || r.status === 403) || i + 1 === auth.length) break;   // a rejected credential moves to the next
+		}
 		if (!r.ok) throw new Error(`Roblox ${r.status}: ${text.slice(0, 300)}`);
 		return text ? JSON.parse(text) : {};
 	}
