@@ -137,15 +137,17 @@ async function listStudiosViaMcp(): Promise<Studio[]> {
 
 async function syncFolderFor(placeId: string): Promise<string | undefined> {
 	if (process.platform !== "win32" || !placeId) return undefined;
-	const json = await new Promise<string>((res) => execFile("powershell", ["-NoProfile", "-Command",
-		"(Get-ItemProperty 'HKCU:\\Software\\Roblox\\RobloxStudio').PSObject.Properties | Where-Object { $_.Name -like 'File_Sync_Persistence_Record_V1:" + placeId + ":*' } | ForEach-Object { $_.Value } | ConvertTo-Json -Compress"],
-		{ windowsHide: true, maxBuffer: 8 << 20 }, (_e, out) => res(String(out ?? ""))));
-	const paths = Array.from(json.matchAll(/[A-Za-z]:(?:\\\\|\\|\/)[^"\r\n]+/g), (m) => m[0].replace(/\\\\/g, "\\").replace(/\//g, "\\"));
-	const dirs = paths.filter((p) => fs.existsSync(p)).map((p) => (fs.statSync(p).isDirectory() ? p : path.dirname(p)));
-	if (!dirs.length) return undefined;
-	let common = dirs[0].split("\\");
-	for (const d of dirs.slice(1)) { const parts = d.split("\\"); let i = 0; while (i < common.length && i < parts.length && common[i].toLowerCase() === parts[i].toLowerCase()) i++; common = common.slice(0, i); }
-	return common.length > 1 ? common.join("\\") : undefined;
+	const record = await syncRecordName(placeId);
+	if (!record) return undefined;
+	// each entry's filePath is the service's own folder ("C:/Users\\me\\...\\ReplicatedStorage"); the project is its parent
+	const parents = (await readSyncRecord(record))
+		.map((e) => path.dirname(e.filePath.replace(/\//g, "\\").replace(/\\+/g, "\\")))
+		.filter((p) => /^[A-Za-z]:\\.+/.test(p) && fs.existsSync(p));
+	if (!parents.length) return undefined;
+	const counts = new Map<string, number>();
+	for (const p of parents) counts.set(p.toLowerCase(), (counts.get(p.toLowerCase()) ?? 0) + 1);
+	const best = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0][0];
+	return parents.find((p) => p.toLowerCase() === best);
 }
 
 // ---- git ------------------------------------------------------------------------------------------------------
@@ -194,6 +196,8 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	// the folder Studio already syncs to, else the one Parlay made for this place before, else a fresh one
 	const home = path.join(cfg("projectsDir", "") || path.join(os.homedir(), "Documents", "Parlay"), slug(chosen.name));
 	let folder = await syncFolderFor(chosen.placeId);
+	// never adopt a folder outside the user's profile (a bad parse must not turn C:\Users into a repo)
+	if (folder && !folder.toLowerCase().startsWith(os.homedir().toLowerCase() + path.sep)) folder = undefined;
 	const synced = !!folder;
 	if (!folder) { folder = home; fs.mkdirSync(folder, { recursive: true }); }
 	const gitNote = await wireGit(folder, chosen.name);
