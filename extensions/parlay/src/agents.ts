@@ -70,7 +70,7 @@ async function use(a: Agent, prompt?: string, handoff = true) {
 	const ws = cwd();
 	if (!ws) { void vscode.window.showInformationMessage("Open a folder first: the agent runs in the workspace."); return; }
 	const s = state(), running = term;
-	if (running && s.agent === a) { running.show(true); if (prompt) running.sendText(prompt, true); return; }
+	if (running && s.agent === a) { running.show(true); if (prompt) type(running, prompt); return; }
 	if (running) {
 		const from = s.agent, sess = await session(s);
 		if (sess) s[from] = sess;   // so switching back resumes it
@@ -130,8 +130,16 @@ function end(t: vscode.Terminal, a: Agent) {
 		const done = () => { sub.dispose(); clearTimeout(timer); res(); };
 		const sub = vscode.window.onDidCloseTerminal((x) => { if (x === t) done(); });
 		const timer = setTimeout(() => { t.dispose(); done(); }, 6000);
-		t.sendText(a === "claude" ? "/exit" : "/quit", true);
+		type(t, a === "claude" ? "/exit" : "/quit", 2);
 	});
+}
+
+// Typing into a running CLI. sendText puts the Enter in the same write as the text, and the TUIs read that
+// burst as a paste and keep the newline inside it; Enter on its own a beat later submits. A slash command
+// with nothing after it has its autocomplete open, where the first Enter picks the entry and the second sends.
+function type(t: vscode.Terminal, line: string, enters = 1) {
+	t.sendText(line, false);
+	for (let i = 1; i <= enters; i++) setTimeout(() => t.sendText("", true), 250 * i);
 }
 
 // One turn out of band: the departing CLI writes the note itself. `claude -p --resume <id> …` prints it;
