@@ -24,7 +24,6 @@ interface AccountRow { title: string; status: string; ok: boolean; actions: { la
 export class ParlayAccountWidget extends Disposable {
 
 	private readonly element: HTMLElement;
-	private session: AuthenticationSession | undefined;
 
 	constructor(
 		container: HTMLElement,
@@ -74,7 +73,6 @@ export class ParlayAccountWidget extends Disposable {
 				// the provider is still starting; the next sessions event redraws
 			}
 		}
-		this.session = session;
 		clearNode(this.element);
 		this.element.classList.toggle('signed-in', !!session);
 		if (session?.account.icon) {
