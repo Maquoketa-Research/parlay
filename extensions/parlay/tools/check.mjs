@@ -6,7 +6,8 @@ import { join, dirname } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-const src = readFileSync(join(root, "src", "extension.ts"), "utf8");
+// every source file: commands register wherever their feature lives (extension.ts, accounts.ts, …)
+const src = readdirSync(join(root, "src")).filter((f) => f.endsWith(".ts")).map((f) => readFileSync(join(root, "src", f), "utf8")).join("\n");
 const fail = (m) => { console.error("check: " + m); process.exit(1); };
 
 // every contributed command is registered in the source
