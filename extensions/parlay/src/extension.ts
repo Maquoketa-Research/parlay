@@ -16,6 +16,7 @@ import { MeshyView } from "./meshy";
 import { registerRobloxAuth } from "./roblox-auth";
 import { startSourcemap } from "./sourcemap";
 import { addStudioProject } from "./studio";
+import { installStudioPlugin } from "./studioPlugin";
 import { registerAccounts } from "./accounts";
 import { registerAgents, send } from "./agents";
 
@@ -80,6 +81,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	}
 	void ensureSeleneConfig();
 	startSourcemap(ctx);   // luau-lsp resolves instance requires from it
+	installStudioPlugin(ctx);   // and gets the rest of the DataModel (the non-script instances) live from Studio
 	// a folder that was empty when Studio started syncing into it gets its Selene config as the first script lands
 	const firstScript = vscode.workspace.createFileSystemWatcher("**/*.luau", false, true, true);
 	ctx.subscriptions.push(firstScript, firstScript.onDidCreate(() => void ensureSeleneConfig()));

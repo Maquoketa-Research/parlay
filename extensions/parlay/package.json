@@ -438,7 +438,8 @@
       "workbench.secondarySideBar.defaultVisibility": "visible",
       "window.titleSeparator": "  ·  ",
       "parlay.stackedHeader": true,
-      "luau-lsp.sourcemap.autogenerate": false
+      "luau-lsp.sourcemap.autogenerate": false,
+      "luau-lsp.plugin.enabled": true
     },
     "viewsWelcome": [
       {
@@ -451,7 +452,7 @@
   "scripts": {
     "compile": "gulp compile-extension:parlay-ide",
     "watch": "gulp watch-extension:parlay-ide",
-    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs"
+    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs"
   },
   "devDependencies": {
     "@types/node": "24.x",
