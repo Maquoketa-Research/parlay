@@ -102,7 +102,8 @@ Registry.as<IDragAndDropContributionRegistry>(DragAndDropExtensions.DragAndDropC
 	}
 });
 
-// Register views
+// Register views (Parlay: the terminal lives in the right sidebar beside Aqua, Meshy and Sonar, where the agents run;
+// the chat container stays that location's default, and the panel has no default, which layout.ts tolerates)
 const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer({
 	id: TERMINAL_VIEW_ID,
 	title: nls.localize2('terminal', "Terminal"),
@@ -112,7 +113,7 @@ const VIEW_CONTAINER = Registry.as<IViewContainersRegistry>(ViewContainerExtensi
 	hideIfEmpty: true,
 	order: 3,
 	windowEnablement: WindowEnablement.Both
-}, ViewContainerLocation.Panel, { doNotRegisterOpenCommand: true, isDefault: true });
+}, ViewContainerLocation.AuxiliaryBar, { doNotRegisterOpenCommand: true });
 Registry.as<IViewsRegistry>(ViewContainerExtensions.ViewsRegistry).registerViews([{
 	id: TERMINAL_VIEW_ID,
 	name: nls.localize2('terminal', "Terminal"),

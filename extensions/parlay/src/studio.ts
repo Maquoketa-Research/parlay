@@ -253,7 +253,7 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		const starters = Array.from(real.keys()).filter((c) => !keep.some((e) => e.className === c));
 		await writeSyncRecord(slot, folder, keep, missing, starters, real);
 		log.appendLine(`wrote ${slot}: kept ${keep.length}, added ${[...missing, ...starters].join(", ")}; universe ${universe ?? "unknown"}`);
-		if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
+		if (universe) openStudio(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`);
 		void vscode.window.showInformationMessage((universe
 			? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
 			: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`)
@@ -274,6 +274,12 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		void vscode.window.showInformationMessage(`"${chosen.name}" already syncs into ${folder}; opening it.`);
 	}
 	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(folder), { forceNewWindow: false });
+}
+
+// Studio's own link, started from the home folder: a window opened with openExternal inherits Parlay's working
+// directory (the app folder) and holds it until it closes, which then blocks reinstalling Parlay with EBUSY.
+function openStudio(url: string) {
+	spawn("cmd.exe", ["/d", "/c", "start", "", url], { cwd: os.homedir(), detached: true, stdio: "ignore", windowsHide: true }).unref();
 }
 
 // ---- writing Studio's sync record ---------------------------------------------------------------------------

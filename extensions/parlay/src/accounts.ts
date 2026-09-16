@@ -15,19 +15,24 @@ export function registerAccounts(ctx: vscode.ExtensionContext) {
 	let panel: vscode.WebviewPanel | undefined;
 	const render = async () => { if (panel) { panel.webview.html = html(await rows(ctx), panel.webview.cspSource); } };
 	ctx.subscriptions.push(vscode.authentication.onDidChangeSessions(() => void render()), ctx.secrets.onDidChange(() => void render()));
+	// one action, from the page or from the header menu
+	const act = async (m: Msg) => {
+		try {
+			if ("cmd" in m) { await vscode.commands.executeCommand(m.cmd); }
+			else if ("clear" in m) { await ctx.secrets.delete(m.clear); }
+			else if ("shell" in m) { const t = vscode.window.createTerminal({ name: "Parlay sign-in" }); t.show(); t.sendText(m.shell); }
+		} catch (e) { void vscode.window.showErrorMessage(`Parlay: ${(e as Error).message}`); }
+		setTimeout(() => void render(), 1500);   // CLIs need a moment; sessions and keys redraw on their own events too
+	};
+	// the header's avatar menu (parlayAccount.ts in the workbench) asks for the rows and runs the actions
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.accounts.summary", () => rows(ctx)));
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.accounts.do", (m: Msg) => act(m)));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.accounts", async () => {
 		if (panel) { panel.reveal(); return; }
 		panel = vscode.window.createWebviewPanel("parlay.accounts", "Accounts", vscode.ViewColumn.Active, { enableScripts: true, retainContextWhenHidden: true });
 		panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, "media", "aqua.svg");
 		panel.onDidDispose(() => { panel = undefined; }, null, ctx.subscriptions);
-		panel.webview.onDidReceiveMessage(async (m: Msg) => {
-			try {
-				if ("cmd" in m) { await vscode.commands.executeCommand(m.cmd); }
-				else if ("clear" in m) { await ctx.secrets.delete(m.clear); }
-				else if ("shell" in m) { const t = vscode.window.createTerminal({ name: "Parlay sign-in" }); t.show(); t.sendText(m.shell); }
-			} catch (e) { void vscode.window.showErrorMessage(`Parlay: ${(e as Error).message}`); }
-			setTimeout(() => void render(), 1500);   // CLIs need a moment; sessions and keys redraw on their own events too
-		}, null, ctx.subscriptions);
+		panel.webview.onDidReceiveMessage((m: Msg) => void act(m), null, ctx.subscriptions);
 		await render();
 	}));
 }

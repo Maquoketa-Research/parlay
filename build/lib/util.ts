@@ -306,6 +306,19 @@ export function rimraf(dir: string): () => Promise<void> {
 					return setTimeout(() => retry(), 10);
 				}
 
+				// Parlay: something whose working directory is this folder (a Studio window the app opened, an Explorer
+				// window) blocks removing the folder itself but not what is in it; empty it and keep it.
+				if (err.code === 'EBUSY' && fs.existsSync(dir)) {
+					try {
+						for (const child of fs.readdirSync(dir)) {
+							_rimraf.sync(path.join(dir, child));
+						}
+						return c();
+					} catch (inner) {
+						return e(inner);
+					}
+				}
+
 				return e(err);
 			});
 		};
