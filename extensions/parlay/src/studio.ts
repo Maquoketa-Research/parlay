@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-export interface Studio { id: string; name: string; placeId: string }
+export interface Studio { id: string; name: string; placeId: string; detail?: string }
 
 const cfg = <T>(k: string, d: T): T => vscode.workspace.getConfiguration("parlay").get<T>(k, d);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "place";
@@ -68,10 +68,11 @@ async function listStudiosViaWindows(): Promise<Studio[]> {
 	const out = await new Promise<string>((res) => execFile("powershell", ["-NoProfile", "-Command",
 		"Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.MainWindowTitle }"],
 		{ windowsHide: true }, (_e, o) => res(String(o ?? ""))));
+	// "100 Fogs Draft - World - Roblox Studio": the experience first, then the place within it
 	return out.split(/\r?\n/).map((t) => t.trim()).filter(Boolean)
 		.map((t) => t.replace(/\s*-\s*Roblox Studio.*$/i, "").replace(/^\*\s*/, "").trim())
 		.filter((n, i, a) => n && a.indexOf(n) === i)
-		.map((name) => ({ id: "", name, placeId: "" }));
+		.map((label) => { const [name, ...rest] = label.split(/\s+-\s+/); return { id: "", name, placeId: "", detail: rest.join(" - ") }; });
 }
 
 async function listStudiosViaMcp(): Promise<Studio[]> {
@@ -142,7 +143,7 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	let chosen: Studio | undefined;
 	if (studios.length) {
 		const item = await vscode.window.showQuickPick(
-			studios.map((s) => ({ label: s.name, description: s.placeId ? `placeId ${s.placeId}` : "", s })),
+			studios.map((s) => ({ label: s.name, description: s.placeId ? `placeId ${s.placeId}` : (s.detail ?? ""), s })),
 			{ placeHolder: "Which open Roblox Studio is the project?" });
 		chosen = item?.s;
 		if (!chosen) return;
