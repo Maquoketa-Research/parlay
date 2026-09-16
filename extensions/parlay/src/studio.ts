@@ -227,9 +227,10 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		await writeSyncRecord(slot, folder, record ? existing : await readSyncRecord(slot), missing);
 		const universe = chosen.universeId ?? await universeIdFor(chosen.placeId).catch(() => undefined);
 		if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
-		void vscode.window.showInformationMessage(universe
+		void vscode.window.showInformationMessage((universe
 			? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
-			: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`);
+			: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`)
+			+ ` ${MANUAL_CONTAINERS} cannot be set up from outside Studio: if they hold scripts, right-click them there, Sync to…, and pick the same folder.`);
 	} else if (!synced) {
 		{
 			await vscode.env.clipboard.writeText(folder);
@@ -253,7 +254,11 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 // and status; Studio resolves a service by className and does not check the id (a made-up one synced all of
 // ReplicatedStorage), but it skips entries without one.
 
-const SCRIPT_CONTAINERS = ["ReplicatedFirst", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterPlayer", "StarterGui"];
+// The containers Studio resolves by class name when it resumes from a record we wrote. StarterPlayer, StarterGui,
+// StarterPlayerScripts and StarterCharacterScripts all came back "the instance no longer exists" (tested
+// 2026-09-15), so those two stay a right-click in Studio when they hold scripts.
+const SCRIPT_CONTAINERS = ["ReplicatedFirst", "ReplicatedStorage", "ServerScriptService", "ServerStorage"];
+const MANUAL_CONTAINERS = "StarterPlayer and StarterGui";
 const STUDIO_KEY = "HKCU:\\Software\\Roblox\\RobloxStudio";
 
 function powershell(script: string): Promise<string> {
