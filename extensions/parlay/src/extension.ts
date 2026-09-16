@@ -12,6 +12,7 @@ import * as os from "os";
 import * as path from "path";
 import { MeshyView } from "./meshy";
 import { startSourcemap } from "./sourcemap";
+import { addStudioProject } from "./studio";
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
 const GLASS_THEME = "Parlay Glass";
@@ -26,6 +27,8 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.ask", () => ask(ctx)));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.claude.match-assets", () => matchAssets(ctx)));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.installSkills", () => installSkills(ctx, true)));
+	// Start from Studio: pick an open place, get its sync folder (or a new one, wired to git), open it here.
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.studio.add", () => addStudioProject(ctx)));
 	ctx.subscriptions.push(vscode.window.onDidCloseTerminal((t) => { if (t === claudeTerminal) claudeTerminal = undefined; }));
 
 	// The right-hand panel: Aqua (with a Start button when it is down), Meshy, and Sonar.
@@ -59,6 +62,9 @@ export function activate(ctx: vscode.ExtensionContext) {
 	}
 	void ensureSeleneConfig();
 	startSourcemap(ctx);   // luau-lsp resolves instance requires from it
+	// a folder that was empty when Studio started syncing into it gets its Selene config as the first script lands
+	const firstScript = vscode.workspace.createFileSystemWatcher("**/*.luau", false, true, true);
+	ctx.subscriptions.push(firstScript, firstScript.onDidCreate(() => void ensureSeleneConfig()));
 
 	// The lens over the selection: Explain · Fix · Validate, without a right-click.
 	const lens = new SelectionLens();

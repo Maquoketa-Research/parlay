@@ -88,6 +88,11 @@
         "command": "parlay.openai.setKey",
         "title": "Set OpenAI API key (concept drafts)",
         "category": "Parlay"
+      },
+      {
+        "command": "parlay.studio.add",
+        "title": "Add Roblox Studio project",
+        "category": "Parlay"
       }
     ],
     "submenus": [
@@ -285,6 +290,16 @@
           "type": "string",
           "default": "assets/reference",
           "description": "Folder inside the workspace with screenshots of the game; drafts match their look. A Studio capture is added when the Studio MCP is free."
+        },
+        "parlay.projectsDir": {
+          "type": "string",
+          "default": "",
+          "description": "Where Add Roblox Studio project makes folders for places Studio is not syncing yet. Empty: ~/Documents/Parlay."
+        },
+        "parlay.githubOrg": {
+          "type": "string",
+          "default": "Maquoketa-Research",
+          "description": "GitHub owner whose repos Add Roblox Studio project looks for (a repo named after the place is cloned; otherwise git init points origin at it)."
         }
       }
     },
@@ -312,7 +327,14 @@
       "window.titleSeparator": "  ·  ",
       "parlay.stackedHeader": true,
       "luau-lsp.sourcemap.autogenerate": false
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "workbench.explorer.emptyView",
+        "contents": "Parlay works on the folder Roblox Studio syncs a place to. Pick an open Studio and Parlay finds or makes that folder, wires git and opens it.\n[Add Roblox Studio project](command:parlay.studio.add)\n[Open Folder](command:workbench.action.files.openFolder)",
+        "when": "workbenchState == empty"
+      }
+    ]
   },
   "scripts": {
     "compile": "gulp compile-extension:parlay-ide",

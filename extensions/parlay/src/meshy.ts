@@ -7,7 +7,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { spawn } from "child_process";
+import { listStudios, studioSession } from "./studio";
 
 const MESHY = "https://api.meshy.ai";
 const ROBLOX = "https://apis.roblox.com/assets/v1";
@@ -514,36 +514,14 @@ export function slugOf(s: string): string {
 
 // One screenshot from the open Studio through Roblox's own MCP server (stdio JSON-RPC). The Studio seat is
 // exclusive per machine: while Claude Code holds it this fails fast and the drafts use the reference folder.
-function studioCapture(outFile: string): Promise<string | undefined> {
-	return new Promise((resolve, reject) => {
-		const bat = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "mcp.bat");
-		if (!fs.existsSync(bat)) return resolve(undefined);
-		const child = spawn("cmd.exe", ["/d", "/s", "/c", bat], { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
-		let buf = ""; let nextId = 1; const pending = new Map<number, (v: any) => void>();
-		const call = (method: string, params: any) => new Promise<any>((res) => { const id = nextId++; pending.set(id, res); child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"); });
-		const done = (v: string | undefined, err?: Error) => { clearTimeout(t); child.kill(); err ? reject(err) : resolve(v); };
-		const t = setTimeout(() => done(undefined, new Error("Studio MCP timed out")), 20000);
-		child.on("error", (e) => done(undefined, e));
-		child.stdout.on("data", (d) => {
-			buf += d.toString();
-			let i; while ((i = buf.indexOf("\n")) >= 0) {
-				const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-				if (!line) continue;
-				try { const msg = JSON.parse(line); if (msg.id && pending.has(msg.id)) { pending.get(msg.id)!(msg); pending.delete(msg.id); } } catch { /* not json */ }
-			}
-		});
-		(async () => {
-			await call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "parlay-ide", version: "0.0.5" } });
-			child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
-			const studios = await call("tools/call", { name: "list_roblox_studios", arguments: {} });
-			const text = JSON.stringify(studios.result ?? {});
-			const idMatch = /"(?:id|studio_id|instanceId)"\s*:\s*"?([A-Za-z0-9_-]+)"?/.exec(text);
-			if (!idMatch) return done(undefined);
-			const shot = await call("tools/call", { name: "screen_capture", arguments: { studio_id: idMatch[1] } });
-			const img = (shot.result?.content ?? []).find((c: any) => c.type === "image" && c.data);
-			if (!img) return done(undefined);
-			fs.writeFileSync(outFile, Buffer.from(img.data, "base64"));
-			done(outFile);
-		})().catch((e) => done(undefined, e));
+async function studioCapture(outFile: string): Promise<string | undefined> {
+	const studios = await listStudios();
+	if (!studios.length) return undefined;
+	return studioSession(async (call) => {
+		const shot = await call("tools/call", { name: "screen_capture", arguments: { studio_id: studios[0].id } });
+		const img = (shot.result?.content ?? []).find((c: any) => c.type === "image" && c.data);
+		if (!img) return undefined;
+		fs.writeFileSync(outFile, Buffer.from(img.data, "base64"));
+		return outFile;
 	});
 }
