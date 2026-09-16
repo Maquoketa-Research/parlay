@@ -6,9 +6,14 @@
 // The browser comes back to a one-shot loopback server on one of two fixed ports, both registered on the app as
 // redirect URLs. Refresh tokens are single-use on both providers: the reply's refresh_token replaces the stored one.
 // Names follow the provider id: setting parlay.<id>ClientId, secrets parlay.<id>ClientSecret and parlay.<id>Session.
+// The secret itself: the one the user typed (SecretStorage) if any, else the one the build baked into
+// secrets.json next to package.json (build-win32.sh writes it from ~/.parlay/<id>-client-secret; the file is
+// gitignored), else a one-time prompt. So an installed Parlay signs in with no setup at all.
 import * as vscode from "vscode";
 import { randomBytes } from "crypto";
+import * as fs from "fs";
 import * as http from "http";
+import * as path from "path";
 import * as pkce from "./pkce";
 
 const PORTS = [53682, 53683];
@@ -106,7 +111,7 @@ export class OAuthProvider implements vscode.AuthenticationProvider {
 	async removeSession(): Promise<void> {
 		const s = await this.stored();
 		if (!s) return;
-		const secret = await this.ctx.secrets.get(this.secretKey);
+		const secret = await this.secret(false).catch(() => undefined);
 		// revoking the refresh token ends the whole grant; if the provider is unreachable the local sign-out still happens
 		if (secret) await fetch(this.p.revokeUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form({ token: s.refreshToken, client_id: this.clientId(), client_secret: secret }) }).catch(() => undefined);
 		await this.ctx.secrets.delete(this.store);
@@ -163,13 +168,19 @@ export class OAuthProvider implements vscode.AuthenticationProvider {
 	private async save(s: Stored) { await this.ctx.secrets.store(this.store, JSON.stringify(s)); return s; }
 
 	private async secret(prompt: boolean): Promise<string> {
-		let v = await this.ctx.secrets.get(this.secretKey);
+		let v = (await this.ctx.secrets.get(this.secretKey)) || this.baked();
 		if (!v && prompt) {
 			v = (await vscode.window.showInputBox({ prompt: `Client Secret of the ${this.p.label} OAuth 2.0 app Parlay signs in as. Kept in SecretStorage.`, password: true, ignoreFocusOut: true }))?.trim();
 			if (v) await this.ctx.secrets.store(this.secretKey, v);
 		}
 		if (!v) throw new Error(`${this.p.label} client secret not set (run Parlay: Sign in to ${this.p.label})`);
 		return v;
+	}
+
+	// the secret the build baked in, if this build has one for this provider
+	private baked(): string | undefined {
+		try { return (JSON.parse(fs.readFileSync(path.join(this.ctx.extensionPath, "secrets.json"), "utf8")) as Record<string, string>)[this.p.id] || undefined; }
+		catch { return undefined; }
 	}
 }
 

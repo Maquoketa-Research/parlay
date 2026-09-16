@@ -34,9 +34,13 @@ export BUILD_SOURCEVERSION="$(git rev-parse HEAD)"
 echo "== Parlay ${RELEASE_VERSION} from ${BUILD_SOURCEVERSION:0:9}  $(date)"
 echo "== node $(node --version)  npm $(npm --version)"
 
-restore() { git checkout -q -- package.json product.json 2>/dev/null || true; }
+restore() { git checkout -q -- package.json product.json 2>/dev/null || true; rm -f extensions/parlay/secrets.json; }
 trap restore EXIT
 node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.RELEASE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+
+# The OAuth client secrets ride in the build, never in the tree: ~/.parlay/<provider>-client-secret (one line each)
+# becomes extensions/parlay/secrets.json (gitignored, removed on exit) and ships inside the extension.
+node -e "const fs=require('fs'),p=require('path'),h=require('os').homedir();const out={};for(const id of ['roblox','discord']){const f=p.join(h,'.parlay',id+'-client-secret');if(fs.existsSync(f))out[id]=fs.readFileSync(f,'utf8').trim();}fs.writeFileSync('extensions/parlay/secrets.json',JSON.stringify(out)+'\n');console.log('== client secrets baked: '+(Object.keys(out).join(', ')||'none'))"
 
 echo "== built-in extensions"
 bash build/parlay/fetch-builtins.sh

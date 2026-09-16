@@ -6,3 +6,4 @@ tools/baketest/out/
 tools/baketest/three/
 tools/baketest/edge-profile/
 tools/baketest/test.html
+secrets.json
