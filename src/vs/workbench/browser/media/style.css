@@ -441,6 +441,7 @@ body.parlay-glass,
 .monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab {
 	border-radius: 8px;
 	margin: 4px 2px 0;
+	--editor-group-tab-height: 27px;   /* the label's line-height and the close button size off the pill, not the 35px strip */
 	height: 27px !important;
 	line-height: 27px !important;
 	border-right: 0 !important;
