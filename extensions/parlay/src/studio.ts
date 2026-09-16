@@ -293,7 +293,12 @@ async function writeSyncRecord(record: string, folder: string, keep: SyncEntry[]
 	const studioPath = (p: string) => p.replace(/\//g, "\\").replace(/^([A-Za-z]:)\\/, "$1/");
 	const entry = (className: string, scriptId: string): SyncEntry => ({ className, filePath: studioPath(path.join(folder, className)), scriptId, status: "Syncing" });
 	const entries: SyncEntry[] = [...keep, ...services.map((c) => entry(c, randomUUID())), ...starters.map((c) => entry(c, realIds.get(c)!))];
-	for (const s of [...services, ...starters]) fs.mkdirSync(path.join(folder, s), { recursive: true });   // Studio reads the folder as it resumes
+	// Studio must create the service folders itself: an existing but empty folder reads as "previously synced
+	// content" and the resume ends "Errored / Unable to read from file" (every failure tonight had pre-made folders)
+	for (const s of [...services, ...starters]) {
+		const p = path.join(folder, s);
+		if (fs.existsSync(p) && fs.readdirSync(p).length === 0) fs.rmdirSync(p);
+	}
 	const b64 = Buffer.from(JSON.stringify(entries, null, 4), "utf8").toString("base64");
 	await powershell(`$k = '${STUDIO_KEY}'; $n = '${record}'
 $json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}'))
