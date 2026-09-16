@@ -14,6 +14,7 @@ import { MeshyView } from "./meshy";
 import { registerRobloxAuth } from "./roblox-auth";
 import { startSourcemap } from "./sourcemap";
 import { addStudioProject } from "./studio";
+import { registerAccounts } from "./accounts";
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
 const GLASS_THEME = "Parlay Glass";
@@ -50,6 +51,8 @@ export function activate(ctx: vscode.ExtensionContext) {
 		send(`/parlay-insert-asset ${clean(id.trim())}`);
 	}));
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.sonar", new UrlView("sonarUrl", "Sonar")));
+	// Accounts: every login and key on one page (the account in the header opens it)
+	registerAccounts(ctx);
 	if (!ctx.globalState.get("firstRunDone")) {
 		void ctx.globalState.update("firstRunDone", true);
 		void firstRun();

@@ -58,6 +58,7 @@ import { safeIntl } from '../../../../base/common/date.js';
 import { IsCompactTitleBarContext, TitleBarVisibleContext } from '../../../common/contextkeys.js';
 import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
 import { WORKBENCH_MENU_MOTION_CLASS, workbenchMenuCloseAnimation } from '../../actions/menuMotion.js';
+import { ParlayAccountWidget } from './parlayAccount.js';
 
 export interface ITitleVariable {
 	readonly name: string;
@@ -547,6 +548,11 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 			this.createActionToolBarMenus();
 		}
 
+		// Parlay: the Roblox account (avatar and name, or Sign in) between the toolbar and the window controls
+		if (!this.isAuxiliary && hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
+			this._register(this.instantiationService.createInstance(ParlayAccountWidget, append(this.rightContent, $('div.parlay-account-container'))));
+		}
+
 		// Window Controls Container
 		if (!hasNativeTitlebar(this.configurationService, this.titleBarStyle)) {
 			let primaryWindowControlsLocation = isMacintosh ? 'left' : 'right';
@@ -775,7 +781,8 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 
 			// --- Activity Actions (always at the end)
 			if (this.activityActionsEnabled) {
-				if (isAccountsActionVisible(this.storageService)) {
+				// Parlay: the main window shows the account widget instead of the stock accounts tile
+				if (this.isAuxiliary && isAccountsActionVisible(this.storageService)) {
 					actions.primary.push(ACCOUNTS_ACTIVITY_TILE_ACTION);
 				}
 

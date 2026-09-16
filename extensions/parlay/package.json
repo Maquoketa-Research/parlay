@@ -90,6 +90,11 @@
         "category": "Parlay"
       },
       {
+        "command": "parlay.accounts",
+        "title": "Accounts",
+        "category": "Parlay"
+      },
+      {
         "command": "parlay.studio.add",
         "title": "Add Roblox Studio project",
         "category": "Parlay"

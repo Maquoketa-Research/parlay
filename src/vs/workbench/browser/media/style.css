@@ -520,6 +520,19 @@ body.parlay-glass,
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item { height: 30px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item .action-label { height: auto !important; line-height: normal !important; margin: 0 !important; padding: 0 6px !important; }
 
+/* the Roblox account in the header (parlayAccount.ts): avatar and name, or Sign in; click opens Accounts */
+.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .parlay-account-container { display: flex; align-items: center; height: 100%; -webkit-app-region: no-drag; }
+.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .parlay-account-container { height: 30px !important; }
+.monaco-workbench .part.titlebar .parlay-account {
+	display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px 0 5px; margin: 0 6px 0 2px; border-radius: 11px; cursor: pointer;
+	font-size: 12px; color: var(--vscode-titleBar-activeForeground); opacity: 0.85; white-space: nowrap; outline: none;
+}
+.monaco-workbench .part.titlebar .parlay-account:hover, .monaco-workbench .part.titlebar .parlay-account:focus-visible { background: var(--vscode-toolbar-hoverBackground); opacity: 1; }
+.monaco-workbench .part.titlebar .parlay-account > .parlay-avatar { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; background: var(--vscode-toolbar-hoverBackground); }
+.monaco-workbench .part.titlebar .parlay-account > .codicon { font-size: 16px; }
+.monaco-workbench .part.titlebar .parlay-account > .parlay-account-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.monaco-workbench .part.titlebar .parlay-account:not(.signed-in) > .parlay-account-name { font-weight: 600; }
+
 /* the Parlay sidebar on the right stays: no hide button on its title */
 .monaco-workbench .part.auxiliarybar > .title .title-actions .action-item .codicon-close,
 .monaco-workbench .part.auxiliarybar > .title .global-actions .action-item .codicon-close,
