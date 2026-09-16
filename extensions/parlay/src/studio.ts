@@ -15,7 +15,7 @@ import { readPlaceIds } from "./rbxl";
 export interface Studio { id: string; name: string; placeId: string; detail?: string; universeId?: string }
 
 // View > Output > Parlay: what each step found, for when "nothing happened"
-export const log = vscode.window.createOutputChannel("Parlay");
+export const log = vscode.window.createOutputChannel("Parlay", { log: true });   // also lands in the exthost log folder
 const cfg = <T>(k: string, d: T): T => vscode.workspace.getConfiguration("parlay").get<T>(k, d);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "place";
 
@@ -223,8 +223,10 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	await ctx.globalState.update(`studioProject:${chosen.placeId || slug(chosen.name)}`, { folder, name: chosen.name, placeId: chosen.placeId, added: Date.now() });
 
 	const record = chosen.placeId ? await syncRecordName(chosen.placeId) : undefined;
-	// entries whose folder is gone (the user deleted the project to start over) are stale: rewrite them
-	const existing = (record ? await readSyncRecord(record) : []).filter((e) => fs.existsSync(path.dirname(e.filePath.replace(/\//g, "\\").replace(/\\+/g, "\\"))));
+	// An entry whose own folder is gone is stale (the user deleted the project, or just the service folders, to start
+	// over): an open Studio shows it Errored "Unable to read from file" and never recreates it, so rewrite it. The
+	// service folder, not its parent: Parlay has just made the parent, so the parent proves nothing.
+	const existing = (record ? await readSyncRecord(record) : []).filter((e) => fs.existsSync(e.filePath.replace(/\//g, "\\").replace(/\\+/g, "\\")));
 	const missing = SCRIPT_CONTAINERS.filter((c) => !existing.some((e) => e.className === c));
 	log.appendLine(`folder ${folder} (${synced ? "already syncing" : "new"}); record ${record ?? "none"}; ${existing.length} live entries; missing ${missing.join(", ") || "nothing"}`);
 	if (chosen.placeId && missing.length) {
@@ -268,7 +270,7 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 			if (how === "How Script Sync works") void vscode.env.openExternal(vscode.Uri.parse("https://create.roblox.com/docs/scripting/sync"));
 		}
 	} else {
-		void vscode.window.showInformationMessage(`Parlay: "${chosen.name}" syncs to ${folder}. ${gitNote}.`);
+		void vscode.window.showInformationMessage(`"${chosen.name}" already syncs into ${folder}; opening it.`);
 	}
 	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(folder), { forceNewWindow: false });
 }
