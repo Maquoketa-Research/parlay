@@ -19,7 +19,7 @@ export const dirs = [
 	'extensions/css-language-features/server',
 	'extensions/debug-auto-launch',
 	'extensions/debug-server-ready',
-	'extensions/parlay-ide',
+	'extensions/parlay',
 	'extensions/emmet',
 	'extensions/extension-editing',
 	'extensions/git',
