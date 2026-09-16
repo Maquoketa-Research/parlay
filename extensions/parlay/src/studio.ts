@@ -6,6 +6,7 @@
 // a click in Studio is choosing the folder; Parlay puts the path on the clipboard and says where to click.
 import * as vscode from "vscode";
 import { execFile, spawn } from "child_process";
+import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -162,21 +163,92 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	await ctx.globalState.update(`studioProject:${chosen.placeId || slug(chosen.name)}`, { folder, name: chosen.name, placeId: chosen.placeId, added: Date.now() });
 
 	if (!synced) {
-		await vscode.env.clipboard.writeText(folder);
-		// when Studio is reachable, leave the script containers selected so the right-click lands on the right thing
-		const selected = chosen.id ? await selectScriptContainers(chosen.id).catch(() => false) : false;
-		const how = await vscode.window.showInformationMessage(
-			`"${chosen.name}" is not syncing yet. Parlay made ${folder} (path on your clipboard; ${gitNote}). `
-			+ (selected ? "The script containers are selected in Studio's Explorer: right-click them, Sync to…, paste the path, Save."
-				: "In Studio's Explorer select ServerScriptService, ReplicatedStorage and StarterPlayer, right-click, Sync to…, paste the path, Save.")
-			+ " Scripts appear here as they sync, and Studio resumes the sync every time the place opens.",
-			{ modal: true }, "Open the folder", "How Script Sync works");
-		if (how === "How Script Sync works") void vscode.env.openExternal(vscode.Uri.parse("https://create.roblox.com/docs/scripting/sync"));
-		if (!how) return;
+		const record = chosen.placeId ? await syncRecordName(chosen.placeId) : undefined;
+		if (record) {
+			// The zero-click path. Studio keeps a per-place record of what it syncs and resumes it when the place
+			// opens; it accepts entries we write (any id, the service by class name). It rewrites the record when
+			// the place closes, so: the user closes the place, Parlay writes, Parlay reopens the place through
+			// Studio's own link, Studio writes every script into the folder.
+			const go = await vscode.window.showInformationMessage(
+				`Parlay will set Studio up to sync ${SCRIPT_CONTAINERS.join(", ")} of "${chosen.name}" into ${folder} (${gitNote}). Close that place in Studio when you are ready; Parlay finishes the moment it closes and reopens the place syncing.`,
+				{ modal: true }, "I'll close it now");
+			if (!go) return;
+			const closed = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Waiting for "${chosen.name}" to close in Studio…`, cancellable: true },
+				(_p, token) => waitForPlaceClose(chosen!.name, token));
+			if (!closed) return;
+			await writeSyncRecord(record, folder!, SCRIPT_CONTAINERS);
+			const universe = await universeIdFor(chosen.placeId).catch(() => undefined);
+			if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
+			void vscode.window.showInformationMessage(universe
+				? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
+				: `Sync is set up for "${chosen.name}". Reopen the place in Studio and it syncs into ${folder}.`);
+		} else {
+			await vscode.env.clipboard.writeText(folder);
+			const selected = chosen.id ? await selectScriptContainers(chosen.id).catch(() => false) : false;
+			const how = await vscode.window.showInformationMessage(
+				`"${chosen.name}" is not syncing yet. Parlay made ${folder} (path on your clipboard; ${gitNote}). `
+				+ (selected ? "The script containers are selected in Studio's Explorer: right-click them, Sync to…, paste the path, Save."
+					: "In Studio's Explorer select ServerScriptService, ReplicatedStorage and StarterPlayer, right-click, Sync to…, paste the path, Save.")
+				+ " Scripts appear here as they sync, and Studio resumes the sync every time the place opens.",
+				{ modal: true }, "Open the folder", "How Script Sync works");
+			if (how === "How Script Sync works") void vscode.env.openExternal(vscode.Uri.parse("https://create.roblox.com/docs/scripting/sync"));
+			if (!how) return;
+		}
 	} else {
 		void vscode.window.showInformationMessage(`Parlay: "${chosen.name}" syncs to ${folder}. ${gitNote}.`);
 	}
 	await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(folder), { forceNewWindow: false });
+}
+
+// ---- writing Studio's sync record ---------------------------------------------------------------------------
+// Verified 2026-09-15 on Studio's File_Sync_Persistence_Record_V1: an entry needs className, filePath, scriptId
+// and status; Studio resolves a service by className and does not check the id (a made-up one synced all of
+// ReplicatedStorage), but it skips entries without one.
+
+const SCRIPT_CONTAINERS = ["ReplicatedFirst", "ReplicatedStorage", "ServerScriptService", "ServerStorage", "StarterPlayer", "StarterGui"];
+const STUDIO_KEY = "HKCU:\\Software\\Roblox\\RobloxStudio";
+
+function powershell(script: string): Promise<string> {
+	const encoded = Buffer.from(script, "utf16le").toString("base64");
+	return new Promise((res) => execFile("powershell", ["-NoProfile", "-EncodedCommand", encoded], { windowsHide: true, maxBuffer: 8 << 20 }, (_e, out) => res(String(out ?? ""))));
+}
+
+// the record Studio made for this place (it makes one when the place opens); undefined when it never has
+async function syncRecordName(placeId: string): Promise<string | undefined> {
+	if (process.platform !== "win32") return undefined;
+	const out = await powershell(`(Get-Item '${STUDIO_KEY}').GetValueNames() | Where-Object { $_ -like 'File_Sync_Persistence_Record_V1:${placeId}:*' -and $_ -notlike '*_timeLastUsed' -and $_ -notlike '*_lastUsedDir' }`);
+	return out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+}
+
+async function writeSyncRecord(record: string, folder: string, services: string[]) {
+	// Studio writes paths as "C:/Users\\name\\..." (forward slash after the drive, backslashes after); mimic it
+	const studioPath = (p: string) => p.replace(/\//g, "\\").replace(/^([A-Za-z]:)\\/, "$1/");
+	const entries = services.map((className) => ({ className, filePath: studioPath(path.join(folder, className)), scriptId: randomUUID(), status: "Syncing" }));
+	const b64 = Buffer.from(JSON.stringify(entries, null, 4), "utf8").toString("base64");
+	await powershell(`$k = '${STUDIO_KEY}'; $n = '${record}'
+$json = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}'))
+Set-ItemProperty -Path $k -Name $n -Value $json -Type String
+Set-ItemProperty -Path $k -Name ($n + '_lastUsedDir') -Value '${folder.replace(/\\/g, "/")}' -Type String
+Set-ItemProperty -Path $k -Name ($n + '_timeLastUsed') -Value ([int64]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())) -Type QWord`);
+}
+
+// true when no Studio window carries the place name any more (polled), false on cancel or after ten minutes
+async function waitForPlaceClose(name: string, token: vscode.CancellationToken): Promise<boolean> {
+	const started = Date.now();
+	while (Date.now() - started < 10 * 60_000 && !token.isCancellationRequested) {
+		const open = await listStudiosViaWindows();
+		if (!open.some((s) => s.name.toLowerCase() === name.toLowerCase())) return true;
+		await new Promise((r) => setTimeout(r, 2000));
+	}
+	return false;
+}
+
+// Studio's edit link needs the universe (experience) id as well as the place id; Roblox answers this publicly
+async function universeIdFor(placeId: string): Promise<string | undefined> {
+	const r = await fetch(`https://apis.roblox.com/universes/v1/places/${placeId}/universe`);
+	if (!r.ok) return undefined;
+	const j = (await r.json()) as { universeId?: number | string | null };
+	return j.universeId !== undefined && j.universeId !== null ? String(j.universeId) : undefined;
 }
 
 // Studio's Explorer selection, set through the MCP server's Luau runner (Edit DataModel). True when it worked.
