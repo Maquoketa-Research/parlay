@@ -14,6 +14,8 @@ import { readPlaceIds } from "./rbxl";
 
 export interface Studio { id: string; name: string; placeId: string; detail?: string; universeId?: string }
 
+// View > Output > Parlay: what each step found, for when "nothing happened"
+export const log = vscode.window.createOutputChannel("Parlay");
 const cfg = <T>(k: string, d: T): T => vscode.workspace.getConfiguration("parlay").get<T>(k, d);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "place";
 
@@ -29,7 +31,8 @@ export function studioSession<T>(fn: (call: Call) => Promise<T>, timeoutMs = 200
 		const child = spawn("cmd.exe", ["/d", "/s", "/c", bat], { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
 		let buf = ""; let nextId = 1; const pending = new Map<number, (v: any) => void>();
 		const call: Call = (method, params) => new Promise((res) => { const id = nextId++; pending.set(id, res); child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"); });
-		const done = (err?: Error, value?: T) => { clearTimeout(t); child.kill(); err ? reject(err) : resolve(value as T); };
+		// kill the tree: child is cmd.exe, and killing only it leaves StudioMCP.exe running forever
+		const done = (err?: Error, value?: T) => { clearTimeout(t); if (child.pid) execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => { }); err ? reject(err) : resolve(value as T); };
 		const t = setTimeout(() => done(new Error("Studio MCP timed out; is another client (Claude Code) connected to Studio?")), timeoutMs);
 		child.on("error", (e) => done(e));
 		child.stdout.on("data", (d) => {
@@ -62,10 +65,13 @@ let lastListError = "";
 export async function listStudios(): Promise<Studio[]> {
 	// the MCP server is the source of truth (instance id and place id straight from Studio); the windows and
 	// their logs are the backup, and fill in any window the server did not report
-	let studios: Studio[] = [];
-	try { studios = await listStudiosViaMcp(); } catch { /* seat taken or server down */ }
-	let viaWindows: Studio[] = [];
-	try { viaWindows = await listStudiosViaWindows(); } catch (e) { lastListError = (e as Error).message; }
+	const t0 = Date.now();
+	const [mcp, win] = await Promise.allSettled([listStudiosViaMcp(), listStudiosViaWindows()]);
+	const studios: Studio[] = mcp.status === "fulfilled" ? mcp.value : [];
+	if (mcp.status === "rejected") log.appendLine(`Studio MCP: ${(mcp.reason as Error).message}`);   // seat taken or server down
+	const viaWindows: Studio[] = win.status === "fulfilled" ? win.value : [];
+	if (win.status === "rejected") { lastListError = (win.reason as Error).message; log.appendLine(`Studio windows: ${lastListError}`); }
+	log.appendLine(`listed Studios in ${Date.now() - t0} ms: mcp ${studios.length}, windows ${viaWindows.map((w) => `${w.name} (${w.placeId || "no place id"})`).join(", ") || "none"}`);
 	for (const w of viaWindows) {
 		const known = studios.some((s) => (w.placeId && s.placeId === w.placeId) || s.name.toLowerCase() === w.name.toLowerCase());
 		if (!known) studios.push(w);
@@ -136,7 +142,7 @@ async function listStudiosViaMcp(): Promise<Studio[]> {
 			const m = /^(.*?)\s*\(placeId:\s*(\d+)\)\s*$/.exec(String(s.name ?? ""));
 			return { id: String(s.id), name: m ? m[1] : String(s.name ?? s.id), placeId: m ? m[2] : "" };
 		});
-	});
+	}, 6000);   // a short leash: the windows list runs alongside and carries when this hangs
 }
 
 // ---- Studio's Script Sync records ---------------------------------------------------------------------------
@@ -183,9 +189,11 @@ async function wireGit(folder: string, name: string): Promise<string> {
 // ---- the command ----------------------------------------------------------------------------------------------
 
 export async function addStudioProject(ctx: vscode.ExtensionContext) {
+	log.appendLine(`--- Add Roblox Studio project (${new Date().toLocaleTimeString()})`);
 	let studios: Studio[] = [];
-	try { studios = await listStudios(); }
-	catch (e) { lastListError = (e as Error).message; }
+	try {
+		studios = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Looking for open Roblox Studio windows…" }, () => listStudios());
+	} catch (e) { lastListError = (e as Error).message; log.appendLine(`listStudios threw: ${lastListError}`); }
 	if (!studios.length) {
 		const pick = await vscode.window.showWarningMessage(`Parlay found no open Roblox Studio window${lastListError ? ` (${lastListError})` : ""}.`, "Type the place name");
 		if (!pick) return;
@@ -194,8 +202,9 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	if (studios.length) {
 		const item = await vscode.window.showQuickPick(
 			studios.map((s) => ({ label: s.name, description: s.placeId ? `placeId ${s.placeId}` : `${s.detail ? s.detail + " · " : ""}no place id found (right-click path)`, s })),
-			{ placeHolder: "Which open Roblox Studio is the project?" });
+			{ placeHolder: "Which open Roblox Studio is the project?", ignoreFocusOut: true });
 		chosen = item?.s;
+		log.appendLine(chosen ? `picked ${chosen.name} placeId=${chosen.placeId || "none"}` : "picker dismissed");
 		if (!chosen) return;
 	} else {
 		const name = await vscode.window.showInputBox({ prompt: "Name of the Roblox place", placeHolder: "100 Fogs" });
@@ -217,6 +226,7 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	// entries whose folder is gone (the user deleted the project to start over) are stale: rewrite them
 	const existing = (record ? await readSyncRecord(record) : []).filter((e) => fs.existsSync(path.dirname(e.filePath.replace(/\//g, "\\").replace(/\\+/g, "\\"))));
 	const missing = SCRIPT_CONTAINERS.filter((c) => !existing.some((e) => e.className === c));
+	log.appendLine(`folder ${folder} (${synced ? "already syncing" : "new"}); record ${record ?? "none"}; ${existing.length} live entries; missing ${missing.join(", ") || "nothing"}`);
 	if (chosen.placeId && missing.length) {
 		// The zero-click path. Studio keeps a per-place record of what it syncs and resumes it when the place
 		// opens; it accepts entries we write (any id, the service by class name) but only in the slot it named
@@ -239,6 +249,7 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		const keep = record ? existing : await readSyncRecord(slot);
 		const starters = Array.from(real.keys()).filter((c) => !keep.some((e) => e.className === c));
 		await writeSyncRecord(slot, folder, keep, missing, starters, real);
+		log.appendLine(`wrote ${slot}: kept ${keep.length}, added ${[...missing, ...starters].join(", ")}; universe ${universe ?? "unknown"}`);
 		if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${chosen.placeId}+universeId:${universe}`));
 		void vscode.window.showInformationMessage((universe
 			? `Studio is reopening "${chosen.name}" and syncing it into ${folder}. Scripts appear as they land.`
