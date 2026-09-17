@@ -382,6 +382,7 @@ import './contrib/themes/browser/themes.contribution.js';
 
 // Update
 import './contrib/update/browser/update.contribution.js';
+import './contrib/parlay/browser/parlayGate.contribution.js';
 
 // Surveys
 import './contrib/surveys/browser/nps.contribution.js';

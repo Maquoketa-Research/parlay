@@ -323,6 +323,12 @@
           "default": "http://127.0.0.1:8801/sonar",
           "description": "Sonar page shown in the Parlay panel."
         },
+        "parlay.requireSignIn": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Ask for a Roblox sign-in before Parlay can be used (the sign-in gate over the workbench)."
+        },
         "parlay.claudeCommand": {
           "type": "string",
           "default": "claude",

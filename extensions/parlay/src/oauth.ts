@@ -16,7 +16,10 @@ import * as http from "http";
 import * as path from "path";
 import * as pkce from "./pkce";
 
-const PORTS = [53682, 53683];
+// The last two are below 49152: Windows machines with Hyper-V or WSL reserve blocks of the ephemeral range (49152
+// and up), and binding a reserved port fails with EACCES even as administrator. All four must be registered as
+// redirect URLs on both apps.
+const PORTS = [53682, 53683, 41813, 41814];
 export const REDIRECTS = PORTS.map((p) => `http://localhost:${p}/callback`);
 
 export interface User { id: string; name: string; displayName: string; avatar?: string }
@@ -201,7 +204,12 @@ function callback(label: string, state: string, token: vscode.CancellationToken,
 			res.writeHead(ok ? 200 : 400, { "Content-Type": "text/html; charset=utf-8" }).end(`<!doctype html><title>Parlay</title><body style="font:15px system-ui;padding:3em;text-align:center">${text.replace(/[<&]/g, (c) => c === "<" ? "&lt;" : "&amp;")}`);
 			done(ok ? undefined : new Error(err ? `${label}: ${err} ${u.searchParams.get("error_description") ?? ""}`.trim() : "state mismatch on the callback"), code ?? undefined);
 		});
-		server.on("error", (e: NodeJS.ErrnoException) => e.code === "EADDRINUSE" && i + 1 < PORTS.length ? server.listen(PORTS[++i], "127.0.0.1") : done(e));
+		server.on("error", (e: NodeJS.ErrnoException) => {
+			if ((e.code === "EADDRINUSE" || e.code === "EACCES") && i + 1 < PORTS.length) { server.listen(PORTS[++i], "127.0.0.1"); return; }
+			done(new Error(e.code === "EACCES"
+				? `${label} sign-in could not open a local port (${PORTS.join(", ")}): Windows has them reserved (Hyper-V or WSL). Run "netsh interface ipv4 show excludedportrange protocol=tcp" to see the ranges, or "netsh int ipv4 add excludedportrange protocol=tcp startport=41813 numberofports=2" as administrator to keep 41813-41814 free.`
+				: `${label} sign-in could not listen on localhost: ${e.message}`));
+		});
 		server.on("listening", () => void open(REDIRECTS[i]));
 		server.listen(PORTS[i], "127.0.0.1");
 	});

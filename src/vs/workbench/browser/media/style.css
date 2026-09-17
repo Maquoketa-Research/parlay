@@ -520,6 +520,26 @@ body.parlay-glass,
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item { height: 30px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item .action-label { height: auto !important; line-height: normal !important; margin: 0 !important; padding: 0 6px !important; }
 
+/* the sign-in gate (contrib/parlay/browser/parlayGate.contribution.ts): under the title bar, under notifications
+   (2545), the quick input (2550) and dialogs (2575), above everything else */
+.monaco-workbench > .parlay-gate {
+	position: absolute; left: 0; right: 0; bottom: 0; z-index: 2400; display: flex; align-items: center; justify-content: center;
+	background: var(--vscode-editor-background); color: var(--vscode-foreground);
+}
+.monaco-workbench > .parlay-gate > .parlay-gate-card { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 380px; padding: 32px; }
+.monaco-workbench > .parlay-gate .parlay-gate-logo { width: 96px; height: 96px; margin-bottom: 18px; background: url('../parts/editor/media/letterpress-dark.svg') center / contain no-repeat; }
+.monaco-workbench.vs > .parlay-gate .parlay-gate-logo, .monaco-workbench.hc-light > .parlay-gate .parlay-gate-logo { background-image: url('../parts/editor/media/letterpress-light.svg'); }
+.monaco-workbench > .parlay-gate h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
+.monaco-workbench > .parlay-gate p { font-size: 13px; line-height: 1.5; margin: 0 0 22px; color: var(--vscode-descriptionForeground); }
+.monaco-workbench > .parlay-gate .parlay-gate-button {
+	font: inherit; font-size: 13px; font-weight: 600; padding: 9px 22px; border: 0; border-radius: 999px; cursor: pointer;
+	background: var(--vscode-button-background); color: var(--vscode-button-foreground);
+}
+.monaco-workbench > .parlay-gate .parlay-gate-button:hover { background: var(--vscode-button-hoverBackground); }
+.monaco-workbench > .parlay-gate .parlay-gate-button:disabled { opacity: 0.6; cursor: default; }
+.monaco-workbench > .parlay-gate .parlay-gate-quit { margin-top: 18px; font-size: 12px; color: var(--vscode-descriptionForeground); cursor: pointer; }
+.monaco-workbench > .parlay-gate .parlay-gate-quit:hover { color: var(--vscode-foreground); text-decoration: underline; }
+
 /* the Roblox account in the header (parlayAccount.ts): avatar and name, or Sign in; click opens Accounts */
 /* above the drag region like the toolbar (position + z-index), or the cursor and clicks flicker between the two */
 .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-right > .parlay-account-container { display: flex; align-items: center; height: 100%; position: relative; z-index: 2500; -webkit-app-region: no-drag; }

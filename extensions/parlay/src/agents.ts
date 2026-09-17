@@ -126,6 +126,15 @@ async function start(s: State, a: Agent, prompt?: string) {
 // on its own the tab goes with it; Ctrl+Alt+A or the >_ brings it back.)
 function options(s: State, a: Agent, prompt?: string): vscode.TerminalOptions {
 	const ws = cwd(), old = s[a], args = argsOf(a), tail = prompt ? [prompt] : [];
+	// No CLI on this machine: a terminal that cannot start is a terminal that never opens (the tester saw exactly
+	// that), so open a plain PowerShell that says what is missing and offer the official installer.
+	if (!onPath(exe(a))) {
+		const name = NAMES[a], install = a === "claude" ? "irm https://claude.ai/install.ps1 | iex" : "npm install -g @openai/codex";
+		void vscode.window.showWarningMessage(`${name} is not installed on this machine, so the agent terminal opened as PowerShell. Install it?`, `Install ${name}`).then((pick) => {
+			if (pick && term) type(term, install);
+		});
+		return { name, cwd: ws, shellPath: "powershell.exe", shellArgs: ["-NoLogo", "-NoExit", "-Command", `Write-Host '${name} is not installed. Install it with:  ${install}' -ForegroundColor Yellow`], iconPath: new vscode.ThemeIcon(ICON[a]), color: new vscode.ThemeColor(COLOR[a]) };
+	}
 	const resume = !!old && !!(a === "claude" ? ws && claudeTranscript(ws, old.id) : old.file && fs.existsSync(old.file));
 	let shellArgs: string[];
 	if (a === "claude") {
@@ -259,11 +268,18 @@ function writeHandoff(from: Agent, sess: Session, body: string, ws: string) {
 
 // Which executable: parlay.claudeCommand as is. codex.exe is on no PATH here (the Codex desktop app keeps it under
 // %LOCALAPPDATA%\OpenAI\Codex\bin\<hash>\), so parlay.codexCommand wins when it resolves, else the newest one the app installed.
+// is `cmd` runnable as a terminal process: an absolute path that exists, or a name found on PATH
+function onPath(cmd: string): boolean {
+	if (path.isAbsolute(cmd)) return fs.existsSync(cmd);
+	const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
+	return dirs.some((d) => ["", ".exe", ".cmd"].some((x) => fs.existsSync(path.join(d, cmd + x))));
+}
+export const claudeInstalled = () => onPath(cfg("claudeCommand", "claude"));
+
 function exe(a: Agent): string {
 	if (a === "claude") return cfg("claudeCommand", "claude");
 	const set = cfg("codexCommand", "codex");
-	const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
-	if (path.isAbsolute(set) || dirs.some((d) => ["", ".exe", ".cmd"].some((x) => fs.existsSync(path.join(d, set + x))))) return set;
+	if (onPath(set)) return set;
 	const bin = path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), "AppData", "Local"), "OpenAI", "Codex", "bin");
 	let best: { file: string; mtime: number } | undefined;
 	try {
