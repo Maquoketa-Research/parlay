@@ -36,7 +36,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.studio.add", () => addStudioProject(ctx)));
 
 	// The right-hand panel: Aqua (with a Start button when it is down), Meshy, and Sonar.
-	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", new UrlView("aquaUrl", "Aqua", startAqua)));
+	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", new UrlView("aquaUrl", "Aqua", startAqua, vscode.Uri.joinPath(ctx.extensionUri, "media", "aqua.png"))));
 	const meshy = new MeshyView(ctx, async (assetId, name) => { await installSkills(ctx, false); send(`/parlay-insert-asset ${assetId} ${clean(name)}`); });
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.meshy", meshy, { webviewOptions: { retainContextWhenHidden: true } }));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.meshy.setKey", () => meshy.setKey("meshy")));
@@ -253,9 +253,10 @@ function startAqua(): boolean {
 }
 
 class UrlView implements vscode.WebviewViewProvider {
-	constructor(private setting: string, private label: string, private start?: () => boolean) {}
+	// logo: shown on the placeholder (not running / start) page, from the extension's media folder
+	constructor(private setting: string, private label: string, private start?: () => boolean, private logo?: vscode.Uri) {}
 	resolveWebviewView(view: vscode.WebviewView) {
-		view.webview.options = { enableScripts: true };
+		view.webview.options = { enableScripts: true, localResourceRoots: this.logo ? [vscode.Uri.joinPath(this.logo, "..")] : [] };
 		let poll: NodeJS.Timeout | undefined;
 		const url = () => vscode.workspace.getConfiguration("parlay").get<string>(this.setting, "");
 		const render = async (starting = false) => {
@@ -273,16 +274,18 @@ class UrlView implements vscode.WebviewViewProvider {
 			const button = this.start
 				? `<button id="s" ${starting ? "disabled" : ""}>${starting ? "Starting…" : `Start ${this.label}`}</button>`
 				: "";
-			view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
+			const logo = this.logo ? `<img class="logo" src="${view.webview.asWebviewUri(this.logo)}" alt="">` : "";
+			view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${view.webview.cspSource}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
 <style>
 body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px/1.5 var(--vscode-font-family);color:var(--vscode-descriptionForeground);background:transparent}
 .c{text-align:center;max-width:32ch}
+.logo{width:72px;height:72px;object-fit:contain;margin-bottom:14px;opacity:.95}
 b{display:block;color:var(--vscode-foreground);font-weight:600;margin-bottom:6px}
 code{font-family:var(--vscode-editor-font-family);font-size:12px}
 button{margin-top:14px;padding:6px 16px;border:0;border-radius:999px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer}
 button[disabled]{opacity:.6;cursor:default}
 </style>
-<div class="c"><b>${this.label} is not running</b>Nothing answered at <code>${u}</code>.${button}</div>
+<div class="c">${logo}<b>${this.label} is not running</b>Nothing answered at <code>${u}</code>.${button}</div>
 <script nonce="${nonce}">const v=acquireVsCodeApi();document.getElementById("s")?.addEventListener("click",()=>v.postMessage({type:"start"}));</script>`;
 		};
 		view.webview.onDidReceiveMessage((m) => {

@@ -72,6 +72,15 @@ export class ParlayAccountWidget extends Disposable {
 				const store = new DisposableStore();
 				const root = append(container, $('.parlay-account-popover'));
 				const on = (el: HTMLElement, fn: () => void) => store.add(addDisposableListener(el, EventType.CLICK, fn));
+				// the context view stays until told: it goes when focus leaves it (a click anywhere else) or on Escape
+				root.tabIndex = -1;
+				store.add(addDisposableListener(root, EventType.FOCUS_OUT, (e: FocusEvent) => {
+					if (!(e.relatedTarget instanceof Node) || !root.contains(e.relatedTarget)) {
+						this.contextViewService.hideContextView();
+					}
+				}));
+				store.add(addDisposableListener(root, EventType.KEY_DOWN, (e: KeyboardEvent) => { if (e.key === 'Escape') { this.contextViewService.hideContextView(); } }));
+				setTimeout(() => root.focus(), 0);
 
 				// who you are
 				const roblox = rows.find(r => r.title === 'Roblox');
