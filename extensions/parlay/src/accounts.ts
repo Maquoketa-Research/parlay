@@ -22,6 +22,8 @@ export function registerAccounts(ctx: vscode.ExtensionContext) {
 		panel.webview.html = html(await rows(ctx), panel.webview.cspSource, brand);
 	};
 	ctx.subscriptions.push(vscode.authentication.onDidChangeSessions(() => void render()), ctx.secrets.onDidChange(() => void render()));
+	onCli = () => void render();
+	void refreshCli(vscode.workspace.getConfiguration("parlay").get<string>("claudeCommand", "claude"));   // warm the cache at startup
 	// one action, from the page or from the header menu
 	const act = async (m: Msg) => {
 		try {
@@ -29,7 +31,8 @@ export function registerAccounts(ctx: vscode.ExtensionContext) {
 			else if ("clear" in m) { await ctx.secrets.delete(m.clear); }
 			else if ("shell" in m) { const t = vscode.window.createTerminal({ name: "Parlay sign-in" }); t.show(); t.sendText(m.shell); }
 		} catch (e) { void vscode.window.showErrorMessage(`Parlay: ${(e as Error).message}`); }
-		setTimeout(() => void render(), 1500);   // CLIs need a moment; sessions and keys redraw on their own events too
+		// CLIs need a moment; sessions and keys redraw on their own events too
+		setTimeout(() => { cliState.at = 0; void refreshCli(vscode.workspace.getConfiguration("parlay").get<string>("claudeCommand", "claude")); void render(); }, 1500);
 	};
 	// the header's avatar menu (parlayAccount.ts in the workbench) asks for the rows and runs the actions
 	// the brand marks go along as data URIs: the header popover is workbench code with no access to extension files
@@ -50,17 +53,36 @@ export function registerAccounts(ctx: vscode.ExtensionContext) {
 
 // ---- what is linked --------------------------------------------------------------------------------------
 
+// The CLIs' own answers about who is logged in, cached: asking takes seconds, and the header popover has to open
+// at once. Refreshed at most every 20 s, in the background; whoever asked next sees the new answer.
+type CliStatus = { ok: boolean; status: string; installed: boolean };
+const cliState: { claude: CliStatus; codex: CliStatus; at: number; busy?: Promise<void> } = {
+	claude: { ok: false, status: "Checking…", installed: true }, codex: { ok: false, status: "Checking…", installed: true }, at: 0,
+};
+let onCli: (() => void) | undefined;   // the page redraws when a fresh answer lands
+function refreshCli(claudeCmd: string): Promise<void> {
+	if (cliState.busy) return cliState.busy;
+	if (Date.now() - cliState.at < 20_000) return Promise.resolve();
+	return cliState.busy = Promise.all([claudeStatus(claudeCmd), codexStatus()]).then(([c, x]) => {
+		const changed = JSON.stringify([c, x]) !== JSON.stringify([cliState.claude, cliState.codex]);
+		cliState.claude = c; cliState.codex = x; cliState.at = Date.now();
+		if (changed) onCli?.();
+	}).finally(() => { cliState.busy = undefined; });
+}
+
 async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 	const session = async (provider: string, scopes: string[]) => {
 		try { return await vscode.authentication.getSession(provider, scopes, { silent: true }); } catch { return undefined; }   // provider absent = not linked
 	};
 	const has = async (k: string) => !!(await ctx.secrets.get(k));
 	const claudeCmd = vscode.workspace.getConfiguration("parlay").get<string>("claudeCommand", "claude");
-	const [roblox, discord, robloxKey, meshyKey, openaiKey, claude, codex] = await Promise.all([
+	// sessions and keys are milliseconds; the two CLI status calls are seconds, so they come from the cache below
+	const [roblox, discord, robloxKey, meshyKey, openaiKey] = await Promise.all([
 		session("roblox", ROBLOX_SCOPES), session("discord", ["identify"]),
 		has("parlay.robloxApiKey"), has("parlay.meshyApiKey"), has("parlay.openaiApiKey"),
-		claudeStatus(claudeCmd), codexStatus(),
 	]);
+	void refreshCli(claudeCmd);
+	const { claude, codex } = cliState;
 	const avatar = (s?: vscode.AuthenticationSession) => (s?.account as { icon?: vscode.Uri } | undefined)?.icon?.toString();
 	const keyActions = (k: string, cmd: string, set: boolean) => set
 		? [{ label: "Replace key", msg: { cmd }, quiet: true }, { label: "Remove", msg: { clear: k }, quiet: true }]
@@ -89,7 +111,7 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 				: [{ label: claude.installed ? "Log in" : "Install Claude Code", msg: claude.installed ? { shell: `${claudeCmd} auth login` } : { shell: "npm install -g @anthropic-ai/claude-code" } }],
 		},
 		{
-			title: "GPT", status: codex.status, ok: codex.ok, icon: "hubot", note: openaiKey ? "OpenAI API key set: concept drafts and texture painting." : "OpenAI API key not set: concept drafts and texture painting need one.",
+			title: "GPT", status: codex.status, ok: codex.ok, icon: "hubot", brand: "openai.svg", note: openaiKey ? "OpenAI API key set: concept drafts and texture painting." : "OpenAI API key not set: concept drafts and texture painting need one.",
 			actions: [
 				codex.ok ? { label: "Log out of Codex", msg: { shell: "codex logout" }, quiet: true }
 					: { label: codex.installed ? "Log in to Codex" : "Install Codex", msg: codex.installed ? { shell: "codex login" } : { shell: "npm install -g @openai/codex" } },
