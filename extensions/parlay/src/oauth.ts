@@ -86,11 +86,14 @@ export class OAuthProvider implements vscode.AuthenticationProvider {
 
 	// ---- vscode.AuthenticationProvider ----
 
-	async getSessions(scopes?: readonly string[]): Promise<vscode.AuthenticationSession[]> {
+	// One account, one session: it answers whatever scopes are asked for. The provider may grant fewer scopes than
+	// requested (an app permission left unticked), and filtering on that made the header show the avatar while the
+	// rest of Parlay said "not signed in" and asked to sign in again forever. A missing scope shows up where it
+	// matters, as a 403 from the API, where the Open Cloud key takes over.
+	async getSessions(_scopes?: readonly string[]): Promise<vscode.AuthenticationSession[]> {
 		let s = await this.stored();
 		if (s && s.expiresAt - Date.now() < 60_000) s = await (this.refreshing ??= this.refresh(s).finally(() => { this.refreshing = undefined; }));
-		if (!s || scopes?.some((x) => !s!.scopes.includes(x))) return [];
-		return [toSession(s)];
+		return s ? [toSession(s)] : [];
 	}
 
 	async createSession(scopes: readonly string[]): Promise<vscode.AuthenticationSession> {
@@ -108,7 +111,7 @@ export class OAuthProvider implements vscode.AuthenticationProvider {
 		const tok = await this.token({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri }, secret);
 		const user = await this.p.parseUser(await this.json(this.p.userinfoUrl, { headers: { Authorization: `Bearer ${tok.access_token}` } }));
 		const s = await this.save({ ...pack(tok, want), user });
-		log.info(`${this.p.label}: signed in as ${user.name} (${user.id})`);
+		log.info(`${this.p.label}: signed in as ${user.name} (${user.id}); granted scopes: ${s.scopes.join(" ")}`);
 		this.changed.fire({ added: [toSession(s)], removed: undefined, changed: undefined });
 		return toSession(s);
 	}
