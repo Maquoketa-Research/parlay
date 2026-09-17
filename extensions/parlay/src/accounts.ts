@@ -6,6 +6,8 @@
 // does its own browser dance and nothing about its credentials passes through Parlay.
 import * as vscode from "vscode";
 import { execFile } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import { SCOPES as ROBLOX_SCOPES } from "./roblox-auth";
 
 type Msg = { cmd: string } | { clear: string } | { shell: string };
@@ -30,7 +32,11 @@ export function registerAccounts(ctx: vscode.ExtensionContext) {
 		setTimeout(() => void render(), 1500);   // CLIs need a moment; sessions and keys redraw on their own events too
 	};
 	// the header's avatar menu (parlayAccount.ts in the workbench) asks for the rows and runs the actions
-	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.accounts.summary", () => rows(ctx)));
+	// the brand marks go along as data URIs: the header popover is workbench code with no access to extension files
+	const brandData = (f: string) => {
+		try { const b = fs.readFileSync(path.join(ctx.extensionPath, "media", "brands", f)); return `data:${f.endsWith(".svg") ? "image/svg+xml" : "image/x-icon"};base64,${b.toString("base64")}`; } catch { return undefined; }
+	};
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.accounts.summary", async () => (await rows(ctx)).map((r) => ({ ...r, brandData: r.brand ? brandData(r.brand) : undefined }))));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.accounts.do", (m: Msg) => act(m)));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.accounts", async () => {
 		if (panel) { panel.reveal(); return; }

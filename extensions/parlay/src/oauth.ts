@@ -14,6 +14,7 @@ import { randomBytes } from "crypto";
 import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
+import { log } from "./log";
 import * as pkce from "./pkce";
 
 // The last two are below 49152: Windows machines with Hyper-V or WSL reserve blocks of the ephemeral range (49152
@@ -107,6 +108,7 @@ export class OAuthProvider implements vscode.AuthenticationProvider {
 		const tok = await this.token({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: redirectUri }, secret);
 		const user = await this.p.parseUser(await this.json(this.p.userinfoUrl, { headers: { Authorization: `Bearer ${tok.access_token}` } }));
 		const s = await this.save({ ...pack(tok, want), user });
+		log.info(`${this.p.label}: signed in as ${user.name} (${user.id})`);
 		this.changed.fire({ added: [toSession(s)], removed: undefined, changed: undefined });
 		return toSession(s);
 	}
@@ -114,6 +116,7 @@ export class OAuthProvider implements vscode.AuthenticationProvider {
 	async removeSession(): Promise<void> {
 		const s = await this.stored();
 		if (!s) return;
+		log.info(`${this.p.label}: signing out ${s.user.name}`);
 		const secret = await this.secret(false).catch(() => undefined);
 		// revoking the refresh token ends the whole grant; if the provider is unreachable the local sign-out still happens
 		if (secret) await fetch(this.p.revokeUrl, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form({ token: s.refreshToken, client_id: this.clientId(), client_secret: secret }) }).catch(() => undefined);
@@ -159,7 +162,13 @@ export class OAuthProvider implements vscode.AuthenticationProvider {
 			return n;
 		} catch (e) {
 			if (!(e instanceof HttpError)) return s;   // offline: keep the session, the next call retries
+			// Refresh tokens are single-use, and every Parlay window has its own extension host: when two windows
+			// refresh at once the second one's token is already spent. The store then holds the winner's session; use
+			// it rather than signing the user out.
+			const now = await this.stored();
+			if (now && now.refreshToken !== s.refreshToken) { log.info(`${this.p.label}: refresh raced another window; using its session`); return now; }
 			// a dead refresh token (revoked, idle past its life, secret regenerated): signed out, said once
+			log.warn(`${this.p.label}: refresh failed, signing out: ${(e as Error).message}`);
 			await this.ctx.secrets.delete(this.store);
 			this.changed.fire({ added: undefined, removed: [toSession(s)], changed: undefined });
 			void vscode.window.showWarningMessage(`Parlay: ${this.p.label} sign-in expired (${(e as Error).message}). Run Parlay: Sign in to ${this.p.label}.`);

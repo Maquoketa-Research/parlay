@@ -15,8 +15,8 @@ import { SCOPES as ROBLOX_SCOPES } from "./roblox-auth";
 
 export interface Studio { id: string; name: string; placeId: string; detail?: string; universeId?: string }
 
-// View > Output > Parlay: what each step found, for when "nothing happened"
-export const log = vscode.window.createOutputChannel("Parlay", { log: true });   // also lands in the exthost log folder
+import { log } from "./log";
+export { log };   // the other modules still import it from here
 const cfg = <T>(k: string, d: T): T => vscode.workspace.getConfiguration("parlay").get<T>(k, d);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "place";
 
