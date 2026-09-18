@@ -133,8 +133,9 @@
       },
       {
         "command": "parlay.agents.open",
-        "title": "Open the agent terminal",
-        "category": "Parlay"
+        "title": "Open agent",
+        "category": "Parlay",
+        "icon": "$(sparkle)"
       },
       {
         "command": "parlay.agents.useClaude",
@@ -246,8 +247,13 @@
       ],
       "view/title": [
         {
+          "command": "parlay.agents.open",
+          "when": "view == terminal && !parlay.agentRunning",
+          "group": "navigation@1"
+        },
+        {
           "command": "parlay.agents.switch",
-          "when": "view == terminal",
+          "when": "view == terminal && parlay.agentRunning",
           "group": "navigation@1"
         },
         {
@@ -326,8 +332,8 @@
       "properties": {
         "parlay.aquaUrl": {
           "type": "string",
-          "default": "http://localhost:8787",
-          "description": "Aqua dashboard shown in the Parlay panel."
+          "default": "https://aqua.maquoketa.net",
+          "description": "The Aqua Parlay talks to and shows in its panel. A localhost URL means a checkout Parlay can start itself (parlay.aquaRepo)."
         },
         "parlay.sonarUrl": {
           "type": "string",

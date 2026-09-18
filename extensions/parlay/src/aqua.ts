@@ -21,7 +21,9 @@ import { log } from "./log";
 import { listStudios, listStudiosViaWindows, Studio } from "./studio";
 
 const cfg = () => vscode.workspace.getConfiguration("parlay");
-export const aquaUrl = () => cfg().get<string>("aquaUrl", "http://localhost:8787").replace(/\/+$/, "");
+// the hosted Aqua by default; a localhost URL means a checkout Parlay can start (startAqua)
+export const aquaUrl = () => cfg().get<string>("aquaUrl", "https://aqua.maquoketa.net").replace(/\/+$/, "");
+export const aquaIsLocal = () => { try { return ["localhost", "127.0.0.1"].includes(new URL(aquaUrl()).hostname); } catch { return false; } };
 
 // ---- the server ---------------------------------------------------------------------------------
 
@@ -105,21 +107,24 @@ async function installPlugin(): Promise<string> {
 
 // ---- the strip over the dashboard ---------------------------------------------------------------
 
-export interface Strip { text: string; action?: { label: string; command: string } }
-const PAIR = { label: "Pair Studio", command: "parlay.aqua.pair" };
+// paired: every open Studio place is paired (the panel then shows the dashboard instead of the landing page)
+export interface Strip { text: string; action?: { label: string; command: string }; paired?: boolean }
+const PAIR = { label: "Pair with Aqua", command: "parlay.aqua.pair" };
 
 // The next step, or that there is none. Studios are read from their windows only: a status line must not take
 // the Studio MCP seat from Claude Code.
 export async function aquaStrip(): Promise<Strip> {
 	const r = await api("GET", "/api/games");
-	if (r.status === 401) return { text: "Aqua has Roblox sign-in on; pair from its Setup page (Parlay holds no session there)." };
-	if (!r.ok) return { text: "" };   // down: the panel shows its Start page instead
+	// the hosted Aqua asks for its own sign-in: the dashboard handles that, the button still installs the plugin
+	if (r.status === 401) return { text: "Sign in to Aqua in the dashboard, then pair your Studio place.", action: PAIR, paired: false };
+	if (!r.ok) return { text: "", paired: false };   // down: the panel shows its unreachable page instead
 	const list: Game[] = r.data.games ?? [];
-	if (!pluginInstalled()) return { text: "The Aqua Studio plugin is not installed.", action: { ...PAIR, label: "Install and pair" } };
+	if (!pluginInstalled()) return { text: "The Aqua Studio plugin is not installed yet; pairing installs it.", action: PAIR, paired: false };
 	const studios = await listStudiosViaWindows().catch(() => [] as Studio[]);
-	if (!studios.length) return { text: "Open a place in Roblox Studio to pair it with Aqua." };
+	if (!studios.length) return { text: "Open a place in Roblox Studio to pair it with Aqua.", action: PAIR, paired: false };
 	const text = studios.map((s) => { const g = pairedGame(list, s); return g ? `${s.name}: paired with ${g.name}` : `${s.name}: not paired`; }).join(" · ");
-	return { text, action: studios.some((s) => !pairedGame(list, s)) ? PAIR : undefined };
+	const unpaired = studios.some((s) => !pairedGame(list, s));
+	return { text, action: unpaired ? PAIR : undefined, paired: !unpaired };
 }
 
 // ---- Pair Studio --------------------------------------------------------------------------------
@@ -141,17 +146,28 @@ async function until<T>(probe: () => Promise<T>, ms: number, token?: vscode.Canc
 
 // Parlay: Pair Roblox Studio with Aqua. Server up, plugin installed, then the plugin's request is watched for,
 // its code shown here and approved here. Each step is a line in the Parlay output channel.
-async function pairStudio(refresh: () => void) {
+async function pairStudio(refresh: () => void, showDashboard: () => void) {
 	log.info(`--- Pair Studio with Aqua (${new Date().toLocaleTimeString()})`);
 	const url = aquaUrl();
 	if (!(await reachable(url))) {
+		if (!aquaIsLocal()) { fail(`Aqua is unreachable at ${url}. Check your connection, or set parlay.aquaUrl.`); return; }
 		const go = await vscode.window.showInformationMessage(`Aqua is not running at ${url}.`, "Start Aqua");
 		if (!go || !startAqua()) return;
 		log.info("starting Aqua in its terminal; waiting for it to answer");
 		if (!(await progress("Starting Aqua…", () => until(() => reachable(url), 60_000)))) { fail("Aqua did not start within a minute; see the Aqua terminal."); return; }
 	}
 	let r = await api("GET", "/api/games");
-	if (r.status === 401) { fail("Aqua has Roblox sign-in on and Parlay holds no session there. Pair from the dashboard's Setup page for now; docs/aqua-pairing.md proposes the fix."); return; }
+	if (r.status === 401) {
+		// The hosted Aqua has its own sign-in and Parlay holds no session there (docs/aqua-pairing.md proposes the
+		// token exchange). Until then: the plugin from here, the approval in the dashboard, which the panel shows.
+		if (!pluginInstalled()) {
+			try { log.info(`installed the Aqua Studio plugin: ${await installPlugin()}`); } catch (e) { fail(`Could not install the Aqua Studio plugin: ${(e as Error).message}`); return; }
+		}
+		showDashboard();
+		void vscode.window.showInformationMessage("Sign in to Aqua in the panel, then in Studio: Plugins tab > Aqua QA > \"Pair this place with Aqua\". The dashboard shows the code to approve.",
+			{ modal: true, detail: pluginInstalled() ? "The Aqua Studio plugin is installed; Studio loads it when it starts (restart Studio if the Aqua QA button is not there)." : "" });
+		return;
+	}
 	if (!r.ok) { fail(`Aqua did not answer /api/games: ${detail(r)}`); return; }
 	const list: Game[] = r.data.games ?? [];
 	log.info(`Aqua up at ${url}: ${list.length} game(s): ${list.map((g) => `${g.name} (place ${g.place_id || "none"})`).join(", ") || "none"}`);
@@ -207,6 +223,6 @@ async function pairStudio(refresh: () => void) {
 	refresh();
 }
 
-export function registerAqua(ctx: vscode.ExtensionContext, refresh: () => void) {
-	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.aqua.pair", () => pairStudio(refresh)));
+export function registerAqua(ctx: vscode.ExtensionContext, refresh: () => void, showDashboard: () => void) {
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.aqua.pair", () => pairStudio(refresh, showDashboard)));
 }

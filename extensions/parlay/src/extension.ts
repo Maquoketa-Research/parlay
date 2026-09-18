@@ -37,7 +37,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	// The right-hand panel: Aqua (with a Start button when it is down, and the pairing strip when it is up), Meshy, and Sonar.
 	const aqua = new UrlView("aquaUrl", "Aqua", startAqua, vscode.Uri.joinPath(ctx.extensionUri, "media", "aqua.png"), aquaStrip);
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", aqua));
-	registerAqua(ctx, () => aqua.refresh());   // Pair Roblox Studio with Aqua (aqua.ts), from the strip or the view's title
+	registerAqua(ctx, () => aqua.refresh(), () => aqua.showDashboard());   // Pair with Aqua (aqua.ts), from the landing page or the view's title
 	const meshy = new MeshyView(ctx, async (assetId, name) => { await installSkills(ctx, false); send(`/parlay-insert-asset ${assetId} ${clean(name)}`); });
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.meshy", meshy, { webviewOptions: { retainContextWhenHidden: true } }));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.meshy.setKey", () => meshy.setKey("meshy")));
@@ -225,24 +225,58 @@ async function syncGlass() {
 
 class UrlView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
-	// logo: shown on the placeholder (not running / start) page, from the extension's media folder.
-	// strip: a status line and next step drawn above the live page (the Aqua pairing state, aqua.ts).
+	private render?: (starting?: boolean) => Promise<void>;
+	// With a strip provider the view opens on a landing page like the Studio plugin's: the logo large, one line
+	// of state, one button (Pair with Aqua). The live page (dashboard) shows once a place is paired, or on request.
+	private mode: "landing" | "dashboard" = "landing";
+	// logo: shown on the landing and placeholder pages, from the extension's media folder.
+	// strip: the state line and next step (the Aqua pairing state, aqua.ts); drawn above the live page too.
 	constructor(private setting: string, private label: string, private start?: () => boolean, private logo?: vscode.Uri, private strip?: () => Promise<Strip>) {}
 	// Re-read the strip and push it into the page; the iframe underneath is not reloaded.
 	refresh() {
 		if (!this.view?.visible || !this.strip) return;
+		if (this.mode === "landing") { void this.render?.(); return; }
 		void this.strip().then((s) => this.view?.webview.postMessage({ type: "strip", ...s }));
 	}
+	// Show the live page (the dashboard), for when the pairing needs it or the user asks
+	showDashboard() { this.mode = "dashboard"; void this.render?.(); }
 	resolveWebviewView(view: vscode.WebviewView) {
 		this.view = view;
 		view.webview.options = { enableScripts: true, localResourceRoots: this.logo ? [vscode.Uri.joinPath(this.logo, "..")] : [] };
 		let poll: NodeJS.Timeout | undefined;
 		const url = () => vscode.workspace.getConfiguration("parlay").get<string>(this.setting, "");
+		const isLocal = (u: string) => { try { return ["localhost", "127.0.0.1"].includes(new URL(u).hostname); } catch { return false; } };
 		const render = async (starting = false) => {
 			const u = url();
 			let origin = "";
 			try { origin = new URL(u).origin; } catch { /* blank frame */ }
-			if (await reachable(u)) {
+			const up = await reachable(u);
+			// the landing page: logo, state, one button; the dashboard takes over once every open place is paired
+			if (this.strip && this.mode === "landing") {
+				const s = up ? await this.strip() : { text: `${this.label} is unreachable at ${u}.`, paired: false };
+				if (s.paired) this.mode = "dashboard";
+				else {
+					const nonce = Math.random().toString(36).slice(2);
+					const logo = this.logo ? `<img class="logo" src="${view.webview.asWebviewUri(this.logo)}" alt="">` : "";
+					const primary = up ? `<button id="p" data-cmd="${s.action?.command ?? "parlay.aqua.pair"}">${s.action?.label ?? `Pair with ${this.label}`}</button>`
+						: (this.start && isLocal(u) ? `<button id="s" ${starting ? "disabled" : ""}>${starting ? "Starting…" : `Start ${this.label}`}</button>` : "");
+					view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${view.webview.cspSource}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
+<style>
+body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px/1.5 var(--vscode-font-family);color:var(--vscode-descriptionForeground);background:transparent}
+.c{text-align:center;max-width:36ch;padding:0 16px}
+.logo{width:128px;height:128px;object-fit:contain;margin-bottom:18px}
+h1{font-size:20px;font-weight:600;margin:0 0 6px;color:var(--vscode-foreground)}
+p{margin:0 0 18px;font-size:12px}
+button{padding:9px 24px;border:0;border-radius:999px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer;font:inherit;font-size:13px;font-weight:600}
+button:hover{background:var(--vscode-button-hoverBackground)}button[disabled]{opacity:.6;cursor:default}
+a{display:block;margin-top:16px;font-size:12px;color:var(--vscode-textLink-foreground);cursor:pointer}a:hover{text-decoration:underline}
+</style>
+<div class="c">${logo}<h1>${this.label}</h1><p>${(s.text || `Pair your Roblox Studio place with ${this.label}.`).replace(/[<&]/g, (c) => c === "<" ? "&lt;" : "&amp;")}</p>${primary}${up ? `<a id="d">Open the dashboard</a>` : ""}</div>
+<script nonce="${nonce}">const v=acquireVsCodeApi();document.getElementById("p")?.addEventListener("click",(e)=>v.postMessage({type:"command",command:e.currentTarget.dataset.cmd}));document.getElementById("s")?.addEventListener("click",()=>v.postMessage({type:"start"}));document.getElementById("d")?.addEventListener("click",()=>v.postMessage({type:"dashboard"}));</script>`;
+					return;
+				}
+			}
+			if (up) {
 				if (poll) { clearInterval(poll); poll = undefined; }
 				const nonce = Math.random().toString(36).slice(2);
 				view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
@@ -261,7 +295,7 @@ b.addEventListener("click",()=>cmd&&v.postMessage({type:"command",command:cmd}))
 				return;
 			}
 			const nonce = Math.random().toString(36).slice(2);
-			const button = this.start
+			const button = this.start && isLocal(u)   // a hosted Aqua cannot be started from here
 				? `<button id="s" ${starting ? "disabled" : ""}>${starting ? "Starting…" : `Start ${this.label}`}</button>`
 				: "";
 			const logo = this.logo ? `<img class="logo" src="${view.webview.asWebviewUri(this.logo)}" alt="">` : "";
@@ -281,12 +315,14 @@ button[disabled]{opacity:.6;cursor:default}
 		view.webview.onDidReceiveMessage((m) => {
 			// the strip's button runs a Parlay command (only ours: the page is an iframe of a web app)
 			if (m?.type === "command" && typeof m.command === "string" && m.command.startsWith("parlay.")) { void vscode.commands.executeCommand(m.command); return; }
+			if (m?.type === "dashboard") { this.showDashboard(); return; }
 			if (m?.type !== "start" || !this.start) return;
 			if (!this.start()) return;
 			void render(true);
 			let tries = 0;
 			poll = setInterval(() => { tries++; void render(tries < 30); if (tries >= 30 && poll) { clearInterval(poll); poll = undefined; } }, 2000);
 		});
+		this.render = render;
 		void render();
 		const sub = vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration(`parlay.${this.setting}`)) void render(); });
 		view.onDidChangeVisibility(() => { if (view.visible) void render(); });

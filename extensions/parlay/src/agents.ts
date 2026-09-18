@@ -73,6 +73,7 @@ const argsOf = (a: Agent) => cfg(a === "claude" ? "claudeArgs" : "codexArgs", DE
 function refresh() {
 	const a = active();
 	void vscode.commands.executeCommand("setContext", "parlay.agent", a);
+	void vscode.commands.executeCommand("setContext", "parlay.agentRunning", !!term);   // Open agent vs Swap model on the terminal title
 	status.text = `$(${ICON[a]}) ${NAMES[a]}`;
 	status.tooltip = `Agent terminal: ${NAMES[a]}${term ? "" : " (not running)"}. Click to swap to ${NAMES[other(a)]} (Ctrl+Alt+S).`;
 	status.show();
