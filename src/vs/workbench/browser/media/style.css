@@ -527,6 +527,10 @@ body.parlay-glass,
 	background: var(--vscode-editor-background); color: var(--vscode-foreground);
 }
 .monaco-workbench > .parlay-gate > .parlay-gate-card { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 380px; padding: 32px; }
+/* gated: no menu bar to open folders from, no quick input to run commands from; the window controls stay */
+.monaco-workbench.parlay-gated .part.titlebar .menubar { display: none !important; }
+.monaco-workbench.parlay-gated .quick-input-widget { display: none !important; }
+.monaco-workbench.parlay-gated .part.titlebar > .titlebar-container > .titlebar-center > .window-title { visibility: hidden; }
 .monaco-workbench > .parlay-gate .parlay-gate-logo { width: 96px; height: 96px; margin-bottom: 18px; background: url('../parts/editor/media/letterpress-dark.svg') center / contain no-repeat; }
 .monaco-workbench.vs > .parlay-gate .parlay-gate-logo, .monaco-workbench.hc-light > .parlay-gate .parlay-gate-logo { background-image: url('../parts/editor/media/letterpress-light.svg'); }
 .monaco-workbench > .parlay-gate h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }

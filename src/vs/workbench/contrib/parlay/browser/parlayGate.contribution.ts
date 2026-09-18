@@ -55,6 +55,7 @@ class ParlayGate extends Disposable implements IWorkbenchContribution {
 			this.listeners.clear();
 			this.overlay?.remove();
 			this.overlay = undefined;
+			this.layoutService.mainContainer.classList.remove('parlay-gated');
 			return;
 		}
 		this.show(ready);
@@ -64,6 +65,8 @@ class ParlayGate extends Disposable implements IWorkbenchContribution {
 		if (!this.overlay) {
 			this.overlay = append(this.layoutService.mainContainer, $('.parlay-gate'));
 		}
+		// while gated the menu bar and the quick input are hidden too (style.css): no File > Open Folder, no F1 around it
+		this.layoutService.mainContainer.classList.add('parlay-gated');
 		this.listeners.clear();
 		clearNode(this.overlay);
 		this.place();
@@ -83,13 +86,15 @@ class ParlayGate extends Disposable implements IWorkbenchContribution {
 		}
 	}
 
-	// the overlay starts under the title bar, whatever height the header has (stacked or not)
+	// the overlay starts under the title row: in the stacked header that is the first 30px (the menu row below it
+	// is hidden while gated), otherwise the whole title bar, so the window controls stay usable either way
 	private place(): void {
 		if (!this.overlay) {
 			return;
 		}
-		const title = this.layoutService.mainContainer.querySelector<HTMLElement>('.part.titlebar');
-		this.overlay.style.top = `${title?.offsetHeight ?? 30}px`;
+		const container = this.layoutService.mainContainer;
+		const title = container.querySelector<HTMLElement>('.part.titlebar');
+		this.overlay.style.top = container.classList.contains('parlay-stacked') ? '30px' : `${title?.offsetHeight ?? 30}px`;
 	}
 }
 
