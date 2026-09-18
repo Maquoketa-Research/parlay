@@ -1,9 +1,9 @@
 {
-  "url": "https://github.com/Maquoketa-Research/parlay/releases/download/v1.135.06260/ParlayUserSetup-x64-1.135.06260.exe",
-  "name": "1.135.06260",
-  "version": "0f689fadfe61b46daaf6aaace095bc0195ab862c",
-  "productVersion": "1.135.06260",
-  "hash": "56cea6d594d09472fcce2500537d76f40f900b29",
-  "timestamp": "1789689778054",
-  "sha256hash": "44c78825a85edc927787267088cf21a77047c53a64b6ac653199b671c0f5f728"
+  "url": "https://github.com/Maquoketa-Research/parlay/releases/download/v1.135.06261/ParlayUserSetup-x64-1.135.06261.exe",
+  "name": "1.135.06261",
+  "version": "07dd420266ea0f5fda2fcc8284456612cffbaca2",
+  "productVersion": "1.135.06261",
+  "hash": "ca51270c4f669ce8c1168e76c33c82412554e1bd",
+  "timestamp": "1789691224022",
+  "sha256hash": "01b360c9c9e92fb53c16c6ceb508f0b8cf9c8d0fd04f5ba697a56300207e548e"
 }
