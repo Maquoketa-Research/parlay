@@ -153,6 +153,12 @@
         "title": "Swap model",
         "category": "Parlay",
         "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "parlay.aqua.pair",
+        "title": "Pair Roblox Studio with Aqua",
+        "category": "Parlay",
+        "icon": "$(plug)"
       }
     ],
     "keybindings": [
@@ -242,6 +248,11 @@
         {
           "command": "parlay.agents.switch",
           "when": "view == terminal",
+          "group": "navigation@1"
+        },
+        {
+          "command": "parlay.aqua.pair",
+          "when": "view == parlay.aqua",
           "group": "navigation@1"
         }
       ]

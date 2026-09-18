@@ -7,10 +7,9 @@
 import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as fs from "fs";
-import * as http from "http";
-import * as https from "https";
 import * as os from "os";
 import * as path from "path";
+import { aquaStrip, reachable, registerAqua, startAqua, Strip } from "./aqua";
 import { registerDiscordAuth } from "./discord-auth";
 import { MeshyView } from "./meshy";
 import { registerRobloxAuth } from "./roblox-auth";
@@ -35,8 +34,10 @@ export function activate(ctx: vscode.ExtensionContext) {
 	// Start from Studio: pick an open place, get its sync folder (or a new one, wired to git), open it here.
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.studio.add", () => addStudioProject(ctx)));
 
-	// The right-hand panel: Aqua (with a Start button when it is down), Meshy, and Sonar.
-	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", new UrlView("aquaUrl", "Aqua", startAqua, vscode.Uri.joinPath(ctx.extensionUri, "media", "aqua.png"))));
+	// The right-hand panel: Aqua (with a Start button when it is down, and the pairing strip when it is up), Meshy, and Sonar.
+	const aqua = new UrlView("aquaUrl", "Aqua", startAqua, vscode.Uri.joinPath(ctx.extensionUri, "media", "aqua.png"), aquaStrip);
+	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", aqua));
+	registerAqua(ctx, () => aqua.refresh());   // Pair Roblox Studio with Aqua (aqua.ts), from the strip or the view's title
 	const meshy = new MeshyView(ctx, async (assetId, name) => { await installSkills(ctx, false); send(`/parlay-insert-asset ${assetId} ${clean(name)}`); });
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.meshy", meshy, { webviewOptions: { retainContextWhenHidden: true } }));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.meshy.setKey", () => meshy.setKey("meshy")));
@@ -220,42 +221,20 @@ async function syncGlass() {
 }
 
 // ---- the panel views (Aqua, Sonar) --------------------------------------------------------------
-
-function reachable(url: string): Promise<boolean> {
-	return new Promise((res) => {
-		try {
-			const req = (url.startsWith("https") ? https : http).get(url, (r) => { r.resume(); res(true); });
-			req.setTimeout(1500, () => { req.destroy(); res(false); });
-			req.on("error", () => res(false));
-		} catch { res(false); }
-	});
-}
-
-// Where the aqua checkout is: the setting, else a sibling of the workspace named aqua, else ~/Documents/GitHub/aqua.
-function aquaRepo(): string | undefined {
-	const set = vscode.workspace.getConfiguration("parlay").get<string>("aquaRepo", "");
-	const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-	const guesses = [set, ws ? path.join(path.dirname(ws), "aqua") : "", path.join(os.homedir(), "Documents", "GitHub", "aqua")];
-	return guesses.find((g) => g && fs.existsSync(path.join(g, "pyproject.toml")));
-}
-
-function startAqua(): boolean {
-	const repo = aquaRepo();
-	if (!repo) {
-		void vscode.window.showWarningMessage("Parlay: aqua checkout not found. Set parlay.aquaRepo to its folder.", "Open Settings")
-			.then((p) => { if (p) void vscode.commands.executeCommand("workbench.action.openSettings", "parlay.aquaRepo"); });
-		return false;
-	}
-	const t = vscode.window.terminals.find((x) => x.name === "Aqua") ?? vscode.window.createTerminal({ name: "Aqua", cwd: repo });
-	t.show(true);
-	t.sendText("uv run aqua serve --worker", true);
-	return true;
-}
+// (reachable and startAqua live in aqua.ts with the rest of the Aqua integration)
 
 class UrlView implements vscode.WebviewViewProvider {
-	// logo: shown on the placeholder (not running / start) page, from the extension's media folder
-	constructor(private setting: string, private label: string, private start?: () => boolean, private logo?: vscode.Uri) {}
+	private view?: vscode.WebviewView;
+	// logo: shown on the placeholder (not running / start) page, from the extension's media folder.
+	// strip: a status line and next step drawn above the live page (the Aqua pairing state, aqua.ts).
+	constructor(private setting: string, private label: string, private start?: () => boolean, private logo?: vscode.Uri, private strip?: () => Promise<Strip>) {}
+	// Re-read the strip and push it into the page; the iframe underneath is not reloaded.
+	refresh() {
+		if (!this.view?.visible || !this.strip) return;
+		void this.strip().then((s) => this.view?.webview.postMessage({ type: "strip", ...s }));
+	}
 	resolveWebviewView(view: vscode.WebviewView) {
+		this.view = view;
 		view.webview.options = { enableScripts: true, localResourceRoots: this.logo ? [vscode.Uri.joinPath(this.logo, "..")] : [] };
 		let poll: NodeJS.Timeout | undefined;
 		const url = () => vscode.workspace.getConfiguration("parlay").get<string>(this.setting, "");
@@ -265,9 +244,20 @@ class UrlView implements vscode.WebviewViewProvider {
 			try { origin = new URL(u).origin; } catch { /* blank frame */ }
 			if (await reachable(u)) {
 				if (poll) { clearInterval(poll); poll = undefined; }
-				view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; style-src 'unsafe-inline'">
-<style>html,body,iframe{margin:0;width:100%;height:100vh;border:0;background:transparent}</style>
-<iframe src="${u}" allow="clipboard-write"></iframe>`;
+				const nonce = Math.random().toString(36).slice(2);
+				view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
+<style>
+html,body{margin:0;height:100vh;background:transparent}body{display:flex;flex-direction:column}iframe{flex:1;width:100%;border:0}
+#strip{display:none;align-items:center;gap:10px;padding:6px 10px;font:12px/1.4 var(--vscode-font-family);color:var(--vscode-descriptionForeground);border-bottom:1px solid var(--vscode-panel-border)}
+#strip.on{display:flex}#t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#strip button{padding:3px 10px;border:0;border-radius:999px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer;white-space:nowrap}
+</style>
+<div id="strip"><span id="t"></span><button id="b" hidden></button></div>
+<iframe src="${u}" allow="clipboard-write"></iframe>
+<script nonce="${nonce}">const v=acquireVsCodeApi(),s=document.getElementById("strip"),t=document.getElementById("t"),b=document.getElementById("b");let cmd="";
+window.addEventListener("message",(e)=>{const m=e.data;if(m?.type!=="strip")return;t.textContent=m.text;s.className=m.text?"on":"";b.hidden=!m.action;b.textContent=m.action?.label??"";cmd=m.action?.command??"";});
+b.addEventListener("click",()=>cmd&&v.postMessage({type:"command",command:cmd}));</script>`;
+				this.refresh();
 				return;
 			}
 			const nonce = Math.random().toString(36).slice(2);
@@ -289,6 +279,8 @@ button[disabled]{opacity:.6;cursor:default}
 <script nonce="${nonce}">const v=acquireVsCodeApi();document.getElementById("s")?.addEventListener("click",()=>v.postMessage({type:"start"}));</script>`;
 		};
 		view.webview.onDidReceiveMessage((m) => {
+			// the strip's button runs a Parlay command (only ours: the page is an iframe of a web app)
+			if (m?.type === "command" && typeof m.command === "string" && m.command.startsWith("parlay.")) { void vscode.commands.executeCommand(m.command); return; }
 			if (m?.type !== "start" || !this.start) return;
 			if (!this.start()) return;
 			void render(true);
@@ -298,7 +290,8 @@ button[disabled]{opacity:.6;cursor:default}
 		void render();
 		const sub = vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration(`parlay.${this.setting}`)) void render(); });
 		view.onDidChangeVisibility(() => { if (view.visible) void render(); });
-		view.onDidDispose(() => { sub.dispose(); if (poll) clearInterval(poll); });
+		const tick = setInterval(() => this.refresh(), 60_000);   // Studio opened or closed, a pairing made elsewhere
+		view.onDidDispose(() => { sub.dispose(); clearInterval(tick); if (poll) clearInterval(poll); this.view = undefined; });
 	}
 }
 

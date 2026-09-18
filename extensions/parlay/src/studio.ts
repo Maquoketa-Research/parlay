@@ -83,7 +83,7 @@ export async function listStudios(): Promise<Studio[]> {
 // Each Studio window is a process; its log in %LOCALAPPDATA%\Roblox\logs is named with the process start time
 // (…_20260916T011322Z_Studio_XXXXX_last.log) and carries "placeid: N" and "universeid: N" near the top. So a
 // window title plus a start time gives the place id, offline, for published and unpublished places alike.
-async function listStudiosViaWindows(): Promise<Studio[]> {
+export async function listStudiosViaWindows(): Promise<Studio[]> {
 	if (process.platform !== "win32") return [];
 	const out = await powershell("Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.MainWindowTitle + '|' + $_.StartTime.ToUniversalTime().ToString('yyyyMMddTHHmmss') }");
 	let logs: ReturnType<typeof studioLogs> = [];
