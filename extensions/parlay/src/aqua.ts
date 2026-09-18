@@ -1,6 +1,7 @@
 // Aqua from inside Parlay: whether the server is up, whether the Studio plugin is installed, whether the open
 // place is paired, and the pairing handshake itself, driven from here so the browser dashboard never has to be
-// opened. docs/aqua-pairing.md has the protocol as Aqua implements it and what is proposed on its side.
+// opened. docs/aqua.md has the protocol as Aqua implements it and what is proposed on its side; the issues
+// list and evidence panel over the same API live in aquaIssues.ts.
 //
 // Aqua's pairing: the plugin in Studio has no key, so it POSTs /api/studio/pair with the place it has open and
 // gets a six-letter code, then long-polls GET /api/studio/pair/<id>. A dashboard user sees the request at
@@ -9,8 +10,10 @@
 // store that key, so the one click that stays in Studio is "Pair this place with Aqua"; everything around it
 // (server up, plugin installed, spotting the request, showing the code, approving) happens here.
 //
-// Dashboard calls carry no cookie. Aqua without Roblox sign-in (no AQUA_ROBLOX_CLIENT_ID, which is the local
-// setup) answers every caller as the local operator; with sign-in on they come back 401 and this says so.
+// Dashboard calls: Aqua without Roblox sign-in (no AQUA_ROBLOX_CLIENT_ID, which is the local setup) answers
+// every caller as the local operator. The hosted Aqua wants its aqua_session cookie; Parlay gets one by trading
+// the Roblox access token it already holds (docs/aqua.md, proposal A) and keeps it in SecretStorage. Until Aqua
+// ships that endpoint the trade answers 404 and dashboard calls stay 401, which the panel explains.
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as http from "http";
@@ -18,6 +21,7 @@ import * as https from "https";
 import * as os from "os";
 import * as path from "path";
 import { log } from "./log";
+import { SCOPES } from "./roblox-auth";
 import { listStudios, listStudiosViaWindows, Studio } from "./studio";
 
 const cfg = () => vscode.workspace.getConfiguration("parlay");
@@ -59,30 +63,65 @@ export function startAqua(): boolean {
 }
 
 // Aqua's JSON API the way its own api.js calls it: {ok, status, data}; a network failure is ok:false, status 0.
-interface Reply { ok: boolean; status: number; data: any }
-async function api(method: string, route: string, body?: unknown): Promise<Reply> {
+// A 401 from a hosted Aqua is retried once after a silent session trade (below).
+export interface Reply { ok: boolean; status: number; data: any }
+export async function api(method: string, route: string, body?: unknown): Promise<Reply> {
+	const r = await call(method, route, body);
+	if (r.status !== 401 || aquaIsLocal()) return r;
+	if (await aquaSignIn(true)) return call(method, route, body);
+	return r;
+}
+async function call(method: string, route: string, body?: unknown): Promise<Reply> {
 	try {
 		const r = await fetch(aquaUrl() + route, {
 			method, body: body === undefined ? undefined : JSON.stringify(body),
-			headers: body === undefined ? undefined : { "Content-Type": "application/json" }, signal: AbortSignal.timeout(8000),
+			headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(await sessionHeaders()) },
+			signal: AbortSignal.timeout(8000),
 		});
 		return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
 	} catch (e) { return { ok: false, status: 0, data: { detail: (e as Error).message } }; }
 }
-const detail = (r: Reply) => String(r.data?.detail ?? `HTTP ${r.status}`);
+export const detail = (r: Reply) => String(r.data?.detail ?? `HTTP ${r.status}`);
+
+// ---- the session on a hosted Aqua ---------------------------------------------------------------
+
+// docs/aqua.md proposal A: POST /api/auth/token {access_token} with Parlay's Roblox OAuth access token answers
+// {session}, the same value the browser gets as Set-Cookie; it goes back as the aqua_session cookie.
+const SESSION_KEY = "parlay.aquaSession";
+let secrets: vscode.SecretStorage | undefined;
+let lastTrade = 0;   // a failed trade is not repeated on every call: once per five minutes until Aqua has the route
+export async function sessionHeaders(): Promise<Record<string, string>> {
+	const s = aquaIsLocal() ? undefined : await secrets?.get(SESSION_KEY);
+	return s ? { Cookie: `aqua_session=${s}` } : {};
+}
+// Trade the Roblox session for an Aqua one. `silent` never prompts (a call retrying a 401); the command prompts
+// for the Roblox sign-in when there is none. True when Aqua handed a session back.
+export async function aquaSignIn(silent: boolean): Promise<boolean> {
+	if (silent && Date.now() - lastTrade < 5 * 60_000) return false;
+	lastTrade = Date.now();
+	const s = await vscode.authentication.getSession("roblox", SCOPES, silent ? { silent: true } : { createIfNone: true }).then((x) => x, () => undefined);
+	if (!s) return false;
+	await secrets?.delete(SESSION_KEY);   // whatever we held came back 401
+	const r = await call("POST", "/api/auth/token", { access_token: s.accessToken });
+	if (!r.ok || typeof r.data?.session !== "string") { log.info(`Aqua token trade: ${r.status === 404 || r.status === 405 ? "POST /api/auth/token is not on this Aqua yet" : detail(r)}`); return false; }
+	await secrets?.store(SESSION_KEY, r.data.session);
+	lastTrade = 0;
+	return true;
+}
 
 // ---- what Aqua knows ----------------------------------------------------------------------------
 
 // GET /api/games. A game's place_id is the place its code is synced from, set the moment a pairing is approved,
 // and places[] every place the game knows; a Studio place is paired when one of those is it.
-interface Game { slug: string; name: string; place_id: string; universe_id: string; places?: { place_id: string }[] }
+export interface Game { slug: string; name: string; place_id: string; universe_id: string; places?: { place_id: string; name?: string }[] }
 // GET /api/pairing: what the plugin asked for, matched by Aqua to a game of the user's on the universe.
 interface PairRequest { id: string; code: string; place_id: string; place_name: string; universe_id: string; matched_game: { slug: string; name: string } | null }
 
-function pairedGame(list: Game[], s: Studio): Game | undefined {
-	if (!s.placeId) return undefined;
-	return list.find((g) => g.place_id === s.placeId || (g.places ?? []).some((p) => p.place_id === s.placeId));
+export function gameForPlace(list: Game[], placeId: string): Game | undefined {
+	if (!placeId) return undefined;
+	return list.find((g) => g.place_id === placeId || (g.places ?? []).some((p) => p.place_id === placeId));
 }
+const pairedGame = (list: Game[], s: Studio) => gameForPlace(list, s.placeId);
 
 // ---- the Studio plugin --------------------------------------------------------------------------
 
@@ -158,7 +197,7 @@ async function pairStudio(refresh: () => void, showDashboard: () => void) {
 	}
 	let r = await api("GET", "/api/games");
 	if (r.status === 401) {
-		// The hosted Aqua has its own sign-in and Parlay holds no session there (docs/aqua-pairing.md proposes the
+		// The hosted Aqua has its own sign-in and Parlay holds no session there (docs/aqua.md proposes the
 		// token exchange). Until then: the plugin from here, the approval in the dashboard, which the panel shows.
 		if (!pluginInstalled()) {
 			try { log.info(`installed the Aqua Studio plugin: ${await installPlugin()}`); } catch (e) { fail(`Could not install the Aqua Studio plugin: ${(e as Error).message}`); return; }
@@ -224,5 +263,6 @@ async function pairStudio(refresh: () => void, showDashboard: () => void) {
 }
 
 export function registerAqua(ctx: vscode.ExtensionContext, refresh: () => void, showDashboard: () => void) {
+	secrets = ctx.secrets;
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.aqua.pair", () => pairStudio(refresh, showDashboard)));
 }

@@ -160,6 +160,28 @@
         "title": "Pair Roblox Studio with Aqua",
         "category": "Parlay",
         "icon": "$(plug)"
+      },
+      {
+        "command": "parlay.aqua.refresh",
+        "title": "Refresh Aqua issues",
+        "category": "Parlay",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "parlay.aqua.openInAqua",
+        "title": "Open in Aqua",
+        "category": "Parlay",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "parlay.aqua.signIn",
+        "title": "Sign in to Aqua",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.aqua.landing",
+        "title": "Show the Aqua pairing page",
+        "category": "Parlay"
       }
     ],
     "keybindings": [
@@ -260,6 +282,21 @@
           "command": "parlay.aqua.pair",
           "when": "view == parlay.aqua",
           "group": "navigation@1"
+        },
+        {
+          "command": "parlay.aqua.refresh",
+          "when": "view == parlay.aqua.issues",
+          "group": "navigation@1"
+        },
+        {
+          "command": "parlay.aqua.openInAqua",
+          "when": "view == parlay.aqua.issues && parlay.aqua.state =~ /^(ok|empty)$/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "parlay.aqua.pair",
+          "when": "view == parlay.aqua.issues",
+          "group": "navigation@3"
         }
       ]
     },
@@ -285,9 +322,13 @@
     "views": {
       "parlay-aqua": [
         {
+          "id": "parlay.aqua.issues",
+          "name": "Issues"
+        },
+        {
           "type": "webview",
           "id": "parlay.aqua",
-          "name": "Aqua"
+          "name": "Evidence"
         }
       ],
       "parlay-meshy": [
@@ -469,13 +510,38 @@
         "view": "workbench.explorer.emptyView",
         "contents": "Parlay works on the folder Roblox Studio syncs a place to. Pick an open Studio and Parlay finds or makes that folder, wires git and opens it.\n[Add Roblox Studio project](command:parlay.studio.add)\n[Open Folder](command:workbench.action.files.openFolder)",
         "when": "workbenchState == empty"
+      },
+      {
+        "view": "parlay.aqua.issues",
+        "contents": "Asking Aqua…",
+        "when": "parlay.aqua.state == loading"
+      },
+      {
+        "view": "parlay.aqua.issues",
+        "contents": "Aqua does not watch this folder's place yet. Pairing tells Aqua which game the open Studio place is; Parlay then lists its issues here, each one a click from the line.\n[Pair with Aqua](command:parlay.aqua.pair)\n[Refresh](command:parlay.aqua.refresh)",
+        "when": "parlay.aqua.state == noGame"
+      },
+      {
+        "view": "parlay.aqua.issues",
+        "contents": "Aqua is not answering. A local Aqua can be started from the panel below; otherwise check the connection or the parlay.aquaUrl setting.\n[Retry](command:parlay.aqua.refresh)",
+        "when": "parlay.aqua.state == unreachable"
+      },
+      {
+        "view": "parlay.aqua.issues",
+        "contents": "This Aqua wants a sign-in. Parlay signs in with your Roblox account through Aqua's token exchange; until Aqua has that route the list cannot load here, and the dashboard below takes its own sign-in.\n[Sign in to Aqua](command:parlay.aqua.signIn)",
+        "when": "parlay.aqua.state == signIn"
+      },
+      {
+        "view": "parlay.aqua.issues",
+        "contents": "No open issues. Aqua lists them here as players report them and servers hit them.\n[Open in Aqua](command:parlay.aqua.openInAqua)",
+        "when": "parlay.aqua.state == empty"
       }
     ]
   },
   "scripts": {
     "compile": "gulp compile-extension:parlay-ide",
     "watch": "gulp watch-extension:parlay-ide",
-    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs"
+    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs && node --no-warnings tools/aqua-check.mjs"
   },
   "devDependencies": {
     "@types/node": "24.x",

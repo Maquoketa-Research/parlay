@@ -305,7 +305,7 @@ function powershell(script: string): Promise<string> {
 }
 
 // the record Studio made for this place (it makes one when the place opens); undefined when it never has
-async function syncRecordName(placeId: string): Promise<string | undefined> {
+export async function syncRecordName(placeId: string): Promise<string | undefined> {
 	if (process.platform !== "win32") return undefined;
 	const out = await powershell(`(Get-Item '${STUDIO_KEY}').GetValueNames() | Where-Object { $_ -like 'File_Sync_Persistence_Record_V1:${placeId}:*' -and $_ -notlike '*_timeLastUsed' -and $_ -notlike '*_lastUsedDir' }`);
 	return out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
@@ -313,7 +313,7 @@ async function syncRecordName(placeId: string): Promise<string | undefined> {
 
 interface SyncEntry { className: string; filePath: string; scriptId?: string; status: string }
 
-async function readSyncRecord(record: string): Promise<SyncEntry[]> {
+export async function readSyncRecord(record: string): Promise<SyncEntry[]> {
 	const out = await powershell(`(Get-ItemProperty '${STUDIO_KEY}').'${record}'`);
 	// entries without a scriptId are ones Studio ignores; treat them as absent so they get rewritten with one
 	try { const v = JSON.parse(out); return Array.isArray(v) ? v.filter((e) => e && e.className && e.filePath && e.scriptId) : []; } catch { return []; }

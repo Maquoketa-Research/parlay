@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { aquaStrip, reachable, registerAqua, startAqua, Strip } from "./aqua";
+import { registerAquaIssues } from "./aquaIssues";
 import { registerDiscordAuth } from "./discord-auth";
 import { MeshyView } from "./meshy";
 import { registerRobloxAuth } from "./roblox-auth";
@@ -34,10 +35,15 @@ export function activate(ctx: vscode.ExtensionContext) {
 	// Start from Studio: pick an open place, get its sync folder (or a new one, wired to git), open it here.
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.studio.add", () => addStudioProject(ctx)));
 
-	// The right-hand panel: Aqua (with a Start button when it is down, and the pairing strip when it is up), Meshy, and Sonar.
+	// The right-hand panel: Aqua (the issues list over the evidence panel; the pairing page and dashboard when no
+	// game is known, with a Start button when a local Aqua is down), Meshy, and Sonar.
 	const aqua = new UrlView("aquaUrl", "Aqua", startAqua, vscode.Uri.joinPath(ctx.extensionUri, "media", "aqua.png"), aquaStrip);
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", aqua));
 	registerAqua(ctx, () => aqua.refresh(), () => aqua.showDashboard());   // Pair with Aqua (aqua.ts), from the landing page or the view's title
+	registerAquaIssues(ctx, {   // the issues tree (aquaIssues.ts) drives the panel under it
+		showEvidence: (body) => aqua.showEvidence(body), showLanding: () => aqua.showLanding(), showDashboard: () => aqua.showDashboard(),
+		fix: async (line) => { await installSkills(ctx, false); send(line); },
+	});
 	const meshy = new MeshyView(ctx, async (assetId, name) => { await installSkills(ctx, false); send(`/parlay-insert-asset ${assetId} ${clean(name)}`); });
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.meshy", meshy, { webviewOptions: { retainContextWhenHidden: true } }));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.meshy.setKey", () => meshy.setKey("meshy")));
@@ -227,19 +233,24 @@ class UrlView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
 	private render?: (starting?: boolean) => Promise<void>;
 	// With a strip provider the view opens on a landing page like the Studio plugin's: the logo large, one line
-	// of state, one button (Pair with Aqua). The live page (dashboard) shows once a place is paired, or on request.
-	private mode: "landing" | "dashboard" = "landing";
+	// of state, one button (Pair with Aqua). The live page (dashboard) shows on request; "evidence" is a page
+	// the issues tree hands over (aquaIssues.ts), shown whenever the folder's game is known.
+	private mode: "landing" | "dashboard" | "evidence" = "landing";
+	private evidence = "";
 	// logo: shown on the landing and placeholder pages, from the extension's media folder.
 	// strip: the state line and next step (the Aqua pairing state, aqua.ts); drawn above the live page too.
 	constructor(private setting: string, private label: string, private start?: () => boolean, private logo?: vscode.Uri, private strip?: () => Promise<Strip>) {}
 	// Re-read the strip and push it into the page; the iframe underneath is not reloaded.
 	refresh() {
-		if (!this.view?.visible || !this.strip) return;
+		if (!this.view?.visible || !this.strip || this.mode === "evidence") return;
 		if (this.mode === "landing") { void this.render?.(); return; }
 		void this.strip().then((s) => this.view?.webview.postMessage({ type: "strip", ...s }));
 	}
 	// Show the live page (the dashboard), for when the pairing needs it or the user asks
 	showDashboard() { this.mode = "dashboard"; void this.render?.(); }
+	showLanding() { this.mode = "landing"; void this.render?.(); }
+	// The evidence page: a body (styles included) whose [data-goto] and [data-cmd] elements run Parlay commands.
+	showEvidence(body: string) { this.mode = "evidence"; if (body) this.evidence = body; void this.render?.(); }
 	resolveWebviewView(view: vscode.WebviewView) {
 		this.view = view;
 		view.webview.options = { enableScripts: true, localResourceRoots: this.logo ? [vscode.Uri.joinPath(this.logo, "..")] : [] };
@@ -247,6 +258,14 @@ class UrlView implements vscode.WebviewViewProvider {
 		const url = () => vscode.workspace.getConfiguration("parlay").get<string>(this.setting, "");
 		const isLocal = (u: string) => { try { return ["localhost", "127.0.0.1"].includes(new URL(u).hostname); } catch { return false; } };
 		const render = async (starting = false) => {
+			if (this.mode === "evidence") {
+				const nonce = Math.random().toString(36).slice(2);
+				view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
+${this.evidence}
+<script nonce="${nonce}">const v=acquireVsCodeApi();document.addEventListener("click",(e)=>{const g=e.target.closest("[data-goto]");if(g){const [p,l]=g.dataset.goto.split("|");v.postMessage({type:"command",command:"parlay.aqua.goto",args:[p,Number(l)]});return;}
+const b=e.target.closest("[data-cmd]");if(b)v.postMessage({type:"command",command:b.dataset.cmd,args:b.dataset.args?JSON.parse(b.dataset.args):[]});});</script>`;
+				return;
+			}
 			const u = url();
 			let origin = "";
 			try { origin = new URL(u).origin; } catch { /* blank frame */ }
@@ -313,8 +332,8 @@ button[disabled]{opacity:.6;cursor:default}
 <script nonce="${nonce}">const v=acquireVsCodeApi();document.getElementById("s")?.addEventListener("click",()=>v.postMessage({type:"start"}));</script>`;
 		};
 		view.webview.onDidReceiveMessage((m) => {
-			// the strip's button runs a Parlay command (only ours: the page is an iframe of a web app)
-			if (m?.type === "command" && typeof m.command === "string" && m.command.startsWith("parlay.")) { void vscode.commands.executeCommand(m.command); return; }
+			// the strip's button and the evidence page run Parlay commands (only ours: the page is an iframe of a web app)
+			if (m?.type === "command" && typeof m.command === "string" && m.command.startsWith("parlay.")) { void vscode.commands.executeCommand(m.command, ...(Array.isArray(m.args) ? m.args : [])); return; }
 			if (m?.type === "dashboard") { this.showDashboard(); return; }
 			if (m?.type !== "start" || !this.start) return;
 			if (!this.start()) return;

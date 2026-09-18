@@ -15,8 +15,11 @@ VS Code today; the fork (`fork/README.md`) turns it into the standalone **Parlay
   Validate, Ask). Each is a Claude Code skill (`skills/parlay-*/SKILL.md`) run in a terminal named Claude,
   on the file and line range you selected. The code lands in the file; with Script Sync on, it lands in Studio.
 - **Parlay sidebar** on the right (the secondary side bar, its own container, open by default, no hide button):
-  - **Aqua**: the patch queue (`parlay.aquaUrl`). When the server is down the view shows a Start button that
-    runs `uv run aqua serve --worker` from `parlay.aquaRepo` (or a sibling folder named aqua) and waits for it.
+  - **Aqua** (`parlay.aquaUrl`): the issues Aqua holds against this folder's game, one click from the script
+    and line, with the evidence (message, stack, reports, verdict, Aqua's patch) underneath and the actions
+    Apply fix, Fix with Claude, Open in Aqua, Dismiss (`docs/aqua.md`). Pairing a Studio place stays a button;
+    when a local server is down the panel shows a Start button that runs `uv run aqua serve --worker` from
+    `parlay.aquaRepo` (or a sibling folder named aqua) and waits for it.
   - **Meshy**, as a workflow. Describe a prop ("an axe"). Screenshots of the game set the style: everything in
     `assets/reference/` plus one live Studio capture through Roblox's Studio MCP when nothing else holds it.
     An OpenAI image model (`parlay.imageModel`, gpt-image-2.5) drafts three concepts in that look; pick one.

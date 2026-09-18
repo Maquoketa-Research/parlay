@@ -1,9 +1,15 @@
-# Aqua pairing from inside Parlay
+# Aqua inside Parlay: issues, evidence, fixes, pairing
 
 Sep 17 2026. Read from the Aqua checkout at `~/Documents/GitHub/aqua` (`main` = 0569d7e) and the other
 session's in-flight branch (`worktree-agent-a4a2ade117ccf2533` = 2c3e988, plus an uncommitted plugin 0.7.0 that
 is what is installed on this machine). Nothing in Aqua was changed; "verified" means read in the code or probed
-read-only on this machine today. Implementation: `src/aqua.ts`, wired from `src/extension.ts` and `package.json`.
+read-only on this machine today. Implementation: `src/aquaIssues.ts` (the issues list, the evidence panel, the
+fixes; pure text logic in `src/aquaText.ts`, checked by `tools/aqua-check.mjs`) and `src/aqua.ts` (the API
+client, the session, pairing), wired from `src/extension.ts` and `package.json`.
+
+Sections 1 to 4 are the pairing protocol and design (unchanged from the first cut). Section 5 is the issues
+integration Dave asked for ("relay the fixes into VS Code directly ... click on a button, go to the script and
+line numbers ... evidence with why on the right"), section 6 what Aqua has to add for the hosted case.
 
 ## 1. The protocol as Aqua implements it
 
@@ -193,3 +199,109 @@ can show `plugin_seen`/`plugin_live` before any game exists; today that only com
 - `webview.postMessage` before the iframe page has finished loading: the strip arrives ≥1 s later (a
   PowerShell call), so in practice the page is ready; if a strip is ever missed, the 60 s tick brings it.
 - The other session's uncommitted plugin 0.7.0 may have moved further than the 2c3e988 diff read here.
+
+## 5. Issues in Parlay
+
+### What the person sees
+
+The Aqua container in the right sidebar has two views: **Issues** (a tree) over **Evidence** (the webview that
+used to be the whole panel). When the folder is a known Aqua game the tree lists its live issues and the panel
+waits for a click; when it is not, the panel is the old landing page (Pair with Aqua, Open the dashboard) and the
+tree explains why (not paired, Aqua down, sign-in). A status bar item `$(bug) Aqua N` shows the open count and
+focuses the list.
+
+1. **Which game.** The folder is the Script Sync target of one Roblox place. Parlay finds the place id in the
+   record `Add Roblox Studio project` wrote (`globalState["studioProject:<placeId>"].folder`), else in Studio's
+   own `File_Sync_Persistence_Record_V1:<placeId>:*` of an open Studio whose entries' parent folder is this
+   folder (`listStudiosViaWindows` + `syncRecordName` + `readSyncRecord`). Then `GET /api/games` and the game
+   whose `place_id` or `places[].place_id` is that place. Remembered in `workspaceState["aquaPlaceId"]`.
+2. **The list.** `GET /api/state?game=<slug>` → `issues[]` filtered to `kind == "bug"` and status
+   open/investigating/patched, sorted critical→low then newest `updated_at`. Row: label = `title`, description =
+   `Shop.Buy:105 · ×12` (the last two names of the script's path, the line, the error/report count), icon by
+   severity, tooltip with first/last seen and the places seen in.
+3. **The click.** The row's command resolves the script (below), opens it with the line selected and centred,
+   then fetches `GET /api/issues/<id>/messages` and, when a patch exists, `GET /api/patches/<id>`, and draws the
+   evidence page: severity/status, title, the script:line (a link; or why it is not on disk), counts and
+   first/last seen and places, the actions, the summary, **Why Aqua thinks so** (verdict, confidence, the
+   verifier's reasoning), **Errors from the servers** (each log line with side, server, count, place, time; the
+   message and the first eight stack frames with every script:line a link), **Reports** (the players' words),
+   **Metrics**, and **Aqua's fix** (title, root cause, summary, the diff coloured).
+4. **The actions.** *Apply fix* (when the patch has a diff): each file of the diff is found in the folder,
+   hunks are applied in memory (`aquaText.applyHunks`: at its own line, else wherever its old lines are; refused
+   if the code under it changed), one `WorkspaceEdit` replaces the documents, they are saved so Script Sync
+   ships them to Studio; Ctrl+Z in the editor undoes it. *Fix with Claude* (when the script is on disk):
+   `/parlay-fix <file>:<line>-<line> Aqua issue #id (severity): title. <first error message> Seen ×N. <reasoning>`
+   typed into the agent terminal. *Open in Aqua*: the dashboard at `/?game=<slug>` in the browser (no per-issue
+   link exists; see 6). *Dismiss*: `POST /api/issues/<id>/dismiss {note}` after a confirm (Aqua has no "resolve";
+   resolved is what an applied patch makes an issue).
+5. **Live.** While the list is visible Parlay holds `GET /api/events` open (SSE; frames `event: <topic>`) and
+   re-reads state 1.5 s after an `issue`, `patch` or `job` frame. When the stream cannot be opened (Aqua down, or a
+   401 before a session exists) it re-reads every 30 s instead.
+
+### How a script and a line are named
+
+Aqua has no script/line fields. Its issues come from triage over reports, and the reports that name code are
+Roblox's own error text: the swept server logs (`servererrors.py`), the Creator Hub error report
+(`monitoring.py`) and the relay's client errors. That text reaches Parlay in `issue.evidence` (JSON text, the
+verifier's `gather()`: `server_logs[].message` and `.stack`) and in the `errors`-source messages. Roblox writes
+the script as its full instance name, two ways, both handled by `aquaText.locate`:
+
+| Form | Example | Where |
+|---|---|---|
+| `Path:line:` at the head of the message | `ServerScriptService.Shop.Buy:105: attempt to index nil with 'Price'` | Luau runtime errors; `tests/test_fingerprint.py` |
+| `Script 'Path', Line N` per stack frame | `Script 'ServerScriptService.UserGenerated.Analytics.PlayerKit', Line 650` | `ScriptContext.Error` traces, Creator Hub `stacktrace`; `tests/test_monitoring.py` |
+
+The first hit across the log lines (message, then stack), then the title and summary, is the row's location.
+`game.` is dropped; a client script's runtime path is folded back to the container Script Sync mirrors
+(`Players.<player>.PlayerScripts.X` → `StarterPlayer.StarterPlayerScripts.X`, `PlayerGui` → `StarterGui`,
+`Backpack`/`StarterGear` → `StarterPack`). Then the Script Sync layout (`X.server.luau` Script, `X.client.luau`
+LocalScript, `X.luau` ModuleScript, `init.*` the folder; `StarterPlayerScripts` both under `StarterPlayer/` and at
+the top level, which is where Script Sync writes it) gives the candidates, tried in order; if none exists the
+name is looked for anywhere in the folder. Not found means not synced (Workspace scripts, for one), and the
+panel says so with the full path to find it in Studio's Explorer.
+
+### The API relied on
+
+| Call | Auth | Answer, the parts used |
+|---|---|---|
+| `GET /api/games` | dashboard user | `{games:[{slug, name, place_id, universe_id, places:[{place_id, name, ...}]}]}` |
+| `GET /api/state?game=<slug>` | dashboard user | `issues[]` (`db/rows.py Issue.as_dict()` + `sources`, `channels`, `agent_notes`, `dismissed_because`): `id, title, summary, severity (critical\|high\|medium\|low), status (open\|investigating\|patched\|resolved\|dismissed), kind (bug\|feature), area, report_count, reporter_count, created_at, updated_at, verdict_state, confidence, evidence (JSON text), blocked_on`; `patches[]` (`db.patch_summaries`, no diff): `id, issue_id, status (pending\|queued\|approved\|denied\|applied\|failed), title, files[], root_cause, fix_summary, also_fixes[], created_at, diff_lines`; `counts.issues_open`; `game` |
+| `issue.evidence` | | `{reporting:{reports, distinct_players, distinct_servers, sources[], job_ids[], first_ts, last_ts}, server_logs:[{job_id, severity, message, stack, ts, side, fingerprint, count, servers, from_reporter, mentions, place_id?}], analytics:[{metric, during_reports, week_before, change_percent, significant}], reasoning, cited, about_this_game, exploit?}` (`verify.py`) |
+| `GET /api/issues/{id}/messages` | dashboard user | `{messages:[{source, author, author_id, content, ts, channel, confidence, ...}]}` (`db/rows.py Message`) |
+| `GET /api/patches/{id}` | dashboard user | the `Patch` row with `diff` (`git diff main...branch`, paths relative to the mirror: `ServerScriptService/Shop/Buy.server.luau`), `issue`, `reports`, `outcome`, `preview` |
+| `POST /api/issues/{id}/dismiss` | dashboard user | `{note}` → `{ok}`; `POST .../reopen` undoes it |
+| `GET /api/events` | dashboard user | SSE; topics `chat, patch, job, issue, agent, incident, pairing`, one frame per topic per second at most, `: beat` every 20 s |
+
+Timestamps are Unix seconds. Every call goes through `aqua.api()`: `{ok, status, data}`, 8 s timeout, and on a
+401 from a non-local Aqua one silent session trade (6, A) before giving up.
+
+## 6. What Aqua must add for the hosted case (and what would help)
+
+**A. The token exchange, exactly as Parlay calls it.** `POST /api/auth/token`, JSON body
+`{"access_token": "<Roblox OAuth access token>"}` (Parlay's own Roblox session, scopes `openid profile asset:read
+asset:write`, from `vscode.authentication.getSession("roblox", ...)`), no cookie. Aqua: `roblox.userinfo(access)`,
+`db.upsert_user(...)` as `auth_callback` does (a stranger is a sign-up, not a session), `db.create_session(user_id,
+token, session_days)`, answer `200 {"session": "<token>"}`; 401 when Roblox rejects the token, 403 for an account
+that has not finished sign-up. Parlay stores the value in SecretStorage `parlay.aquaSession` and sends
+`Cookie: aqua_session=<token>` on every dashboard call and on `/api/events`; a 401 later deletes it and trades
+again (at most once per five minutes). Until the route exists the trade answers 404, the list shows the sign-in
+state, and *Sign in to Aqua* opens the dashboard in the panel for its own sign-in (that cookie lives in the
+webview, not in Parlay's fetch, so the list stays empty; the dashboard works).
+
+**Nice to have, in order of value to the panel:**
+
+1. A per-issue link on the dashboard (`/?game=<slug>&issue=<id>` opening the inspector), so *Open in Aqua*
+   lands on the issue instead of the game's list.
+2. `script`/`line` on the issue row (or on `error_groups`, surfaced in evidence), taken from the same regexes
+   at sweep time. Parlay would read them first and keep its own parse as the fallback for old rows.
+3. An `/api/games/<slug>/issues` route returning only the live issues with their evidence: `/api/state` carries
+   the whole dashboard (events, patches, org, provider) on every refresh.
+4. B and C from section 3 stand.
+
+### Unverified
+
+- Not run against a live Aqua: the server was down and the hosted one answers 401; every shape is from the
+  code. In particular the exact `stack` text Roblox's server-logs API returns per frame is inferred from Aqua's
+  tests and its fingerprint regexes, not from a captured line.
+- The panel and tree were type-checked, bundled and checked (`tools/check.mjs`, `tools/aqua-check.mjs`), not
+  clicked through in a running Parlay.
