@@ -996,6 +996,9 @@
 		"workbench.tree.indent": 14,
 		"workbench.editor.tabSizing": "shrink",
 		"workbench.startupEditor": "none",
-		"editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace"
+		"editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
+		"window.systemColorTheme": "auto",
+		"security.workspace.trust.enabled": false,
+		"terminal.integrated.defaultProfile.windows": "Claude"
 	}
 }

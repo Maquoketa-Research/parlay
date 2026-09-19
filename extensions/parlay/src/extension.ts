@@ -70,14 +70,9 @@ export function activate(ctx: vscode.ExtensionContext) {
 		void ctx.globalState.update("firstRunDone", true);
 		void firstRun();
 	}
-	// Windows draws the glass acrylic in the OS colour mode; a light-mode desktop turns a dark theme to grey mud.
-	// "auto" makes the native tint follow the colour theme (dark for Dark/Glass/Aqua, light for Paper).
-	void ensureUserSetting("window.systemColorTheme", "auto");
-	// The folders Parlay opens are the user's own Script Sync folders; Restricted Mode would only switch Parlay off
-	// in them (and did, before the extension declared untrustedWorkspaces support). Application scope: user settings.
-	void ensureUserSetting("security.workspace.trust.enabled", false);
-	// The terminal is the agent: the >_ in the sidebar, Ctrl+` and + all start Claude (the profile agents.ts provides)
-	void ensureUserSetting("terminal.integrated.defaultProfile.windows", "Claude");
+	// window.systemColorTheme (the acrylic follows the theme), security.workspace.trust.enabled (Script Sync folders
+	// are the user's own) and terminal.integrated.defaultProfile.windows (the >_ is Claude) are product defaults in
+	// product.json: writing them here on a fresh profile made Parlay ask for a restart on its first ever launch.
 	// Layout v2: Parlay is its own container in the right sidebar; the terminal panel goes back to the bottom.
 	if (!ctx.globalState.get("layoutV2Done")) {
 		void ctx.globalState.update("layoutV2Done", true);
@@ -108,11 +103,6 @@ export function activate(ctx: vscode.ExtensionContext) {
 	void refreshStatus(status);
 	const timer = setInterval(() => void refreshStatus(status), 30_000);
 	ctx.subscriptions.push({ dispose: () => clearInterval(timer) });
-}
-
-async function ensureUserSetting(key: string, value: unknown) {
-	const cfg = vscode.workspace.getConfiguration();
-	if (cfg.inspect(key)?.globalValue === undefined) await cfg.update(key, value, vscode.ConfigurationTarget.Global);
 }
 
 // ---- first run ----------------------------------------------------------------------------------
