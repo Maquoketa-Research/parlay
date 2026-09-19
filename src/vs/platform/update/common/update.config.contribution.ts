@@ -65,7 +65,7 @@ configurationRegistry.registerConfiguration({
 		},
 		'update.minReleaseAge': {
 			type: 'integer',
-			default: 120,
+			default: 0,
 			scope: ConfigurationScope.APPLICATION,
 			description: localize('update.cooldown', "Control how old an update need to be before installing it (in hours)."),
 		},

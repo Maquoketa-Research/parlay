@@ -44,7 +44,8 @@ function packageInnoSetup(iss: string, options: { definitions?: Record<string, u
 	const args = [
 		iss,
 		...defs,
-		`/sesrp=node ${signWin32Path} $f`
+		// Parlay: build/parlay/build-win32.sh points this at build/parlay/sign.ps1 (signtool); upstream's ESRP otherwise
+		`/sesrp=${process.env['VSCODE_INNO_SIGN_CMD'] || `node ${signWin32Path} $f`}`
 	];
 
 	cp.spawn(innoSetupPath, args, { stdio: ['ignore', 'inherit', 'inherit'] })

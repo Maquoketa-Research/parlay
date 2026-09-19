@@ -66,10 +66,23 @@ npm run gulp "vscode-win32-${VSCODE_ARCH}-min-packing"
 echo "== installer  $(date)"
 bash build/parlay/license-rtf.sh
 npm run gulp "vscode-win32-${VSCODE_ARCH}-inno-updater"
-npm run gulp "vscode-win32-${VSCODE_ARCH}-user-setup"
+
+# Authenticode (README "Signing"). The app folder after inno-updater, which rcedits tools/inno_updater.exe, the same
+# point upstream's codesign.ts signs; then Inno signs the setup exe and the uninstaller itself through the SignTool
+# directive in build/win32/code.iss (--sign defines Sign; VSCODE_INNO_SIGN_CMD is the command ISCC runs per file).
+echo "== sign  $(date)"
+bash build/parlay/sign.sh "../VSCode-win32-${VSCODE_ARCH}"
+SIGNING="${PARLAY_SIGN_PFX:-}${PARLAY_SIGN_THUMBPRINT:-}${PARLAY_SIGN_AZURE_METADATA:-}"
+SIGN_ARGS=()
+if [[ -n "$SIGNING" ]]; then
+  export VSCODE_INNO_SIGN_CMD="powershell.exe -NoProfile -ExecutionPolicy Bypass -File \$q$(cygpath -aw build/parlay/sign.ps1)\$q \$f"
+  SIGN_ARGS=(-- --sign)
+fi
+npm run gulp "vscode-win32-${VSCODE_ARCH}-user-setup" "${SIGN_ARGS[@]}"
 mkdir -p .build/parlay
 SETUP=".build/parlay/ParlayUserSetup-${VSCODE_ARCH}-${RELEASE_VERSION}"
 mv ".build/win32-${VSCODE_ARCH}/user-setup/VSCodeSetup.exe" "$SETUP.exe"
+[[ -z "$SIGNING" ]] || bash build/parlay/sign.sh --verify "$SETUP.exe"
 # sidecar for release.sh: what the installer's own product.json says it is (gulp stamped commit, version and
 # target there) plus the build time, which becomes the update manifest's timestamp
 node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('.build/win32-${VSCODE_ARCH}/user-setup/product.json','utf8'));fs.writeFileSync(process.argv[1],JSON.stringify({commit:p.commit,productVersion:p.version,quality:p.quality,target:p.target,arch:'${VSCODE_ARCH}',timestamp:Date.now()})+'\n')" "$SETUP.json"
