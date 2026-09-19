@@ -64,6 +64,7 @@ class AquaIssues implements vscode.TreeDataProvider<Row> {
 
 	private set(state: State) {
 		this.state = state;
+		log.appendLine(`Aqua issues: ${state}${this.game ? ` for ${this.game.slug}` : ""}, ${this.rows.length} row(s), ${aquaUrl()}`);
 		void vscode.commands.executeCommand("setContext", "parlay.aqua.state", state);
 		this.changed.fire();
 		const known = state === "ok" || state === "empty";
@@ -113,16 +114,20 @@ class AquaIssues implements vscode.TreeDataProvider<Row> {
 		if (cached) return cached;
 		if (Date.now() - this.missedAt < 5 * 60_000) return undefined;
 		const same = (a: string, b: string) => path.resolve(a).replace(/[\\/]+$/, "").toLowerCase() === path.resolve(b).replace(/[\\/]+$/, "").toLowerCase();
-		let found: string | undefined;
+		// Studio's own record is the judge: the place whose sync entries name this folder
+		const names = async (placeId: string) => { const rec = await syncRecordName(placeId); return !!rec && (await readSyncRecord(rec)).some((e) => same(path.dirname(e.filePath.replace(/\//g, "\\")), ws)); };
+		// every place Parlay ever pointed at this folder (a folder can be re-pointed, and the stale entry stays behind)
+		const mine: string[] = [];
 		for (const k of this.ctx.globalState.keys()) {
 			if (!k.startsWith("studioProject:")) continue;
 			const v = this.ctx.globalState.get<{ folder: string; placeId: string }>(k);
-			if (v?.placeId && same(v.folder, ws)) { found = v.placeId; break; }
+			if (v?.placeId && same(v.folder, ws)) mine.push(v.placeId);
 		}
+		let found: string | undefined;
+		for (const id of mine) if (await names(id)) { found = id; break; }
+		found ??= mine[0];
 		if (!found) for (const s of await listStudiosViaWindows().catch(() => [])) {
-			if (!s.placeId) continue;
-			const rec = await syncRecordName(s.placeId);
-			if (rec && (await readSyncRecord(rec)).some((e) => same(path.dirname(e.filePath.replace(/\//g, "\\")), ws))) { found = s.placeId; break; }
+			if (s.placeId && await names(s.placeId)) { found = s.placeId; break; }
 		}
 		if (found) await this.ctx.workspaceState.update("aquaPlaceId", found); else this.missedAt = Date.now();
 		return found;

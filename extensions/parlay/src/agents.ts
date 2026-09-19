@@ -54,6 +54,14 @@ async function adoptSurvivors() {
 	for (const t of vscode.window.terminals.filter(isAgent)) {
 		if (await t.processId) term = t; else t.dispose();
 	}
+	// The Terminal view comes back before this extension activates, and at that moment the Claude profile is not
+	// registered yet, so its first tab is a plain shell nobody asked for. One lone shell and no agent: it becomes
+	// the agent tab.
+	const all = vscode.window.terminals;
+	if (!term && all.length === 1 && /powershell|pwsh|cmd|bash/i.test(all[0].name) && cwd()) {
+		all[0].dispose();
+		await use(state().agent, undefined, false);
+	}
 	refresh();
 }
 
