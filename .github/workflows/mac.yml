@@ -1,0 +1,107 @@
+# Parlay, macOS: build/parlay/build-darwin.sh on a hosted Mac runner (nobody here has a Mac). Output: the app
+# zip, the DMG and the update manifest as a workflow artifact. On a v* tag, or when dispatched with release on,
+# the zip and DMG also go to the GitHub release of that version (created when missing) and the manifest rides
+# along as latest-darwin-<arch>.json for release.sh to commit (build/parlay/README.md, macOS).
+name: Parlay (macOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: Architecture
+        type: choice
+        options: [arm64, x64]
+        default: arm64
+      release:
+        description: Upload to the GitHub release v<version>
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parlay-mac-${{ github.ref }}-${{ inputs.arch || 'arm64' }}
+  cancel-in-progress: true
+
+env:
+  VSCODE_ARCH: ${{ inputs.arch || 'arm64' }}
+
+jobs:
+  build:
+    # Intel on an Intel runner: native modules are compiled for the host, so no cross-compiling
+    runs-on: ${{ (inputs.arch || 'arm64') == 'x64' && 'macos-15-intel' || 'macos-14' }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python for node-gyp
+        run: |
+          pip install setuptools
+          echo "npm_config_python=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-${{ runner.arch }}-
+
+      # build-darwin.sh bakes ~/.parlay/<provider>-client-secret into the extension; absent secrets mean no OAuth login
+      - name: Client secrets
+        env:
+          ROBLOX: ${{ secrets.PARLAY_ROBLOX_CLIENT_SECRET }}
+          DISCORD: ${{ secrets.PARLAY_DISCORD_CLIENT_SECRET }}
+        run: |
+          mkdir -p ~/.parlay
+          if [ -n "$ROBLOX" ]; then printf '%s\n' "$ROBLOX" > ~/.parlay/roblox-client-secret; fi
+          if [ -n "$DISCORD" ]; then printf '%s\n' "$DISCORD" > ~/.parlay/discord-client-secret; fi
+
+      - name: Build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}   # gulp-electron fetches Electron from GitHub releases; anonymous calls hit the API rate limit
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then export RELEASE_VERSION="${GITHUB_REF_NAME#v}"; fi
+          bash build/parlay/build-darwin.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Parlay-darwin-${{ env.VSCODE_ARCH }}
+          path: |
+            .build/parlay/*.zip
+            .build/parlay/*.dmg
+            .build/parlay/latest-darwin-*.json
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag' || inputs.release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Parlay-darwin-${{ env.VSCODE_ARCH }}
+          path: out
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(jq -r .productVersion out/latest-darwin-*.json)"
+          TAG="v$VERSION"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Parlay $VERSION" --notes "Parlay $VERSION, built from ${GITHUB_SHA::9}. Installed copies update themselves from this release."
+          gh release upload "$TAG" out/* --repo "$GITHUB_REPOSITORY" --clobber
+          echo "== $TAG: $(ls out | tr '\n' ' ')"
+          cat out/latest-darwin-*.json

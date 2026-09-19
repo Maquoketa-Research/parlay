@@ -1,0 +1,16 @@
+{"type":"thread.started","thread_id":"01a0b7df-96f0-77d0-8367-d14ef7fd9af2"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll run the command and create the file."}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'echo hi'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'echo hi'","aggregated_output":"hi\r\n","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Set-Content -LiteralPath 'codex-probe.txt' -Value 'ok' -NoNewline\"","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"Set-Content -LiteralPath 'codex-probe.txt' -Value 'ok' -NoNewline\"","aggregated_output":"","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"done"}}
+{"type":"turn.completed","usage":{"input_tokens":35141,"cached_input_tokens":24576,"cache_write_input_tokens":0,"output_tokens":76,"reasoning_output_tokens":0}}
+{"type":"thread.started","thread_id":"01a0b7df-96f0-77d0-8367-d14ef7fd9af2"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll update the file using apply_patch."}}
+{"type":"item.started","item":{"id":"item_1","type":"file_change","changes":[{"path":"C:\\Users\\Dave.MAQUOKETA\\AppData\\Local\\Temp\\parlay-chat-probe\\codex-probe.txt","kind":"update"}],"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"file_change","changes":[{"path":"C:\\Users\\Dave.MAQUOKETA\\AppData\\Local\\Temp\\parlay-chat-probe\\codex-probe.txt","kind":"update"}],"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"patched"}}
+{"type":"turn.completed","usage":{"input_tokens":70630,"cached_input_tokens":59648,"cache_write_input_tokens":0,"output_tokens":160,"reasoning_output_tokens":0}}

@@ -283,7 +283,9 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 
 // Studio's own link, started from the home folder: a window opened with openExternal inherits Parlay's working
 // directory (the app folder) and holds it until it closes, which then blocks reinstalling Parlay with EBUSY.
+// (Windows only; elsewhere the app bundle is not a folder anyone reinstalls over, so openExternal is fine.)
 function openStudio(url: string) {
+	if (process.platform !== "win32") { void vscode.env.openExternal(vscode.Uri.parse(url)); return; }
 	spawn("cmd.exe", ["/d", "/c", "start", "", url], { cwd: os.homedir(), detached: true, stdio: "ignore", windowsHide: true }).unref();
 }
 

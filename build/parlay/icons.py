@@ -74,6 +74,8 @@ if __name__ == "__main__":
     mark.resize((256, 256), Image.LANCZOS).save(os.path.join(WIN32, "code.ico"), format="ICO", sizes=[(n, n) for n in sizes])
     mark.resize((70, 70), Image.LANCZOS).save(os.path.join(WIN32, "code_70x70.png"))
     mark.resize((150, 150), Image.LANCZOS).save(os.path.join(WIN32, "code_150x150.png"))
+    # macOS: the app bundle icon (build/lib/electron.ts points at it); Pillow writes every icns size from this master
+    mark.resize((1024, 1024), Image.LANCZOS).save(os.path.join(ROOT, "resources", "darwin", "code.icns"), format="ICNS")
     for pct in (100, 125, 150, 175, 200, 225, 250):
         s = pct / 100
         on_plate(mark, (round(164 * s), round(314 * s)), round(96 * s), top=round(40 * s)).save(os.path.join(WIN32, f"inno-big-{pct}.bmp"))

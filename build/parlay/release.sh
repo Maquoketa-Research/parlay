@@ -57,6 +57,16 @@ node -e "const [url,name,version,hash,timestamp,sha256hash]=process.argv.slice(1
   "$URL" "$VERSION" "$COMMIT" "$SHA1" "$TIMESTAMP" "$SHA256" > "$MANIFEST"
 cat "$MANIFEST"
 
+# macOS: the tag push above starts .github/workflows/mac.yml, which builds the zip on a hosted Mac and puts its
+# manifest on this release as latest-darwin-<arch>.json. Whatever is there (or already in .build/parlay) becomes
+# updates/<quality>/darwin/<arch>/latest.json in the same commit; re-run release.sh once the Mac build has finished.
+[[ -n "$DRY" ]] || gh release download "$TAG" --repo "$REPO" --pattern 'latest-darwin-*.json' --dir .build/parlay --clobber 2>/dev/null || true
+for f in .build/parlay/latest-darwin-*.json; do
+  [[ -f "$f" ]] || continue
+  DARWIN="updates/$QUALITY/darwin/$(basename "${f%.json}" | sed 's/^latest-darwin-//')/latest.json"
+  mkdir -p "$(dirname "$DARWIN")"; cp "$f" "$DARWIN"; echo "== $DARWIN  <- $(basename "$f")"
+done
+
 if [[ -n "$DRY" ]]; then
   echo "== dry run: skipped gh release create/upload $TAG and the commit, mirror and push of $MANIFEST"
   exit 0
@@ -64,6 +74,8 @@ fi
 
 echo "== commit on main, mirror onto parlay, push as GitHub main"
 git add "$MANIFEST"
+[[ -d "updates/$QUALITY/darwin" ]] && git add "updates/$QUALITY/darwin"
+git diff --cached --quiet && { echo "== nothing new to commit: the manifests already say this"; exit 0; }
 git commit -q -m "Release Parlay $VERSION" -m "$URL"
 P="$(git commit-tree "HEAD^{tree}" -p parlay -m "$(git log -1 --format=%B HEAD)")"
 git branch -f parlay "$P"

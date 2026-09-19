@@ -76,7 +76,7 @@ export function send(line: string) {
 const state = (): State => ctx.workspaceState.get<State>("agents") ?? { agent: "claude" };
 const cwd = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 const cfg = (k: string, d: string) => vscode.workspace.getConfiguration("parlay").get<string>(k, d);
-const argsOf = (a: Agent) => cfg(a === "claude" ? "claudeArgs" : "codexArgs", DEFAULT_ARGS[a]).split(/\s+/).filter(Boolean);
+export const argsOf = (a: Agent) => cfg(a === "claude" ? "claudeArgs" : "codexArgs", DEFAULT_ARGS[a]).split(/\s+/).filter(Boolean);
 
 function refresh() {
 	const a = active();
@@ -138,11 +138,15 @@ function options(s: State, a: Agent, prompt?: string): vscode.TerminalOptions {
 	// No CLI on this machine: a terminal that cannot start is a terminal that never opens (the tester saw exactly
 	// that), so open a plain PowerShell that says what is missing and offer the official installer.
 	if (!onPath(exe(a))) {
-		const name = NAMES[a], install = a === "claude" ? "irm https://claude.ai/install.ps1 | iex" : "npm install -g @openai/codex";
-		void vscode.window.showWarningMessage(`${name} is not installed on this machine, so the agent terminal opened as PowerShell. Install it?`, `Install ${name}`).then((pick) => {
+		const win = process.platform === "win32", sh = process.env.SHELL || "/bin/zsh";
+		const name = NAMES[a], install = a === "claude" ? (win ? "irm https://claude.ai/install.ps1 | iex" : "curl -fsSL https://claude.ai/install.sh | bash") : "npm install -g @openai/codex";
+		void vscode.window.showWarningMessage(`${name} is not installed on this machine, so the agent terminal opened as ${win ? "PowerShell" : "a plain shell"}. Install it?`, `Install ${name}`).then((pick) => {
 			if (pick && term) type(term, install);
 		});
-		return { name, cwd: ws, shellPath: "powershell.exe", shellArgs: ["-NoLogo", "-NoExit", "-Command", `Write-Host '${name} is not installed. Install it with:  ${install}' -ForegroundColor Yellow`], iconPath: new vscode.ThemeIcon(ICON[a]), color: new vscode.ThemeColor(COLOR[a]) };
+		const note = `${name} is not installed. Install it with:  ${install}`;
+		const shell = win ? { shellPath: "powershell.exe", shellArgs: ["-NoLogo", "-NoExit", "-Command", `Write-Host '${note}' -ForegroundColor Yellow`] }
+			: { shellPath: sh, shellArgs: ["-c", `echo '${note}'; exec ${sh}`] };
+		return { name, cwd: ws, ...shell, iconPath: new vscode.ThemeIcon(ICON[a]), color: new vscode.ThemeColor(COLOR[a]) };
 	}
 	const resume = !!old && !!(a === "claude" ? ws && claudeTranscript(ws, old.id) : old.file && fs.existsSync(old.file));
 	let shellArgs: string[];
@@ -175,7 +179,7 @@ function end(t: vscode.Terminal, a: Agent) {
 // on. Ponytail full: its plugin's SessionStart hook reads ~/.claude/.ponytail-active, so that file is set to
 // "full" when the plugin is installed. Caveman lite: the skill text is inlined with the level pinned (it has
 // no persistence of its own). Written fresh on each launch into Parlay's global storage.
-function writeBrief(): string | undefined {
+export function writeBrief(): string | undefined {
 	try {
 		const claude = path.join(os.homedir(), ".claude");
 		const read = (f: string) => { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } };
@@ -193,7 +197,7 @@ function writeBrief(): string | undefined {
 	} catch { return undefined; }
 }
 
-const BRIEF_CORE = `# Parlay
+export const BRIEF_CORE = `# Parlay
 
 You are running inside Parlay, Maquoketa Research's editor for Roblox game development (a VS Code fork). The user is a game developer working on a live Roblox place.
 
@@ -278,14 +282,14 @@ function writeHandoff(from: Agent, sess: Session, body: string, ws: string) {
 // Which executable: parlay.claudeCommand as is. codex.exe is on no PATH here (the Codex desktop app keeps it under
 // %LOCALAPPDATA%\OpenAI\Codex\bin\<hash>\), so parlay.codexCommand wins when it resolves, else the newest one the app installed.
 // is `cmd` runnable as a terminal process: an absolute path that exists, or a name found on PATH
-function onPath(cmd: string): boolean {
+export function onPath(cmd: string): boolean {
 	if (path.isAbsolute(cmd)) return fs.existsSync(cmd);
 	const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
 	return dirs.some((d) => ["", ".exe", ".cmd"].some((x) => fs.existsSync(path.join(d, cmd + x))));
 }
 export const claudeInstalled = () => onPath(cfg("claudeCommand", "claude"));
 
-function exe(a: Agent): string {
+export function exe(a: Agent): string {
 	if (a === "claude") return cfg("claudeCommand", "claude");
 	const set = cfg("codexCommand", "codex");
 	if (onPath(set)) return set;

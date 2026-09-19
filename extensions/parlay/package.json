@@ -182,6 +182,30 @@
         "command": "parlay.aqua.landing",
         "title": "Show the Aqua pairing page",
         "category": "Parlay"
+      },
+      {
+        "command": "parlay.chat.open",
+        "title": "Open chat",
+        "category": "Parlay",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "parlay.chat.new",
+        "title": "New chat",
+        "category": "Parlay",
+        "icon": "$(add)"
+      },
+      {
+        "command": "parlay.chat.useClaude",
+        "title": "Chat: continue in Claude",
+        "category": "Parlay",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "parlay.chat.useGpt",
+        "title": "Chat: continue in GPT",
+        "category": "Parlay",
+        "icon": "$(hubot)"
       }
     ],
     "keybindings": [
@@ -269,6 +293,21 @@
       ],
       "view/title": [
         {
+          "command": "parlay.chat.new",
+          "when": "view == parlay.chat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "parlay.chat.useGpt",
+          "when": "view == parlay.chat && parlay.chat.agent == claude",
+          "group": "navigation@2"
+        },
+        {
+          "command": "parlay.chat.useClaude",
+          "when": "view == parlay.chat && parlay.chat.agent == gpt",
+          "group": "navigation@2"
+        },
+        {
           "command": "parlay.agents.open",
           "when": "view == terminal && !parlay.agentRunning",
           "group": "navigation@1"
@@ -303,6 +342,11 @@
     "viewsContainers": {
       "secondarySidebar": [
         {
+          "id": "parlay-chat",
+          "title": "Chat",
+          "icon": "media/chat.svg"
+        },
+        {
           "id": "parlay-aqua",
           "title": "Aqua",
           "icon": "media/aqua.png"
@@ -320,6 +364,13 @@
       ]
     },
     "views": {
+      "parlay-chat": [
+        {
+          "type": "webview",
+          "id": "parlay.chat",
+          "name": "Chat"
+        }
+      ],
       "parlay-aqua": [
         {
           "id": "parlay.aqua.issues",
@@ -541,7 +592,7 @@
   "scripts": {
     "compile": "gulp compile-extension:parlay-ide",
     "watch": "gulp watch-extension:parlay-ide",
-    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs && node --no-warnings tools/aqua-check.mjs"
+    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs && node --no-warnings tools/aqua-check.mjs && node --no-warnings tools/chat-check.mjs"
   },
   "devDependencies": {
     "@types/node": "24.x",

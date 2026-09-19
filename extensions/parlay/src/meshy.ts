@@ -63,7 +63,7 @@ export class MeshyView implements vscode.WebviewViewProvider {
 	}
 
 	private cfg<T>(k: string, d: T): T { return vscode.workspace.getConfiguration("parlay").get<T>(k, d); }
-	private ws(): string { return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.join(process.env.USERPROFILE ?? ".", "Documents"); }
+	private ws(): string { return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.join(process.env.USERPROFILE ?? process.env.HOME ?? ".", "Documents"); }
 	private assetsRoot(): string { const d = path.join(this.ws(), this.cfg("assetsDir", "assets/meshy")); fs.mkdirSync(d, { recursive: true }); return d; }
 
 	// ---- the view ----------------------------------------------------------------------------------

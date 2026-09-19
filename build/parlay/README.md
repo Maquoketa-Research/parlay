@@ -6,12 +6,14 @@ prepack/packing split and the vsix built-ins).
 | File | What |
 | --- | --- |
 | `build-win32.sh` | Parlay app folder and user installer for Windows x64; stamps the version into the build tree only; writes a `.json` sidecar next to the installer for `release.sh` |
-| `release.sh` | GitHub release `v<version>` with the installer, then the update manifest `updates/stable/win32/x64/user/latest.json` committed on `main` and mirrored to GitHub; `--dry-run` skips gh and git |
-| `fetch-builtins.sh` | luau-lsp and StyLua from Open VSX, Selene via `selene-vsix.sh`, into `build/builtin/`; stamps their sha256 into `product.json` for the build |
+| `build-darwin.sh` | Parlay.app for macOS (arm64 default, `VSCODE_ARCH=x64` for Intel), ad-hoc signed, as a zip and a DMG in `.build/parlay/`, plus its update manifest `latest-darwin-<arch>.json`; runs on the hosted Mac of `.github/workflows/mac.yml` (see macOS below) |
+| `release.sh` | GitHub release `v<version>` with the installer, then the update manifest `updates/stable/win32/x64/user/latest.json` (and any darwin manifest the Mac workflow put on the release) committed on `main` and mirrored to GitHub; `--dry-run` skips gh and git |
+| `fetch-builtins.sh` | luau-lsp (for `VSIX_TARGET`, default `win32-x64`) and StyLua from Open VSX, Selene via `selene-vsix.sh`, into `build/builtin/`; stamps their sha256 into `product.json` for the build |
 | `selene-vsix.sh` | builds the Selene extension from source (it is not on Open VSX) |
 | `license-rtf.sh` | `LICENSE.rtf` for the Inno installer |
 | `sign.sh`, `sign.ps1` | Authenticode signing (below); `sign.sh` is the Git Bash entry, `sign.ps1` does the work and is also what Inno Setup calls for the setup exe and the uninstaller |
 | `icons.py`, `logo.png` | the spade as `.ico`, tiles and installer bitmaps in `resources/win32`, the in-app icon `src/vs/workbench/browser/media/code-icon.svg`, the title-bar data URIs in `style.css`, the empty-editor letterpress SVGs |
+| `icons.py`, `logo.png` | the spade as `.ico`, tiles and installer bitmaps in `resources/win32`, the Mac bundle icon `resources/darwin/code.icns`, the in-app icon `src/vs/workbench/browser/media/code-icon.svg`, the title-bar data URIs in `style.css`, the empty-editor letterpress SVGs |
 | `shots.ps1` | launches the built app once per theme on the sample workspace and captures it |
 
 ## Releasing
@@ -117,3 +119,58 @@ $env:PARLAY_SIGN_THUMBPRINT = $c.Thumbprint          # then build, or bash build
 Get-AuthenticodeSignature <file>                     # SignerCertificate CN=Parlay Test, Status UnknownError: expected
 Remove-Item "Cert:\CurrentUser\My\$($c.Thumbprint)"
 ```
+## macOS
+
+Nobody here has a Mac, so the Mac build is a GitHub Actions job: `.github/workflows/mac.yml` runs
+`build/parlay/build-darwin.sh` on a hosted runner (`macos-14`, Apple silicon; `macos-15-intel` when `arch` is
+`x64`). It starts on every `v*` tag, so `release.sh` starting the Windows release starts the Mac one, and by hand
+from Actions > Parlay (macOS) > Run workflow (inputs: `arch`, and `release` to upload to the GitHub release
+`v<version>`, created when missing). Repository secrets it reads, both optional: `PARLAY_ROBLOX_CLIENT_SECRET`
+and `PARLAY_DISCORD_CLIENT_SECRET`, the same one-liners as `~/.parlay/<provider>-client-secret` on the Windows
+build box; without them the build has no OAuth login. Untimed yet (the Windows job takes about two hours); the
+artifact `Parlay-darwin-<arch>` holds:
+
+- `Parlay-darwin-<arch>-<version>.zip`: `Parlay.app` zipped with `ditto --keepParent`, the shape Electron's
+  updater installs from, and what the update manifest points at.
+- `Parlay-darwin-<arch>-<version>.dmg`: the same app with an Applications shortcut, for people who expect a DMG.
+- `latest-darwin-<arch>.json`: the update manifest for that zip (`updates/stable/darwin/<arch>/latest.json`).
+
+The gulp tasks are the darwin twins of the Windows ones (`vscode-min-prepack`, then
+`vscode-darwin-<arch>-min-packing`, both in `build/gulpfile.vscode.ts`), after `policyGenerator ... darwin`;
+`fetch-builtins.sh` takes the `darwin-<arch>` luau-lsp vsix (`VSIX_TARGET`), StyLua and Selene are
+platform-independent and Selene is still built from source (Node only, no Rust).
+
+**Opening it.** The app is ad-hoc signed (`codesign --sign -`: Apple silicon runs no arm64 code without some
+signature, and gulp's edits had broken the seal Electron ships with) but not Developer ID signed or notarized, so
+Gatekeeper refuses the first open of a downloaded copy. Either clear the download flag,
+`xattr -dr com.apple.quarantine /Applications/Parlay.app`, or open once, then System Settings > Privacy &
+Security > **Open Anyway** (on macOS 14 and older, right-click > Open also works).
+
+**Updates.** A Mac Parlay asks `${updateUrl}/stable/darwin/<arch>/latest.json` (`createUpdateURL` in
+`src/vs/platform/update/electron-main/abstractUpdateService.ts`, `process.arch`, no target segment) and compares
+`productVersion` with its own, like Windows. When newer, `updateService.darwin.ts` hands the same URL to
+Electron's `autoUpdater` (Squirrel.Mac), which reads the manifest's `url` and installs the zip in place. Squirrel
+only installs a zip whose app carries the same Developer ID as the running one, so **until Parlay is signed the
+Mac build cannot update itself**: the check runs, the download fails with a code-signature error, and only Help >
+Check for Updates shows it. The manifest is still right for that day; until then the `updates/stable/darwin/`
+manifests are informational and people download the new zip themselves.
+
+**Releasing.** `release.sh` creates the tag, the Mac build follows, and the workflow's `release` job uploads the
+zip, the DMG and `latest-darwin-<arch>.json` to that release. Once it is done, on local `main`,
+`bash build/parlay/release.sh` again: it finds nothing new to upload, downloads the darwin manifest from the
+release, writes `updates/stable/darwin/<arch>/latest.json` and commits and mirrors it like the Windows one. Intel:
+Run workflow with `arch` `x64` and `release` on, then the same re-run.
+
+**Signing later.** An Apple Developer Program membership gives a Developer ID Application certificate; exported
+as a `.p12` and stored as a secret, the job would import it into a temporary keychain, sign with upstream's
+`build/darwin/sign.ts` (hardened runtime, the entitlements in `build/azure-pipelines/darwin/*-entitlements.plist`),
+submit the zip with `xcrun notarytool submit --wait` and staple the ticket (`xcrun stapler staple`); VSCodium's
+`build/osx/prepare_assets.sh` is a working model of exactly those steps. That removes the Gatekeeper prompt and
+lets Squirrel install updates.
+
+**Not done yet on Mac.** The extension activates cleanly (its Windows-only paths are behind `process.platform`
+checks or `LOCALAPPDATA` guards) but Studio integration is Windows-shaped: Studio's local plugins live in
+`~/Documents/Roblox/Plugins` on a Mac (the luau-lsp and Aqua plugin installers look in `%LOCALAPPDATA%\Roblox\Plugins`),
+the Studio MCP is started through `%LOCALAPPDATA%\Roblox\mcp.bat` and the Script Sync record and open-Studio list are
+read from the registry and PowerShell, and the Codex fallback looks for `codex.exe`. Each says so instead of
+failing, and each is a follow-up.

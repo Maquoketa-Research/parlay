@@ -19,6 +19,7 @@ import { addStudioProject } from "./studio";
 import { installStudioPlugin } from "./studioPlugin";
 import { registerAccounts } from "./accounts";
 import { registerAgents, send } from "./agents";
+import { registerChat } from "./chat";
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
 const GLASS_THEME = "Parlay Glass";
@@ -26,6 +27,7 @@ const LUAU = [{ language: "luau" }, { language: "lua" }, { pattern: "**/*.luau" 
 
 export function activate(ctx: vscode.ExtensionContext) {
 	registerAgents(ctx);   // the agent terminal every send() below types into
+	registerChat(ctx);     // the Chat tab: the same two agents headless, one transcript (chat.ts)
 	for (const key of ACTIONS) {
 		ctx.subscriptions.push(vscode.commands.registerCommand(`parlay.claude.${key}`, (range?: vscode.Range) => runSkill(ctx, key, range)));
 	}
