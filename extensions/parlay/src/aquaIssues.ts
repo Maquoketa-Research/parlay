@@ -84,11 +84,14 @@ class AquaIssues implements vscode.TreeDataProvider<Row> {
 
 	private async doLoad() {
 		if (!root()) { this.rows = []; this.set("noGame"); return; }
-		const placeId = await this.placeId();
+		let placeId = await this.placeId();
 		const r = await api("GET", "/api/games");
 		if (r.status === 401) { this.set("signIn"); return; }
 		if (!r.ok) { this.set("unreachable"); return; }
-		const game = placeId ? gameForPlace(r.data.games ?? [], placeId) : undefined;
+		const games: Game[] = r.data.games ?? [];
+		let game = placeId ? gameForPlace(games, placeId) : undefined;
+		// a remembered place that Aqua has no game for may be a stale answer: work it out once more
+		if (!game && this.ctx.workspaceState.get("aquaPlaceId")) { await this.forget(); placeId = await this.placeId(); game = placeId ? gameForPlace(games, placeId) : undefined; }
 		if (!game) { log.appendLine(`Aqua issues: no game for place ${placeId ?? "(unknown)"} among ${(r.data.games ?? []).length} game(s)`); this.rows = []; this.set("noGame"); return; }
 		this.game = game;
 		const s = await api("GET", `/api/state?game=${encodeURIComponent(game.slug)}`);
