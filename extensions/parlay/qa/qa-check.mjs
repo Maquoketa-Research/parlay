@@ -36,7 +36,7 @@ let runs = 0;
 const run = (env, ...extra) => new Promise((resolve) => {
 	const out = path.join(tmp, String(++runs));
 	const child = spawn(process.execPath, [path.join(here, "play.mjs"), "--place", "90044978600719", "--minutes", "0.2", "--steps", "30", "--pace-ms", "0", "--out", out, ...extra],
-		{ env: { ...process.env, PARLAY_QA_MCP: "mock", PARLAY_QA_POLICY: "", PARLAY_TYPESAFE_API_KEY: "", ...env } });
+		{ env: { ...process.env, PARLAY_QA_MCP: "mock", PARLAY_QA_POLICY: "", PARLAY_TYPESAFE_API_KEY: "", PARLAY_QA_CHRRXS_URL: "off", ...env } });   // off: a check never reaches a real bridge
 	let stdout = "", stderr = "";
 	child.stdout.on("data", (d) => { stdout += d; });
 	child.stderr.on("data", (d) => { stderr += d; });
@@ -151,9 +151,9 @@ bridge.close();
 // ---- the Jev policy against a mock TypeSafe -----------------------------------------------------------------
 // Answers the exact shape the live POST /v1/systemone gave on 2026-09-20 (model pinned, noul answers carry only
 // noul, choice answers carry choice, confidence, probabilities): picks click_1 (the second button; the scripted
-// policy would take the first) while offered, else walk_S; "looks wrong" and "stuck" high only once the runner
-// says the player is stuck (from step 11 on), so the suspect lands on a step without a console error. A key
-// other than "good" gets a 401. Nothing here reaches the real API.
+// policy would take the first) while offered, else walk_S; "stuck" high once five steps changed nothing (step 11 on),
+// "looks wrong" high at two unchanged steps (step 8, no console error: the suspect) and from five on (no suspect:
+// those are the stuck event). A key other than "good" gets a 401. Nothing here reaches the real API.
 const seen = [];
 const jev = http.createServer((req, res) => {
 	let body = "";
@@ -168,7 +168,7 @@ const jev = http.createServer((req, res) => {
 		res.setHeader("Content-Type", "application/json");
 		res.end(JSON.stringify({ model: "jev-1.13.0", answers: {
 			next: { type: "choice", choice, confidence: 0.8, probabilities: Object.fromEntries(offered.map((k) => [k, k === choice ? 0.6 : 0.4 / (offered.length - 1)])) },
-			stuck: noul(b.state.stuck ? 0.9 : 0.1), noEffect: noul(0.2), looksWrong: noul(b.state.stuck ? 0.9 : 0.1),
+			stuck: noul((b.state.stepsWithoutChange ?? 0) >= 5 ? 0.9 : 0.1), noEffect: noul(0.2), looksWrong: noul([2, 5].includes(b.state.stepsWithoutChange) ? 0.9 : 0.1),
 		}, usage: { input_tokens: 443, output_tokens: 61 } }));
 	});
 });
@@ -184,7 +184,7 @@ assert.ok(seen.length, `no request reached the mock:\n${j.stdout}`);
 assert.equal(seen[0].model, "jev-latest");
 assert.deepEqual(seen[0].state.buttonsOnScreen, ["Buy", "Menu"]);
 assert.deepEqual(seen[0].state.interactablesNearby, ["ProximityPrompt Prompt at 8 studs", "ClickDetector ClickDetector at 16 studs"]);
-assert.equal(seen[0].state.stuck, false);
+assert.equal(seen[0].state.stepsWithoutChange, 0);
 assert.deepEqual(Object.keys(seen[0].questions.next.criteria).sort(), ["click_0", "click_1", "explore", "interact_0", "interact_1", "walk_A", "walk_D", "walk_S", "walk_W"]);
 assert.deepEqual(Object.keys(seen[0].questions).sort(), ["looksWrong", "next", "noEffect", "stuck"]);
 assert.ok(Object.values(seen[0].questions).every((q) => q.type === "choice" || (q.type === "noul" && q.criteria.true && q.criteria.false)));
@@ -198,19 +198,19 @@ assert.equal(first.action.jev.confidence, 0.8);
 assert.deepEqual([second.action.kind, second.action.key, second.action.jump], ["walk", "S", true]);
 assert.ok(jr.actions.slice(1).every((h) => h.action.kind === "walk" && h.action.key === "S"), "walk_S once click_1 is used up");
 // once stuck, only walks are offered and the identical state is answered from the cache, not the mock
-const stuckReq = seen.find((b) => b.state.stuck);
+const stuckReq = seen.find((b) => b.state.stepsWithoutChange >= 5);
 assert.ok(stuckReq && Object.keys(stuckReq.questions.next.criteria).every((k) => k === "explore" || k.startsWith("walk_")));
 assert.ok(seen.length < jr.steps, `${seen.length} requests for ${jr.steps} steps: the cache answered the frozen steps`);
-// the suspect: step 11 is the first the runner calls stuck, the console froze at step 5, so no error accompanies it
-assert.ok(jr.suspects.length >= 1, "a suspect finding");
-assert.equal(jr.suspects[0].step, 11);
+// the suspect: step 8 (two unchanged steps, the console froze at step 5, so no error accompanies it); the frozen steps from 11 on are the stuck event, not suspects
+assert.equal(jr.suspects.length, 1, "one suspect; stuck steps are not suspects");
+assert.equal(jr.suspects[0].step, 8);
 assert.equal(jr.suspects[0].probability, 0.9);
-assert.equal(jr.suspects[0].screenshot, "suspect-step-11.png");
-assert.ok(fs.existsSync(path.join(j.out, "suspect-step-11.png")));
+assert.equal(jr.suspects[0].screenshot, "suspect-step-8.png");
+assert.ok(fs.existsSync(path.join(j.out, "suspect-step-8.png")));
 assert.equal(jr.suspects[0].actionsBefore.length, 5);
 assert.equal(jr.errors.length, 1, "the console error is still one group, not a suspect");
 const jmd = fs.readFileSync(path.join(j.out, "report.md"), "utf8");
-assert.ok(jmd.includes(`## Suspects (${jr.suspects.length})`) && jmd.includes("### step 11: 90% looks wrong; screenshot suspect-step-11.png"));
+assert.ok(jmd.includes(`## Suspects (${jr.suspects.length})`) && jmd.includes("### step 8: 90% looks wrong; screenshot suspect-step-8.png"));
 assert.ok(!md.includes("## Suspects"), "the scripted report has no suspects section");
 assert.match(j.stdout, /jev wrong 0\.90; suspect/);
 assert.ok(!j.stdout.includes("good"), "the key stays out of the log");

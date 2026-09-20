@@ -35,6 +35,8 @@ const json = (text) => { try { return JSON.parse(text); } catch { return {}; } }
 const last = (s) => s.trim().split("\n").pop() ?? "";
 
 export async function connect({ timeoutMs = 30000 } = {}) {
+	// "off": no fallback at all (the checks: a test run must never reach a real bridge and a real Studio)
+	if (process.env.PARLAY_QA_CHRRXS_URL === "off") throw new Error("the Chrrxs fallback is off (PARLAY_QA_CHRRXS_URL=off)");
 	let child, err = "";
 	if (!(await health())) {
 		// nobody runs the server: start it. stdin stays open (the MCP stdio transport exits on EOF); a shell, since
@@ -74,11 +76,13 @@ export async function connect({ timeoutMs = 30000 } = {}) {
 		if (body.isError) throw new Error(`${name}: ${textOf(body).slice(0, 500)}`);
 		return body;
 	}
-	// the plugin's Luau envelope { success, returnValue, output, error } → the returned value as the text
+	// the plugin's Luau envelope → the returned value as the text. Edit-mode execute_luau answers
+	// { success, returnValue, output }, the runtime evals { success, result, output } (verified live, 3.1.5).
 	const unwrap = (name, body) => {
 		const d = json(textOf(body));
 		if (d.success === false) throw new Error(`${name}: ${d.error ?? "failed"}`);
-		return d.returnValue ?? (Array.isArray(d.output) && d.output.length ? d.output.join("\n") : textOf(body));
+		const value = d.returnValue ?? d.result;
+		return value !== undefined && value !== null ? value : Array.isArray(d.output) && d.output.length ? d.output.join("\n") : "";
 	};
 	let consoleText = "", cursor;
 	return {

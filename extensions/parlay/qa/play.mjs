@@ -219,7 +219,7 @@ export async function main(argv = process.argv.slice(2)) {
 			if (Date.now() - t0 > 60000) throw new Error(`Play did not start within 60 s: ${state.trim().replace(/\n/g, " | ")}`);
 		}
 		let lastConsole = (await call("get_console_output")).text;   // the whole log so far; new lines are whatever grows past it
-		let lastError = null, lastPos = "", lastGui = "", streak = 0, recent = [];   // recent: the last console lines, for the policy
+		let lastError = null, lastPos = "", lastGui = "", streak = 0, recent = [], warnedProbe = 0;   // recent: the last console lines, for the policy
 		const deadline = Date.now() + minutes * 60000, history = report.actions;
 		for (let step = 1; step <= maxSteps && Date.now() < deadline && !stopAsked(); step++) {
 			report.steps = step;
@@ -228,7 +228,8 @@ export async function main(argv = process.argv.slice(2)) {
 			report.placeVersion ??= server.placeVersion;
 			report.player ??= server.player && { name: server.player.name, userId: server.player.userId };
 			for (const b of client.buttons ?? []) report.gui.seen[b.path] ??= b.text;
-			const action = await decide({ server, client, stuck: streak >= 5, console: recent }, history);
+			if (!server.player && !warnedProbe++) log(`the server probe returned no player (${JSON.stringify(server).slice(0, 160)}); movement and stuck detection are off until it does`);
+			const action = await decide({ server, client, stuck: streak >= 5, still: streak, console: recent }, history);
 			const entry = { step, t: new Date().toISOString(), action, position: server.player?.position, health: server.player?.health, leaderstats: server.leaderstats };
 			entry.result = await act(call, action, client.viewport, mcp.pixels).catch((e) => `failed: ${e.message}`);
 			if (action.kind === "click" && !report.gui.clicked.includes(action.path)) report.gui.clicked.push(action.path);
@@ -257,13 +258,13 @@ export async function main(argv = process.argv.slice(2)) {
 			}
 			report.console.lines += newLines.length;
 			// stuck: nothing moved, nothing logged, nothing on screen changed, five steps running; one event per streak
-			const pos = JSON.stringify((server.player?.position ?? []).map(Math.round));
+			const pos = server.player?.position ? JSON.stringify(server.player.position.map(Math.round)) : null;
 			const gui = (client.buttons ?? []).map((b) => b.path).sort().join("|");
-			streak = pos === lastPos && gui === lastGui && newLines.length === 0 ? streak + 1 : 0;
+			streak = pos !== null && pos === lastPos && gui === lastGui && newLines.length === 0 ? streak + 1 : 0;
 			lastPos = pos; lastGui = gui;
 			if (streak === 5) report.stuck.push({ step, position: server.player?.position, state: server.player?.state, actions: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
 			// suspect: Jev confident that something looks wrong, with no console error to pin it on (the 0.7 is code, not Jev's)
-			const wrong = action.jev?.flags?.looksWrong ?? 0, suspect = wrong >= 0.7 && !errorLines;
+			const wrong = action.jev?.flags?.looksWrong ?? 0, suspect = wrong >= 0.7 && !errorLines && streak < 5;
 			let file;
 			if (newGroups || suspect || step % 10 === 0) file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : suspect ? `suspect-step-${step}` : `step-${step}`);
 			if (newGroups) for (const e of report.errors.slice(-newGroups)) e.screenshot = file;
