@@ -19,6 +19,7 @@ import { registerAccounts } from "./accounts";
 import { registerProjectToolbar } from "./projectToolbar";
 import { registerAgents } from "./agents";
 import { registerChat } from "./chat";
+import { registerQa } from "./qa";
 
 let sendToChat: ReturnType<typeof registerChat>;
 
@@ -71,6 +72,8 @@ export function activate(ctx: vscode.ExtensionContext) {
 		await dispatchSkill(ctx, `/parlay-insert-asset ${clean(id.trim())}`);
 	}));
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.sonar", new UrlView("sonarUrl", "Sonar")));
+	// QA: the play runner against an open Studio place, its findings with Fix with Claude (qa.ts)
+	registerQa(ctx, async (line) => { await dispatchSkill(ctx, line); });
 	// Accounts: every login and key on one page (the account in the header opens it)
 	registerAccounts(ctx);
 	if (!ctx.globalState.get("firstRunDone")) {

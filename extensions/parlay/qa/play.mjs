@@ -1,9 +1,13 @@
 // Parlay's QA play runner: drives Roblox Studio through Roblox's own Studio MCP server, plays a place with the
 // Studio test player, pokes at it (GUI buttons, prompts, a random walk), harvests console errors and stuck
 // states, and writes report.json + report.md, optionally posting the errors to Aqua's ingest.
-//   node qa/play.mjs --place <id> [--universe <u>] [--minutes 5] [--steps 400] [--pace-ms 500]
-//                    [--out .build/qa/<timestamp>] [--aqua-url <url> --aqua-key <key>]
-// --aqua-url/--aqua-key default to PARLAY_AQUA_URL / PARLAY_AQUA_KEY. PARLAY_QA_POLICY=jev picks policy-jev.mjs.
+//   node qa/play.mjs --place <id> [--universe <u>] [--minutes 5] [--steps 400] [--pace-ms 500] [--policy scripted|jev]
+//                    [--out .build/qa/<timestamp>] [--aqua-url <url> --aqua-key <key>] [--stop-file <path>]
+// --aqua-url/--aqua-key default to PARLAY_AQUA_URL / PARLAY_AQUA_KEY; --policy to PARLAY_QA_POLICY (jev loads
+// policy-jev.mjs). --stop-file is polled each step: the QA view creates it to stop Play cleanly (SIGINT is not
+// reliable on Windows). The run folder also gets stepsLog.jsonl, one line per step as it happens, for the view to tail.
+// A step where Jev flagged "looks wrong" at 0.7 or more without a console error is a suspect: screenshot, listed in
+// the report apart from the errors, no effect on the exit code.
 // Exit 0: clean. 2: findings (errors or stuck events). 1: runner failure (no Studio, seat taken, timeout).
 // PARLAY_QA_MCP=mock plays against qa/mock-mcp.mjs; qa/qa-check.mjs does that end to end.
 import { spawn } from "node:child_process";
@@ -138,6 +142,14 @@ function markdown(r) {
 	}
 	lines.push("", `## Stuck (${r.stuck.length})`);
 	for (const s of r.stuck) lines.push("", `### step ${s.step}: ${s.state ?? "?"} at ${JSON.stringify(s.position)}`, ...s.actions.map((h) => `- ${act(h)}`));
+	if (r.policy === "jev") {
+		lines.push("", `## Suspects (${(r.suspects ?? []).length})`, "", "Steps where Jev put \"something looks wrong for a player\" at 0.7 or more without a console error. Not counted in the exit code.");
+		for (const s of r.suspects ?? []) {
+			lines.push("", `### step ${s.step}: ${Math.round(s.probability * 100)}% looks wrong${s.screenshot ? `; screenshot ${s.screenshot}` : ""}`);
+			if (s.console?.length) lines.push("", "```", ...s.console, "```");
+			lines.push("", "Before:", ...s.actionsBefore.map((h) => `- ${act(h)}`));
+		}
+	}
 	const seen = Object.entries(r.gui.seen);
 	lines.push("", `## GUI: ${seen.length} buttons seen, ${r.gui.clicked.length} clicked`, ...seen.map(([p, t]) => `- ${r.gui.clicked.includes(p) ? "[x]" : "[ ]"} ${t} (${p})`));
 	lines.push("", `## Aqua: ${r.aqua ?? "not attempted"}`, "");
@@ -150,16 +162,20 @@ export async function main(argv = process.argv.slice(2)) {
 		place: { type: "string", default: "" }, universe: { type: "string", default: "" }, minutes: { type: "string", default: "5" },
 		steps: { type: "string", default: "400" }, "pace-ms": { type: "string", default: "500" }, out: { type: "string" },
 		"aqua-url": { type: "string", default: process.env.PARLAY_AQUA_URL ?? "" }, "aqua-key": { type: "string", default: process.env.PARLAY_AQUA_KEY ?? "" },
+		policy: { type: "string", default: process.env.PARLAY_QA_POLICY === "jev" ? "jev" : "scripted" }, "stop-file": { type: "string", default: "" },
 	} });
 	const minutes = parseFloat(a.minutes), maxSteps = parseInt(a.steps, 10), pace = parseInt(a["pace-ms"], 10);
 	const out = path.resolve(a.out ?? path.join(".build", "qa", new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)));
 	fs.mkdirSync(out, { recursive: true });
-	const { decide } = await import(process.env.PARLAY_QA_POLICY === "jev" ? "./policy-jev.mjs" : "./policy.mjs");
+	const { decide } = await import(a.policy === "jev" ? "./policy-jev.mjs" : "./policy.mjs");
 	const PROBE_SERVER = luau("probe.server.luau"), PROBE_CLIENT = luau("probe.client.luau");
-	const report = { place: a.place, universe: a.universe || undefined, studio: null, placeVersion: undefined, start: new Date().toISOString(), end: undefined, steps: 0,
-		actions: [], errors: [], stuck: [], gui: { seen: {}, clicked: [] }, console: { lines: 0, warnings: 0 }, aqua: undefined, failure: undefined, exitCode: 1 };
+	const report = { place: a.place, universe: a.universe || undefined, studio: null, placeVersion: undefined, policy: a.policy, start: new Date().toISOString(), end: undefined, steps: 0,
+		actions: [], errors: [], stuck: [], suspects: [], gui: { seen: {}, clicked: [] }, console: { lines: 0, warnings: 0 }, aqua: undefined, failure: undefined, exitCode: 1 };
 	let aborted = false;
 	process.on("SIGINT", () => { if (aborted) process.exit(1); aborted = true; log("Ctrl+C: stopping Play after this step (again to quit now)"); });
+	// the QA view's Stop: it creates this file, and the runner leaves the loop at the next step
+	const stopAsked = () => aborted || (a["stop-file"] && fs.existsSync(a["stop-file"]) && (log("stop file seen: stopping Play"), aborted = true));
+	const stepsLog = (line) => fs.appendFileSync(path.join(out, "stepsLog.jsonl"), JSON.stringify(line) + "\n");
 
 	let mcp, playing = false;
 	const call = (name, args, ms) => mcp.call(name, { studio_id: report.studio.id, ...args }, ms);
@@ -189,16 +205,16 @@ export async function main(argv = process.argv.slice(2)) {
 			if (Date.now() - t0 > 60000) throw new Error(`Play did not start within 60 s: ${state.trim().replace(/\n/g, " | ")}`);
 		}
 		let lastConsole = (await call("get_console_output")).text;   // the whole log so far; new lines are whatever grows past it
-		let lastError = null, lastPos = "", lastGui = "", streak = 0;
+		let lastError = null, lastPos = "", lastGui = "", streak = 0, recent = [];   // recent: the last console lines, for the policy
 		const deadline = Date.now() + minutes * 60000, history = report.actions;
-		for (let step = 1; step <= maxSteps && Date.now() < deadline && !aborted; step++) {
+		for (let step = 1; step <= maxSteps && Date.now() < deadline && !stopAsked(); step++) {
 			report.steps = step;
 			const server = parseJson((await call("execute_luau", { datamodel_type: "Server", code: PROBE_SERVER })).text);
 			const client = parseJson((await call("execute_luau", { datamodel_type: "Client", code: PROBE_CLIENT })).text);
 			report.placeVersion ??= server.placeVersion;
 			report.player ??= server.player && { name: server.player.name, userId: server.player.userId };
 			for (const b of client.buttons ?? []) report.gui.seen[b.path] ??= b.text;
-			const action = await decide({ server, client, stuck: streak >= 5 }, history);
+			const action = await decide({ server, client, stuck: streak >= 5, console: recent }, history);
 			const entry = { step, t: new Date().toISOString(), action, position: server.player?.position, health: server.player?.health, leaderstats: server.leaderstats };
 			entry.result = await act(call, action, client.viewport).catch((e) => `failed: ${e.message}`);
 			if (action.kind === "click" && !report.gui.clicked.includes(action.path)) report.gui.clicked.push(action.path);
@@ -208,11 +224,13 @@ export async function main(argv = process.argv.slice(2)) {
 			const fresh = now.startsWith(lastConsole) ? now.slice(lastConsole.length) : now;
 			lastConsole = now;
 			const newLines = fresh.split(/\r?\n/).filter((l) => l.trim());
-			let newGroups = 0;
+			recent = newLines.slice(-5);
+			let newGroups = 0, errorLines = 0;
 			for (const line of newLines) {
 				const kind = classify(line);
 				if (kind === "warning") report.console.warnings++;
 				if (kind !== "error") continue;
+				errorLines++;
 				if (isFrame(line) && lastError) { if (!lastError.trace.includes(line.trim())) lastError.trace.push(line.trim()); continue; }
 				const fp = fingerprint(line);
 				let err = report.errors.find((e) => e.fingerprint === fp);
@@ -230,11 +248,14 @@ export async function main(argv = process.argv.slice(2)) {
 			streak = pos === lastPos && gui === lastGui && newLines.length === 0 ? streak + 1 : 0;
 			lastPos = pos; lastGui = gui;
 			if (streak === 5) report.stuck.push({ step, position: server.player?.position, state: server.player?.state, actions: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
-			if (newGroups || step % 10 === 0) {
-				const file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : `step-${step}`);
-				if (newGroups) for (const e of report.errors.slice(-newGroups)) e.screenshot = file;
-			}
-			log(`step ${step}: ${describe(action)} → ${entry.result}; +${newLines.length} lines; ${report.errors.length} error groups${streak >= 5 ? "; stuck" : ""}`);
+			// suspect: Jev confident that something looks wrong, with no console error to pin it on (the 0.7 is code, not Jev's)
+			const wrong = action.jev?.flags?.looksWrong ?? 0, suspect = wrong >= 0.7 && !errorLines;
+			let file;
+			if (newGroups || suspect || step % 10 === 0) file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : suspect ? `suspect-step-${step}` : `step-${step}`);
+			if (newGroups) for (const e of report.errors.slice(-newGroups)) e.screenshot = file;
+			if (suspect) report.suspects.push({ step, probability: wrong, screenshot: file, console: recent, actionsBefore: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
+			stepsLog({ step, action, outcome: entry.result, newLines, errorGroups: report.errors.length, stuck: streak >= 5, screenshot: file });
+			log(`step ${step}: ${describe(action)} → ${entry.result}; +${newLines.length} lines; ${report.errors.length} error groups${streak >= 5 ? "; stuck" : ""}${action.jev ? `; jev wrong ${wrong.toFixed(2)}` : ""}${suspect ? "; suspect" : ""}`);
 			if (pace) await sleep(pace);
 		}
 		report.exitCode = report.errors.length || report.stuck.length ? 2 : 0;

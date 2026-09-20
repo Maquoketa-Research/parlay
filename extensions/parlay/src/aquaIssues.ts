@@ -242,7 +242,8 @@ function tooltip(r: Row, game?: Game): vscode.MarkdownString {
 // ---- files ----------------------------------------------------------------------------------------
 
 // The Script Sync file for an instance path: the layout rules first, then the name anywhere in the folder.
-async function resolveFile(loc: Loc): Promise<vscode.Uri | undefined> {
+// (Exported for the QA view, whose findings name scripts the same way.)
+export async function resolveFile(loc: Loc): Promise<vscode.Uri | undefined> {
 	const ws = root(); if (!ws) return undefined;
 	for (const rel of candidates(loc.path)) { const p = path.join(ws, ...rel.split("/")); if (fs.existsSync(p)) return vscode.Uri.file(p); }
 	const name = loc.path[loc.path.length - 1];
@@ -257,7 +258,7 @@ async function mirrorFile(rel: string): Promise<vscode.Uri | undefined> {
 	return (await vscode.workspace.findFiles(`**/${path.posix.basename(rel)}`, "**/node_modules/**", 2))[0];
 }
 
-async function reveal(uri: vscode.Uri, line: number) {
+export async function reveal(uri: vscode.Uri, line: number) {
 	const doc = await vscode.workspace.openTextDocument(uri);
 	const range = doc.lineAt(Math.min(Math.max(line, 1), doc.lineCount) - 1).range;
 	const ed = await vscode.window.showTextDocument(doc, { selection: range });

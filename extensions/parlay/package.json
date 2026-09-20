@@ -233,6 +233,33 @@
         "title": "Chat: continue in Codex",
         "category": "Parlay",
         "icon": "$(hubot)"
+      },
+      {
+        "command": "parlay.qa.run",
+        "title": "QA: play the open place",
+        "category": "Parlay",
+        "icon": "$(play)"
+      },
+      {
+        "command": "parlay.qa.stop",
+        "title": "QA: stop the run",
+        "category": "Parlay",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "parlay.qa.open",
+        "title": "Open QA",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.typesafe.setKey",
+        "title": "Set TypeSafe API key (Jev, the QA play policy)",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.aqua.setIngestKey",
+        "title": "Set Aqua ingest key (QA findings)",
+        "category": "Parlay"
       }
     ],
     "keybindings": [
@@ -353,6 +380,16 @@
           "command": "parlay.aqua.pair",
           "when": "view == parlay.aqua.issues",
           "group": "navigation@3"
+        },
+        {
+          "command": "parlay.qa.run",
+          "when": "view == parlay.qa && !parlay.qa.running",
+          "group": "navigation@1"
+        },
+        {
+          "command": "parlay.qa.stop",
+          "when": "view == parlay.qa && parlay.qa.running",
+          "group": "navigation@1"
         }
       ]
     },
@@ -377,6 +414,11 @@
           "id": "parlay-sonar",
           "title": "Sonar",
           "icon": "media/sonar.svg"
+        },
+        {
+          "id": "parlay-qa",
+          "title": "QA",
+          "icon": "media/qa.svg"
         }
       ]
     },
@@ -412,6 +454,13 @@
           "type": "webview",
           "id": "parlay.sonar",
           "name": "Sonar"
+        }
+      ],
+      "parlay-qa": [
+        {
+          "type": "webview",
+          "id": "parlay.qa",
+          "name": "QA"
         }
       ]
     },

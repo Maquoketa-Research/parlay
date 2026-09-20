@@ -318,6 +318,29 @@ step summary. The policy is `qa/policy.mjs`: `decide(state, history) → action`
 `{ server, client, stuck }` (the two probe JSONs), `history` the actions so far, and `action` one of
 `{ kind: "click", path }`, `{ kind: "interact", path, class, position }`, `{ kind: "walk", key, ms, jump }`.
 The default is scripted (unclicked button, else nearest unvisited interactable, else random walk);
-`PARLAY_QA_POLICY=jev` loads `policy-jev.mjs`. `node --no-warnings qa/qa-check.mjs` (in `npm run check`) plays
-the mock server (`PARLAY_QA_MCP=mock`) end to end.
+`--policy jev` (or `PARLAY_QA_POLICY=jev`) loads `policy-jev.mjs`. `node --no-warnings qa/qa-check.mjs` (in
+`npm run check`) plays the mock server (`PARLAY_QA_MCP=mock`) end to end, including a mock TypeSafe.
+
+**The Jev policy** (`qa/policy-jev.mjs`, TypeSafe's `POST /v1/systemone` over fetch, no SDK) sends one request
+per step: a small structured state (player, up to ten interactables with class and distance, the buttons on
+screen, the last five actions with outcomes, the last five console lines, stuck) with a `choice` over the actions
+the code enumerates (`click_<i>` per unvisited visible button, `interact_<i>` per unvisited nearby interactable,
+`walk_W/A/S/D`, `explore`; only walks when stuck) and three `noul` flags: the player appears stuck, the last
+action had no effect, something looks wrong for a player. The choice maps back to the runner's action, the flags
+ride on it as `action.jev`, and a step where "looks wrong" is 0.7 or more without a console error becomes a
+*suspect* (screenshot, its own report section, no effect on the exit code). Numbers and safety rules stay in
+code; Jev is literal and text-only. Any failure falls back to the scripted policy, logged once (401/422 for the
+rest of the run; 429/529 retried twice). The key: `PARLAY_TYPESAFE_API_KEY` (the QA view passes the key from
+SecretStorage this way), else the file `~/.parlay/typesafe-api-key` (one line), else `TYPESAFE_API_KEY`.
+
+**The QA view** (`src/qa.ts`, the QA container in Parlay's sidebar) runs the same runner from the editor: an
+open Studio place from `listStudios()` (or a typed place id), minutes, the policy (Jev when a key is stored, else
+scripted, with a Set TypeSafe key link), Run and Stop. The runner is a node child of Parlay writing
+`<globalStorage>/qa/<timestamp>/`, with `PARLAY_AQUA_URL` from the `parlay.aquaUrl` setting and
+`PARLAY_AQUA_KEY` from the Aqua ingest key on the Accounts page; the view tails `stepsLog.jsonl` (one line per
+step: action, outcome, new console lines, error count, screenshot) and, when the runner exits, shows the
+findings with Open in editor and Fix with Claude (`/parlay-fix` on the script and line the error names) and
+`report.md` rendered. Stop creates the runner's `--stop-file` (Play is stopped on the way out) and kills the
+process tree after 30 s if it is still there. Previous runs list from the same folder. The runner holds the
+Studio MCP seat while it plays, so no other MCP client can be connected to Studio on that machine.
 

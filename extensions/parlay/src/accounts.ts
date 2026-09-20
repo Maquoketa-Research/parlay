@@ -13,8 +13,9 @@ import type { Agent } from "./handoff";
 import { SCOPES as ROBLOX_SCOPES } from "./roblox-auth";
 
 type Msg = { cmd: string } | { clear: string } | { shell: string } | { agent: Agent; args: string[] };
-// icon: a codicon for the header menu; brand: a mark in media/brands for the page (CC0 from simpleicons, Meshy's favicon)
-interface Row { title: string; status: string; ok: boolean; note?: string; avatar?: string; icon: string; brand?: string; actions: { label: string; msg: Msg; quiet?: boolean }[] }
+// icon: a codicon for the header menu; brand: a mark in media/brands for the page (CC0 from simpleicons, Meshy's favicon);
+// mono: the monogram drawn when there is no mark (the title itself otherwise)
+interface Row { title: string; status: string; ok: boolean; note?: string; avatar?: string; icon: string; brand?: string; mono?: string; actions: { label: string; msg: Msg; quiet?: boolean }[] }
 
 export function registerAccounts(ctx: vscode.ExtensionContext) {
 	let panel: vscode.WebviewPanel | undefined;
@@ -80,9 +81,9 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 	const has = async (k: string) => !!(await ctx.secrets.get(k));
 	const claudeCmd = exe("claude");
 	// sessions and keys are milliseconds; the two CLI status calls are seconds, so they come from the cache below
-	const [roblox, discord, robloxKey, meshyKey, openaiKey] = await Promise.all([
+	const [roblox, discord, robloxKey, meshyKey, openaiKey, typesafeKey, aquaKey] = await Promise.all([
 		session("roblox", ROBLOX_SCOPES), session("discord", ["identify"]),
-		has("parlay.robloxApiKey"), has("parlay.meshyApiKey"), has("parlay.openaiApiKey"),
+		has("parlay.robloxApiKey"), has("parlay.meshyApiKey"), has("parlay.openaiApiKey"), has("parlay.typesafeApiKey"), has("parlay.aquaIngestKey"),
 	]);
 	void refreshCli(claudeCmd);
 	const { claude, codex } = cliState;
@@ -106,6 +107,16 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 		{
 			title: "Meshy", status: meshyKey ? "API key set" : "No API key", ok: meshyKey, note: "Turns approved concept images into meshes.", icon: "package", brand: "meshy.ico",
 			actions: keyActions("parlay.meshyApiKey", "parlay.meshy.setKey", meshyKey),
+		},
+		{
+			title: "TypeSafe", status: typesafeKey ? "API key set" : "No API key", ok: typesafeKey, icon: "beaker", mono: "TS",
+			note: "Jev, the QA runner's play policy: picks the player's next action and flags what looks wrong. Without a key the runner plays scripted.",
+			actions: keyActions("parlay.typesafeApiKey", "parlay.typesafe.setKey", typesafeKey),
+		},
+		{
+			title: "Aqua", status: aquaKey ? "Ingest key set" : "No ingest key", ok: aquaKey, icon: "bug", mono: "Aq",
+			note: "The game's ingest key from Aqua's Setup page (one per game): the QA runner posts its findings to Aqua with it.",
+			actions: keyActions("parlay.aquaIngestKey", "parlay.aqua.setIngestKey", aquaKey).map((a) => ({ ...a, label: a.label.replace("key", "ingest key") })),
 		},
 		{
 			title: "Claude", status: claude.status, ok: claude.ok, note: "Claude Code, the agent behind every Parlay action.", icon: "sparkle", brand: "claude.svg",
@@ -159,7 +170,7 @@ function html(rows: Row[], csp: string, brand: (file: string) => string): string
 	const mark = (r: Row) => {
 		const b = r.brand ? `<img class="brand" src="${esc(brand(r.brand))}" alt="">` : "";
 		if (r.avatar) return `<div class="av-wrap"><img class="av" src="${esc(r.avatar)}" alt="">${b ? `<span class="badge">${b}</span>` : ""}</div>`;
-		return b ? `<div class="av brandbox">${b}</div>` : `<div class="av mono">${esc(r.title)}</div>`;
+		return b ? `<div class="av brandbox">${b}</div>` : `<div class="av mono">${esc(r.mono ?? r.title)}</div>`;
 	};
 	const row = (r: Row) => `<section class="${r.ok ? "ok" : ""}">
 	${mark(r)}
