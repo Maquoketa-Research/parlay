@@ -34,7 +34,8 @@ select, input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid var(
 .counts { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; } .chip b { font-size: 13px; color: var(--vscode-foreground); }
 .chip.red b { color: var(--red); } .chip.purple b { color: var(--purple); } .chip.amber b { color: var(--amber); } .chip.green { border-color: var(--green); color: var(--green); }
-.status { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); min-height: 1.4em; } .status span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.status { display: flex; gap: 6px; align-items: flex-start; font-size: 11px; color: var(--muted); min-height: 1.4em; }
+.status span { overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; } .status i { margin-top: 5px; }
 .status i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex: none; animation: pulse 1.2s infinite; }
 
 .step { display: grid; grid-template-columns: 3.4ch 1fr; gap: 2px 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12px; } .step:first-child { border-top: 0; }
