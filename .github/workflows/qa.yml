@@ -10,6 +10,14 @@ on:
         description: Roblox place id to test (empty = whatever Studio has open)
         required: false
         default: ""
+      universe:
+        description: Universe id (only needed when the place is not open yet and the public lookup fails)
+        required: false
+        default: ""
+      minutes:
+        description: How long to play
+        required: false
+        default: "5"
 
 permissions:
   contents: read
@@ -47,3 +55,42 @@ jobs:
           $s = (Get-Process -Id $PID).SessionId
           if ($s -eq 0) { throw "runner is in session 0 (a service). Register it through qa-box.ps1 so it runs in the logged-in desktop." }
           "desktop session $s: ok"
+
+  # Play the place with extensions/parlay/qa/play.mjs. Exit 0 clean, 2 findings (errors or stuck events),
+  # 1 runner failure (no Studio, seat taken, timeout): 1 and 2 both fail the job; the report is uploaded and
+  # summarised whenever one was written.
+  play:
+    needs: smoke
+    runs-on: [self-hosted, windows, qa, studio]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: powershell
+    env:
+      PARLAY_AQUA_URL: ${{ secrets.PARLAY_AQUA_URL }}
+      PARLAY_AQUA_KEY: ${{ secrets.PARLAY_AQUA_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Play
+        id: play
+        run: |
+          $args = @("extensions/parlay/qa/play.mjs", "--minutes", "${{ inputs.minutes }}")
+          if ("${{ inputs.place }}") { $args += @("--place", "${{ inputs.place }}") }
+          if ("${{ inputs.universe }}") { $args += @("--universe", "${{ inputs.universe }}") }
+          node @args
+          "code=$LASTEXITCODE" >> $env:GITHUB_OUTPUT
+          exit $LASTEXITCODE
+      - name: Summary
+        if: always()
+        run: |
+          $code = "${{ steps.play.outputs.code }}"
+          $head = if ($code -eq "0") { "Clean" } elseif ($code -eq "2") { "Findings (exit 2)" } else { "Runner failure (exit $code)" }
+          "## QA play: $head" | Add-Content $env:GITHUB_STEP_SUMMARY
+          $md = Get-ChildItem .build/qa -Recurse -Filter report.md -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+          if ($md) { Get-Content $md.FullName | Add-Content $env:GITHUB_STEP_SUMMARY } else { "no report was written" | Add-Content $env:GITHUB_STEP_SUMMARY }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-play
+          path: .build/qa/**
+          if-no-files-found: ignore

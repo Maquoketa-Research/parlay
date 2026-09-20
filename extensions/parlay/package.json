@@ -661,7 +661,7 @@
   "scripts": {
     "compile": "gulp compile-extension:parlay-ide",
     "watch": "gulp watch-extension:parlay-ide",
-    "check": "node tools/check.mjs && node --no-warnings tools/sourcemap-check.mjs && node --no-warnings tools/studio-discovery-check.mjs && node --no-warnings tools/mac-studio-sync-check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs && node --no-warnings tools/aqua-check.mjs && node --no-warnings tools/aqua-pairing-check.mjs && node --no-warnings tools/aqua-identity-check.mjs && node --no-warnings tools/chat-check.mjs && node --no-warnings tools/chat-view-check.mjs && node --no-warnings tools/agent-options-check.mjs"
+    "check": "node tools/check.mjs && node --no-warnings tools/sourcemap-check.mjs && node --no-warnings tools/studio-discovery-check.mjs && node --no-warnings tools/mac-studio-sync-check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs && node --no-warnings tools/aqua-check.mjs && node --no-warnings tools/aqua-pairing-check.mjs && node --no-warnings tools/aqua-identity-check.mjs && node --no-warnings tools/chat-check.mjs && node --no-warnings tools/chat-view-check.mjs && node --no-warnings tools/agent-options-check.mjs && node --no-warnings qa/qa-check.mjs"
   },
   "devDependencies": {
     "@types/node": "24.x",

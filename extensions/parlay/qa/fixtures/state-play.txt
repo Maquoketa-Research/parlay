@@ -1,0 +1,3 @@
+- Current Studio Mode: Play
+- Available DataModels: Edit, Client, Server
+- Focused DataModel in the viewport: Client

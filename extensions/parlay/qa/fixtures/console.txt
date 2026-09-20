@@ -1,0 +1,12 @@
+[Aqua] Aqua plugin 0.7.0 loaded (studio)
+Loaded Cajuns Animation Spoofer v2
+[Shop] ready, 3 items
+ServerScriptService.Shop.Buy:105: attempt to index nil with 'X'
+Stack Begin
+Script 'ServerScriptService.Shop.Buy', Line 105 - function buy
+Stack End
+Infinite yield possible on 'ReplicatedStorage:WaitForChild("Missing")'
+ServerScriptService.Shop.Buy:105: attempt to index nil with 'X'
+Stack Begin
+Script 'ServerScriptService.Shop.Buy', Line 105 - function buy
+Stack End
