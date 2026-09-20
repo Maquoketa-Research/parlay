@@ -37,6 +37,14 @@ if (-not (Test-Path "$env:USERPROFILE\.local\bin\claude.exe") -and -not (Have cl
   "  installing Claude Code"
   irm https://claude.ai/install.ps1 | iex
 }
+# tools winget just installed are not on this session's PATH yet
+$env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+
+Step "Chrrxs Studio plugin (the QA runner's way into Studio when the built-in MCP seat is taken)"
+# Studio loads local plugins at startup only, so this runs before Studio is opened for the first time
+if (-not (Test-Path "$env:LOCALAPPDATA\Roblox\Plugins\MCPPlugin.rbxmx")) {
+  npx -y @chrrxs/robloxstudio-mcp@3.1.5 --install-plugin
+} else { "  present" }
 
 Step "power: never sleep, never turn the display off (Studio plays on the desktop)"
 powercfg /change standby-timeout-ac 0; powercfg /change monitor-timeout-ac 0; powercfg /change hibernate-timeout-ac 0

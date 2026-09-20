@@ -338,8 +338,10 @@ the Studio MCP attached blocks the runner. The runner then switches to the Chrrx
 [Chrrxs/robloxstudio-mcp](https://github.com/Chrrxs/robloxstudio-mcp), a Studio plugin plus a local server whose
 HTTP bridge on `127.0.0.1:58741` any number of clients may call). If nothing listens there the runner starts the
 pinned server itself with `npx -y @chrrxs/robloxstudio-mcp@3.1.5 --auto-install-plugin` (npx on PATH), which
-installs `MCPPlugin.rbxmx` into `%LOCALAPPDATA%\Roblox\Plugins`; Studio loads it live and the plugin connects.
-The token the server writes to `~/.robloxstudio-mcp/auth-token` is sent as `X-MCP-Auth`. `PARLAY_QA_MCP=chrrxs`
+installs `MCPPlugin.rbxmx` into `%LOCALAPPDATA%\Roblox\Plugins`. Studio loads local plugins at startup only, so
+after that first install every Studio window has to be closed and the place opened again (the plugin's toolbar then
+shows MCP Server: Connected); `qa-box.ps1` installs the plugin before Studio's first run so the box never needs
+this. The token the server writes to `~/.robloxstudio-mcp/auth-token` is sent as `X-MCP-Auth`. `PARLAY_QA_MCP=chrrxs`
 goes straight to the bridge, `builtin` never falls back, `PARLAY_QA_CHRRXS_URL` points at another bridge (the
 check's mock). `report.json` records which one played as `transport`.
 

@@ -48,11 +48,20 @@ export async function connect({ timeoutMs = 30000 } = {}) {
 			if (Date.now() - t0 > 90000) { kill(child); throw new Error(`Chrrxs server did not answer on ${url()} within 90 s: ${last(err)}`); }
 		}
 	}
-	// the plugin connects on its own once Studio has loaded it; a fresh install can take a moment
-	for (const t0 = Date.now(); ; await sleep(2000)) {
+	// The plugin connects on its own, but Studio loads local plugins at startup only (Chrrxs: "fully close and reopen
+	// Studio after installation"), so windows that were open before the install never connect.
+	const started = Date.now();
+	for (; ; await sleep(2000)) {
 		const h = await health();
 		if (h?.pluginConnected) break;
-		if (Date.now() - t0 > 60000) { if (child) kill(child); throw new Error("Chrrxs bridge is up but no Studio plugin connected within 60 s: in Studio, Plugins > Manage Plugins, enable MCPPlugin, or restart Studio"); }
+		if (Date.now() - started > 60000) {
+			if (child) kill(child);
+			const plugin = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "Plugins", "MCPPlugin.rbxmx");
+			const fresh = fs.existsSync(plugin) && fs.statSync(plugin).mtimeMs > started - 120000;
+			throw new Error(fresh
+				? "the Chrrxs Studio plugin was just installed and Studio only loads plugins at startup: close every Studio window, open the place again, and run again (its toolbar then shows MCP Server: Connected)"
+				: "the Chrrxs bridge is up but no Studio window has its plugin connected: restart Studio (it loads plugins at startup) and check Plugins > Manage Plugins for MCPPlugin");
+		}
 	}
 	const key = token();
 	if (!key) { if (child) kill(child); throw new Error(`Chrrxs token missing (${tokenFile} or ROBLOX_STUDIO_AUTH_TOKEN)`); }
