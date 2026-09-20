@@ -12,7 +12,7 @@ export function decide(state, history) {
 	// stuck means the last five tries changed nothing; try moving instead of repeating the plan
 	if (!state.stuck) {
 		const button = (state.client?.buttons ?? []).find((b) => !done.has(b.path));
-		if (button) return { kind: "click", path: button.path, text: button.text };
+		if (button) return { kind: "click", path: button.path, text: button.text, x: button.x, y: button.y };
 		const target = (state.server?.interactables ?? []).find((i) => !done.has(i.path));
 		if (target) return { kind: "interact", path: target.path, class: target.class, position: target.position, distance: target.distance };
 	}

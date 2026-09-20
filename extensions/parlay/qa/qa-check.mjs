@@ -85,6 +85,69 @@ const taken = await run({ PARLAY_QA_MOCK_SEAT: "taken" });
 assert.equal(taken.status, 1, taken.stdout);
 assert.match(taken.stdout, /seat taken/i);
 
+// ---- the Chrrxs fallback -------------------------------------------------------------------------------------
+// The built-in seat taken (the mock's PARLAY_QA_MOCK_SEAT) and a mock Chrrxs bridge on a local port answering the
+// shapes @chrrxs/robloxstudio-mcp 3.1.5 sends: /health without a token, then /mcp/<tool> with X-MCP-Auth. The run
+// must go through the bridge end to end: instances → the studio, solo_playtest start, both eval realms, clicks by
+// viewport pixel, key press/release, runtime logs by cursor, a png capture, and stop on the way out.
+const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+const bridgeCalls = [];
+let logRead = 0, playing = false;
+const bridge = http.createServer((req, res) => {
+	let body = "";
+	req.on("data", (d) => { body += d; });
+	req.on("end", () => {
+		const send = (code, obj) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+		const text = (obj) => ({ content: [{ type: "text", text: JSON.stringify(obj) }] });
+		if (req.url === "/health") return send(200, { status: "ok", pluginConnected: true, instanceCount: 1, version: "3.1.5" });
+		if (req.headers["x-mcp-auth"] !== "test-token") return send(401, { error: "unauthorized" });
+		const tool = req.url.replace(/^\/mcp\//, ""), args = JSON.parse(body || "{}");
+		bridgeCalls.push({ tool, args });
+		switch (tool) {
+			case "get_connected_instances": return send(200, text({ instances: [{ id: "inst-1", placeId: "90044978600719", placeName: "Final Eclipse Testing", peers: { edit: ["p1"] } }], multiplayerGroups: [] }));
+			case "solo_playtest":
+				if (args.action === "status") return send(200, { success: true, action: "status", running: playing, roles: playing ? ["edit", "server", "client-1"] : ["edit"] });   // the structured body alone
+				playing = args.action === "start";
+				return send(200, text({ success: true, action: args.action, message: playing ? "Playtest started." : "Playtest stopped." }));
+			case "eval_server_runtime": return send(200, text({ success: true, returnValue: fs.readFileSync(path.join(here, "fixtures", "probe-server.json"), "utf8"), output: [] }));
+			case "eval_client_runtime": return send(200, text({ success: true, returnValue: /PARLAY_QA_PROBE client/.test(args.code) ? fs.readFileSync(path.join(here, "fixtures", "probe-client.json"), "utf8") : "arrived", output: [] }));
+			case "get_runtime_logs": {   // like the mock: two more lines each read; a cursor continues from the last one
+				const upto = Math.min(lines.length, ++logRead * 2), from = args.cursor ? Number(args.cursor.slice(1)) : 0;
+				return send(200, text({ instanceId: "inst-1", entries: lines.slice(from, upto).map((message, i) => ({ seq: from + i, ts: 0, level: "info", message })), nextCursor: `c${upto}` }));
+			}
+			case "capture_screenshot": return send(200, { content: [{ type: "text", text: JSON.stringify({ width: 1, height: 1, format: "png" }) }, { type: "image", data: PNG_1PX, mimeType: "image/png" }] });
+			case "simulate_keyboard_input": case "simulate_mouse_input": return send(200, text({ success: true }));
+			default: return send(500, { error: `Unknown tool: ${tool}` });
+		}
+	});
+});
+await new Promise((r) => bridge.listen(0, "127.0.0.1", r));
+const bridgeUrl = `http://127.0.0.1:${bridge.address().port}`;
+const viaBridge = await run({ PARLAY_QA_MOCK_SEAT: "taken", PARLAY_QA_CHRRXS_URL: bridgeUrl, ROBLOX_STUDIO_AUTH_TOKEN: "test-token" });
+assert.equal(viaBridge.status, 2, viaBridge.stdout);
+assert.match(viaBridge.stdout, /switching to the Chrrxs bridge/);
+const bridged = viaBridge.report();
+assert.equal(bridged.transport, "chrrxs");
+assert.equal(bridged.studio.id, "inst-1");
+assert.ok(bridged.steps >= 12, `only ${bridged.steps} steps through the bridge`);   // the 12 s budget, with the walks' real waits
+assert.equal(bridged.errors.length, 1, "the seeded error group arrives through get_runtime_logs");
+assert.deepEqual(bridgeCalls.slice(0, 3).map((c) => c.tool), ["get_connected_instances", "solo_playtest", "solo_playtest"]);   // list, the state log, start
+assert.deepEqual(bridgeCalls[2].args, { action: "start", mode: "play", timeout: 60, instance_id: "inst-1" });
+assert.ok(bridgeCalls.some((c) => c.tool === "eval_server_runtime" && c.args.instance_id === "inst-1" && /PARLAY_QA_PROBE server/.test(c.args.code)));
+assert.ok(bridgeCalls.some((c) => c.tool === "eval_client_runtime" && c.args.target === "client-1"));
+assert.deepEqual(bridgeCalls.find((c) => c.tool === "simulate_mouse_input").args, { action: "click", x: 640, y: 400, target: "client-1", instance_id: "inst-1" }, "the Buy button by its probe pixels");
+const keys = bridgeCalls.filter((c) => c.tool === "simulate_keyboard_input").map((c) => `${c.args.keyCode}:${c.args.action}`);
+assert.ok(keys.some((k) => /^[WASD]:press$/.test(k)) && keys.some((k) => /^[WASD]:release$/.test(k)) && keys.includes("Space:tap"), keys.join(" "));
+assert.ok(bridgeCalls.some((c) => c.tool === "get_runtime_logs" && c.args.cursor), "later log reads continue from the cursor");
+assert.ok(bridgeCalls.some((c) => c.tool === "capture_screenshot" && c.args.format === "png"));
+assert.deepEqual(bridgeCalls.at(-1), { tool: "solo_playtest", args: { action: "stop", timeout: 15, instance_id: "inst-1" } });
+assert.ok(fs.readdirSync(viaBridge.out).some((f) => f.endsWith(".png")), "a png landed through the bridge");
+// a wrong token is a runner failure that names the token, not a hang
+const badToken = await run({ PARLAY_QA_MOCK_SEAT: "taken", PARLAY_QA_CHRRXS_URL: bridgeUrl, ROBLOX_STUDIO_AUTH_TOKEN: "wrong" });
+assert.equal(badToken.status, 1, badToken.stdout);
+assert.match(badToken.stdout, /rejected the token/);
+bridge.close();
+
 // ---- the Jev policy against a mock TypeSafe -----------------------------------------------------------------
 // Answers the exact shape the live POST /v1/systemone gave on 2026-09-20 (model pinned, noul answers carry only
 // noul, choice answers carry choice, confidence, probabilities): picks click_1 (the second button; the scripted
@@ -174,4 +237,4 @@ assert.match(stopped.stdout, /stop file seen/);
 assert.match(stopped.stdout, /Play stopped/);
 
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log(`qa-check: ok (${report.steps} mock steps, ${report.errors.length} error group ×${err.count}, ${report.stuck.length} stuck; jev: ${seen.length} requests, ${jr.suspects.length} suspects, 401 fallback)`);
+console.log(`qa-check: ok (${report.steps} mock steps, ${report.errors.length} error group ×${err.count}, ${report.stuck.length} stuck; jev: ${seen.length} requests, ${jr.suspects.length} suspects, 401 fallback; chrrxs: ${bridgeCalls.length} bridge calls, bad token)`);

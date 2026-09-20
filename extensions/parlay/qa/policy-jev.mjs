@@ -35,7 +35,7 @@ function options(state, history) {
 	const done = new Set(history.map((h) => h.action?.path).filter(Boolean));
 	const out = {};
 	if (!state.stuck) {
-		(state.client?.buttons ?? []).forEach((b, i) => { if (!done.has(b.path)) out[`click_${i}`] = { action: { kind: "click", path: b.path, text: b.text }, text: `Click the "${b.text}" ${b.class ?? "button"} on screen` }; });
+		(state.client?.buttons ?? []).forEach((b, i) => { if (!done.has(b.path)) out[`click_${i}`] = { action: { kind: "click", path: b.path, text: b.text, x: b.x, y: b.y }, text: `Click the "${b.text}" ${b.class ?? "button"} on screen` }; });
 		(state.server?.interactables ?? []).slice(0, 10).forEach((t, i) => { if (!done.has(t.path)) out[`interact_${i}`] = { action: { kind: "interact", path: t.path, class: t.class, position: t.position, distance: t.distance }, text: `Walk ${Math.round(t.distance ?? 0)} studs to the ${t.class} "${t.text || t.path.split(".").pop()}" and use it` }; });
 	}
 	for (const [key, dir] of Object.entries(WALK)) out[`walk_${key}`] = { action: { kind: "walk", key, ms: 800, jump: true }, text: `Walk ${dir} for a second and jump` };

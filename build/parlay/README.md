@@ -333,6 +333,16 @@ code; Jev is literal and text-only. Any failure falls back to the scripted polic
 rest of the run; 429/529 retried twice). The key: `PARLAY_TYPESAFE_API_KEY` (the Quality Assurance view passes the key from
 SecretStorage this way), else the file `~/.parlay/typesafe-api-key` (one line), else `TYPESAFE_API_KEY`.
 
+**When the built-in seat is taken.** Roblox's Studio MCP admits one client per machine, so a Claude session with
+the Studio MCP attached blocks the runner. The runner then switches to the Chrrxs bridge (`qa/chrrxs.mjs`:
+[Chrrxs/robloxstudio-mcp](https://github.com/Chrrxs/robloxstudio-mcp), a Studio plugin plus a local server whose
+HTTP bridge on `127.0.0.1:58741` any number of clients may call). If nothing listens there the runner starts the
+pinned server itself with `npx -y @chrrxs/robloxstudio-mcp@3.1.5 --auto-install-plugin` (npx on PATH), which
+installs `MCPPlugin.rbxmx` into `%LOCALAPPDATA%\Roblox\Plugins`; Studio loads it live and the plugin connects.
+The token the server writes to `~/.robloxstudio-mcp/auth-token` is sent as `X-MCP-Auth`. `PARLAY_QA_MCP=chrrxs`
+goes straight to the bridge, `builtin` never falls back, `PARLAY_QA_CHRRXS_URL` points at another bridge (the
+check's mock). `report.json` records which one played as `transport`.
+
 **The Quality Assurance view** (`src/qa.ts`, the Quality Assurance container in Parlay's secondary sidebar) runs the same runner from the editor: an
 open Studio place from `listStudios()` (or a typed place id), minutes, the policy (Jev when a key is stored, else
 scripted, with a Set TypeSafe key link), Run and Stop. The runner is a node child of Parlay writing

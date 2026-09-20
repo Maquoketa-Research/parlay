@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { connect as connectChrrxs } from "./chrrxs.mjs";
 import { connect, SeatTaken } from "./mcp.mjs";
 
 // ---- console classification ---------------------------------------------------------------------------------
@@ -80,10 +81,10 @@ function openStudio(url) {
 }
 
 // carry out one policy action through the MCP input tools; returns a one-line result
-async function act(call, action, viewport = [1280, 720]) {
+async function act(call, action, viewport = [1280, 720], pixels = false) {
 	const client = { datamodel_type: "Client" };
 	if (action.kind === "click") {
-		const r = await call("user_mouse_input", { ...client, actions: [{ action: "mouseButtonClick", instance_path: action.path }] });
+		const r = await call("user_mouse_input", { ...client, actions: [{ action: "mouseButtonClick", instance_path: action.path, ...(pixels ? { x: action.x, y: action.y } : {}) }] });
 		return r.text.trim() || "clicked";
 	}
 	if (action.kind === "interact") {
@@ -180,8 +181,21 @@ export async function main(argv = process.argv.slice(2)) {
 	let mcp, playing = false;
 	const call = (name, args, ms) => mcp.call(name, { studio_id: report.studio.id, ...args }, ms);
 	try {
-		mcp = await connect();
-		report.studio = await findStudio(mcp, a.place);
+		// The built-in Studio MCP first (PARLAY_QA_MCP=mock in the checks). Its seat is one client per machine, so when
+		// another client holds it the run goes through the Chrrxs bridge instead (chrrxs.mjs). PARLAY_QA_MCP=chrrxs
+		// skips straight to the bridge; =builtin never falls back.
+		const want = process.env.PARLAY_QA_MCP ?? "auto";
+		mcp = want === "chrrxs" ? await connectChrrxs() : await connect();
+		try { report.studio = await findStudio(mcp, a.place); }
+		catch (e) {
+			if (!(e instanceof SeatTaken) || want === "builtin") throw e;
+			log("the built-in Studio MCP seat is held by another client on this machine; switching to the Chrrxs bridge");
+			mcp.close();
+			try { mcp = await connectChrrxs(); } catch (e2) { throw new SeatTaken(`${e.message}; Chrrxs fallback failed: ${e2.message}`); }
+			report.studio = await findStudio(mcp, a.place);
+		}
+		report.transport = mcp.kind ?? "builtin";
+		log(`studio access: ${report.transport}`);
 		if (!report.studio) {
 			if (!a.place) throw new Error("no Studio with a place is open; pass --place <id>");
 			const universe = a.universe || await universeOf(a.place);
@@ -189,7 +203,7 @@ export async function main(argv = process.argv.slice(2)) {
 			openStudio(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${a.place}+universeId:${universe}`);
 			for (const t0 = Date.now(); !report.studio && Date.now() - t0 < 90000;) {
 				await sleep(5000);
-				mcp.close(); mcp = await connect();   // a fresh session each poll, in case the proxy lists Studios only at startup
+				if (mcp.kind !== "chrrxs") { mcp.close(); mcp = await connect(); }   // a fresh built-in session each poll (it lists Studios at startup); the bridge is live
 				report.studio = await findStudio(mcp, a.place);
 			}
 			if (!report.studio) throw new Error(`Studio did not list place ${a.place} within 90 s`);
@@ -216,7 +230,7 @@ export async function main(argv = process.argv.slice(2)) {
 			for (const b of client.buttons ?? []) report.gui.seen[b.path] ??= b.text;
 			const action = await decide({ server, client, stuck: streak >= 5, console: recent }, history);
 			const entry = { step, t: new Date().toISOString(), action, position: server.player?.position, health: server.player?.health, leaderstats: server.leaderstats };
-			entry.result = await act(call, action, client.viewport).catch((e) => `failed: ${e.message}`);
+			entry.result = await act(call, action, client.viewport, mcp.pixels).catch((e) => `failed: ${e.message}`);
 			if (action.kind === "click" && !report.gui.clicked.includes(action.path)) report.gui.clicked.push(action.path);
 			history.push(entry);
 			// console diff; a cleared log starts over
