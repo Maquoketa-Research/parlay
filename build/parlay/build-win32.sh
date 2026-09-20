@@ -45,9 +45,17 @@ node -e "const fs=require('fs'),p=require('path'),h=require('os').homedir();cons
 echo "== built-in extensions"
 bash build/parlay/fetch-builtins.sh
 
-if [[ "${1:-}" != "--pack-only" ]]; then
-  echo "== npm ci  $(date)"
-  npm ci --no-audit --no-fund
+MODE="${1:-}"
+if [[ "$MODE" != "--pack-only" ]]; then
+  # npm ci only when the lockfile changed since the last install (it is ~3.5 min of a ~13 min build)
+  LOCK_HASH="$(sha1sum package-lock.json | cut -c1-40)"
+  if [[ -f node_modules/.parlay-lock && "$(cat node_modules/.parlay-lock)" == "$LOCK_HASH" && "${FORCE_NPM_CI:-}" == "" ]]; then
+    echo "== npm ci skipped (package-lock.json unchanged; FORCE_NPM_CI=1 to force)"
+  else
+    echo "== npm ci  $(date)"
+    npm ci --no-audit --no-fund
+    echo "$LOCK_HASH" > node_modules/.parlay-lock
+  fi
 
   echo "== compile and minify  $(date)"
   npm run gulp vscode-min-prepack
@@ -62,6 +70,12 @@ echo "== package  $(date)"
 npm run copy-policy-dto --prefix build
 node build/lib/policies/policyGenerator.ts build/lib/policies/policyData.jsonc win32
 npm run gulp "vscode-win32-${VSCODE_ARCH}-min-packing"
+
+# --dev: the app folder only, no installer and no signing (~4 min of the build); releases need the full run
+if [[ "$MODE" == "--dev" ]]; then
+  echo "== done (dev, no installer)  $(date)   app: $(cd .. && pwd)/VSCode-win32-${VSCODE_ARCH}/Parlay.exe"
+  exit 0
+fi
 
 echo "== installer  $(date)"
 bash build/parlay/license-rtf.sh
