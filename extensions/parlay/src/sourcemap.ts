@@ -13,7 +13,7 @@ const SERVICES = new Set([
 	"TestService", "MaterialService", "MarketplaceService", "VoiceChatService",
 ]);
 const STARTER = new Set(["StarterPlayerScripts", "StarterCharacterScripts"]);
-const SKIP = new Set([".git", ".vscode", ".claude", "node_modules", "assets", "Packages", "DevPackages"]);
+const SKIP = new Set([".git", ".vscode", ".claude", "node_modules", "assets"]);
 
 interface Node { name: string; className: string; filePaths?: string[]; children?: Node[] }
 
@@ -61,22 +61,36 @@ export function generateSourcemap(root: string): string {
 
 // Keep sourcemap.json current for Roblox-shaped workspaces that are not Rojo projects (Rojo makes its own).
 export function startSourcemap(ctx: vscode.ExtensionContext) {
-	const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-	if (!ws) return;
-	const roblox = [...SERVICES].some((n) => fs.existsSync(path.join(ws, n)));
-	if (!roblox || fs.existsSync(path.join(ws, "default.project.json"))) return;
-	const out = path.join(ws, "sourcemap.json");
-	const write = () => {
-		try {
-			const json = generateSourcemap(ws);
-			if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== json) fs.writeFileSync(out, json);
-		} catch (e) { console.warn("parlay sourcemap:", (e as Error).message); }
+	const folders = new Map<string, vscode.Disposable>();
+	const attach = (folder: vscode.WorkspaceFolder) => {
+		const ws = folder.uri.fsPath;
+		if (folders.has(ws)) return;
+		const out = path.join(ws, "sourcemap.json");
+		let timer: NodeJS.Timeout | undefined;
+		const write = () => {
+			try {
+				// Studio may populate an initially empty project after extension activation.
+				// Keep watching even when no service exists yet; Rojo retains ownership of its map.
+				if (fs.existsSync(path.join(ws, "default.project.json"))) return;
+				if (![...SERVICES, ...STARTER].some(name => fs.existsSync(path.join(ws, name)))) return;
+				const json = generateSourcemap(ws);
+				if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== json) fs.writeFileSync(out, json);
+			} catch (e) { console.warn("parlay sourcemap:", (e as Error).message); }
+		};
+		const bump = (uri: vscode.Uri) => {
+			// Ignore our own output, but rebuild if somebody deletes it.
+			if (uri.fsPath === out && fs.existsSync(out)) return;
+			if (timer) clearTimeout(timer);
+			timer = setTimeout(write, 400);
+		};
+		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, "**/*"));
+		const subscriptions = [watcher, watcher.onDidCreate(bump), watcher.onDidDelete(bump), watcher.onDidChange(bump)];
+		folders.set(ws, { dispose: () => { if (timer) clearTimeout(timer); for (const subscription of subscriptions) subscription.dispose(); } });
+		write();
 	};
-	write();
-	let timer: NodeJS.Timeout | undefined;
-	const bump = () => { if (timer) clearTimeout(timer); timer = setTimeout(write, 400); };
-	const w = vscode.workspace.createFileSystemWatcher("**/*.{luau,lua}");
-	ctx.subscriptions.push(w, w.onDidCreate(bump), w.onDidDelete(bump), w.onDidChange(bump));
-	const d = vscode.workspace.createFileSystemWatcher("**/");
-	ctx.subscriptions.push(d, d.onDidCreate(bump), d.onDidDelete(bump));
+	for (const folder of vscode.workspace.workspaceFolders ?? []) attach(folder);
+	ctx.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(event => {
+		for (const folder of event.removed) { folders.get(folder.uri.fsPath)?.dispose(); folders.delete(folder.uri.fsPath); }
+		for (const folder of event.added) attach(folder);
+	}), { dispose: () => { for (const subscription of folders.values()) subscription.dispose(); folders.clear(); } });
 }

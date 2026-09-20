@@ -409,7 +409,7 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 	private windowControlsDimmed = false;
 	private lastWindowControlColors: { backgroundColor?: string; foregroundColor?: string } | undefined;
 
-	updateWindowControls(options: { height?: number; backgroundColor?: string; foregroundColor?: string; dimmed?: boolean }): void {
+	updateWindowControls(options: { height?: number; left?: number; backgroundColor?: string; foregroundColor?: string; dimmed?: boolean }): void {
 		const win = this.win;
 		if (!win) {
 			return;
@@ -452,10 +452,10 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 			// in both directions.
 			const buttonHeight = isTahoeOrNewer(release()) ? 14 : 16;
 			const offset = Math.floor((options.height - buttonHeight) / 2);
-			if (!offset) {
+			if (!offset && !options.left) {
 				win.setWindowButtonPosition(null);
 			} else {
-				win.setWindowButtonPosition({ x: offset + 1, y: offset });
+				win.setWindowButtonPosition({ x: offset + 1 + (options.left ?? 0), y: offset });
 			}
 		}
 	}

@@ -39,7 +39,8 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
 			return super.minimumHeight;
 		}
 
-		return (this.isCommandCenterVisible ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : this.macTitlebarSize) / (this.preventZoom ? getZoomFactor(getWindow(this.element)) : 1);
+		const titleRowHeight = this.isCommandCenterVisible ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : this.macTitlebarSize;
+		return (titleRowHeight + this.secondaryRowHeight) / (this.preventZoom ? getZoomFactor(getWindow(this.element)) : 1);
 	}
 	override get maximumHeight(): number { return this.minimumHeight; }
 
@@ -59,6 +60,7 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
 
 	private cachedWindowControlStyles: { bgColor: string; fgColor: string } | undefined;
 	private cachedWindowControlHeight: number | undefined;
+	private cachedWindowControlLeft: number | undefined;
 
 	constructor(
 		id: string,
@@ -271,17 +273,25 @@ export class NativeTitlebarPart extends BrowserTitlebarPart {
 	}
 
 	override layout(width: number, height: number): void {
+		if (isMacintosh) {
+			this.element.style.setProperty('--parlay-title-row-height', `${this.isCommandCenterVisible ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : this.macTitlebarSize}px`);
+			this.element.style.setProperty('--parlay-secondary-row-height', `${this.secondaryRowHeight}px`);
+		}
 		super.layout(width, height);
 
 		if (useWindowControlsOverlay(this.configurationService)) {
 			// Parlay: with the stacked header the window controls belong to the first row, not the whole bar
-			const parlayMenuRow = this.configurationService.getValue<boolean>('parlay.stackedHeader') !== false ? 26 : 0;
-			const newHeight = Math.round((height - parlayMenuRow) * getZoomFactor(getWindow(this.element)));
-			if (newHeight !== this.cachedWindowControlHeight) {
+			const zoomFactor = getZoomFactor(getWindow(this.element));
+			const parlayMenuRow = this.secondaryRowHeight / (this.preventZoom ? zoomFactor : 1);
+			const newHeight = Math.round((height - parlayMenuRow) * zoomFactor);
+			const left = isMacintosh && this.hasStackedHeader ? Math.round(40 * (this.preventZoom ? 1 : zoomFactor)) : 0;
+			if (newHeight !== this.cachedWindowControlHeight || left !== this.cachedWindowControlLeft) {
 				this.cachedWindowControlHeight = newHeight;
+				this.cachedWindowControlLeft = left;
 				this.nativeHostService.updateWindowControls({
 					targetWindowId: getWindowId(getWindow(this.element)),
-					height: newHeight
+					height: newHeight,
+					left
 				});
 			}
 		}

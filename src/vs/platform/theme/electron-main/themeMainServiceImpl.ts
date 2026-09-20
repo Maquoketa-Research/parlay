@@ -94,13 +94,16 @@ export class ThemeMainService extends Disposable implements IThemeMainService {
 		this.updateSystemColorTheme();
 		this.logThemeSettings();
 
-		// Parlay: glass follows the setting live. Windows 11 can swap the backdrop of an existing window;
-		// the workbench toggles its transparency class on the same change.
+		// Parlay: native glass follows the theme live on both Windows and macOS.
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
-			if (e.affectsConfiguration('parlay.glass') && process.platform === 'win32') {
+			if (e.affectsConfiguration('parlay.glass') && (process.platform === 'win32' || process.platform === 'darwin')) {
 				const glass = this.configurationService.getValue<boolean>('parlay.glass') === true;
 				for (const window of electron.BrowserWindow.getAllWindows()) {
-					window.setBackgroundMaterial(glass ? 'acrylic' : 'none');
+					if (process.platform === 'darwin') {
+						window.setVibrancy(glass ? 'under-window' : null);
+					} else {
+						window.setBackgroundMaterial(glass ? 'acrylic' : 'none');
+					}
 					window.setBackgroundColor(glass ? '#00000000' : this.getBackgroundColor());
 				}
 			}

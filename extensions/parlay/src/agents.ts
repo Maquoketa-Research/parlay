@@ -8,6 +8,8 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { modeInstructions } from "./agentModes";
+import { optionArgs } from "./agentOptions";
 import { Agent, CONTINUE_PROMPT, NAMES, SUMMARY_PROMPT, claudeTranscript, codexTranscript, other, renderHandoff, renderTurns, textTurns } from "./handoff";
 
 interface Session { id: string; file?: string }                                    // file: Codex's rollout, once found
@@ -153,12 +155,12 @@ function options(s: State, a: Agent, prompt?: string): vscode.TerminalOptions {
 	if (a === "claude") {
 		const id = resume ? old!.id : crypto.randomUUID();
 		const brief = writeBrief();
-		shellArgs = [...args, ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id, ...tail];
+		shellArgs = [...args, ...optionArgs(a), ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id, ...tail];
 		s.claude = { id };
 	} else {
 		// the same brief for GPT, as Codex's developer instructions (a TOML string on -c: one argument, no raw newlines)
-		const brief = ["-c", `developer_instructions=${JSON.stringify(BRIEF_CORE)}`];
-		shellArgs = resume ? ["resume", ...brief, ...args, old!.id, ...tail] : [...brief, ...args, ...tail];
+		const brief = ["-c", `developer_instructions=${JSON.stringify(agentBrief())}`];
+		shellArgs = resume ? ["resume", ...brief, ...args, ...optionArgs(a), old!.id, ...tail] : [...brief, ...args, ...optionArgs(a), ...tail];
 	}
 	s.agent = a; s.since = Date.now();
 	return { name: NAMES[a], cwd: ws, shellPath: exe(a), shellArgs, iconPath: new vscode.ThemeIcon(ICON[a]), color: new vscode.ThemeColor(COLOR[a]) };
@@ -174,27 +176,13 @@ function end(t: vscode.Terminal, a: Agent) {
 	});
 }
 
-// The system prompt Parlay appends to every Claude it starts: what this folder is (a live Script Sync mirror),
-// how to see and test the game (the Studio MCP), the house rules, the skills, and the two modes the user keeps
-// on. Ponytail full: its plugin's SessionStart hook reads ~/.claude/.ponytail-active, so that file is set to
-// "full" when the plugin is installed. Caveman lite: the skill text is inlined with the level pinned (it has
-// no persistence of its own). Written fresh on each launch into Parlay's global storage.
-export function writeBrief(): string | undefined {
-	try {
-		const claude = path.join(os.homedir(), ".claude");
-		const read = (f: string) => { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } };
-		const parts = [BRIEF];
-		const caveman = read(path.join(claude, "skills", "caveman", "SKILL.md")).replace(/^---[\s\S]*?---\s*/, "");
-		if (caveman) parts.push("# Caveman mode is ON at level lite for this whole session\n\nParlay turned it on for the user, as if `/caveman lite` had been run. The level is lite, not the skill's default.\n\n" + caveman);
-		if (fs.existsSync(path.join(claude, "plugins", "cache", "ponytail"))) {
-			const active = path.join(claude, ".ponytail-active");
-			if (read(active).trim() !== "full") fs.writeFileSync(active, "full");
-		}
-		const dir = ctx.globalStorageUri.fsPath, file = path.join(dir, "claude-brief.md");
-		fs.mkdirSync(dir, { recursive: true });
-		fs.writeFileSync(file, parts.join("\n\n"));
-		return file;
-	} catch { return undefined; }
+// Both Chat and terminal sessions use the bundled, pinned mode instructions.
+export function agentBrief(): string { return BRIEF_CORE + "\n\n" + modeInstructions(ctx.extensionPath); }
+export function writeBrief(): string {
+	const file = path.join(ctx.globalStorageUri.fsPath, "claude-brief.md");
+	fs.mkdirSync(ctx.globalStorageUri.fsPath, { recursive: true });
+	fs.writeFileSync(file, agentBrief());
+	return file;
 }
 
 export const BRIEF_CORE = `# Parlay
@@ -216,12 +204,6 @@ You are running inside Parlay, Maquoketa Research's editor for Roblox game devel
 - Server authority: validate every RemoteEvent and RemoteFunction argument on the server; never trust the client for money, inventory or position.
 - DataStore calls in pcall with retry, never per frame.
 - Minimal, local changes in the file's existing style; no new frameworks.`;
-
-// Claude also has the Parlay skills; GPT gets the core brief alone (JSON.stringify makes a valid TOML basic string)
-const BRIEF = BRIEF_CORE + `
-
-## Parlay skills
-/parlay-explain, /parlay-fix, /parlay-validate, /parlay-pcall, /parlay-extract, /parlay-test, /parlay-ab, /parlay-insert-asset, /parlay-match-assets. Parlay types these in from the editor; run them as written.`;
 
 // Typing into a running CLI. sendText puts the Enter in the same write as the text, and the TUIs read that
 // burst as a paste and keep the newline inside it; Enter on its own a beat later submits. A slash command
@@ -287,12 +269,25 @@ export function onPath(cmd: string): boolean {
 	const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
 	return dirs.some((d) => ["", ".exe", ".cmd"].some((x) => fs.existsSync(path.join(d, cmd + x))));
 }
-export const claudeInstalled = () => onPath(cfg("claudeCommand", "claude"));
+export const claudeInstalled = () => onPath(exe("claude"));
 
 export function exe(a: Agent): string {
-	if (a === "claude") return cfg("claudeCommand", "claude");
-	const set = cfg("codexCommand", "codex");
+	const name = a === "claude" ? "claude" : "codex";
+	const set = cfg(a === "claude" ? "claudeCommand" : "codexCommand", name);
 	if (onPath(set)) return set;
+	// Respect explicit custom commands. Finder-launched Mac apps may not inherit
+	// shell PATH, so resolve the standard local installs and the Codex app too.
+	if (set !== name) return set;
+	if (process.platform === "darwin") {
+		const repo = path.resolve(__dirname, "../../..");
+		const candidates = [
+			path.join(os.homedir(), ".local/bin", name), path.join("/opt/homebrew/bin", name), path.join("/usr/local/bin", name),
+			...(a === "gpt" ? ["/Applications/ChatGPT.app/Contents/Resources/codex", path.join(os.homedir(), "Applications/ChatGPT.app/Contents/Resources/codex")] : []),
+			path.join(repo, ".build/parlay-agents/node_modules/.bin", name),
+		];
+		return candidates.find(candidate => { try { fs.accessSync(candidate, fs.constants.X_OK); return fs.statSync(candidate).isFile(); } catch { return false; } }) ?? set;
+	}
+	if (a === "claude" || process.platform !== "win32") return set;
 	const bin = path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), "AppData", "Local"), "OpenAI", "Codex", "bin");
 	let best: { file: string; mtime: number } | undefined;
 	try {

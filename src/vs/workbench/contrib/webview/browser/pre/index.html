@@ -5,7 +5,7 @@
 	<meta charset="UTF-8">
 
 	<meta http-equiv="Content-Security-Policy"
-		content="default-src 'none'; script-src 'sha256-FFQoOVVa2tOE3uqUvirwaMNT20TZmrHcL2aaOjJ8BUo=' 'self'; frame-src 'self'; style-src 'unsafe-inline';">
+		content="default-src 'none'; script-src 'sha256-xdRl+wZplZZv6ySQaEv4+JGRbaEHDJGmn3Bs555lF+E=' 'self'; frame-src 'self'; style-src 'unsafe-inline';">
 
 	<!-- Disable pinch zooming -->
 	<meta name="viewport"
@@ -1135,7 +1135,8 @@
 								});
 							};
 
-							const resizeObserver = new ResizeObserver(postSize);
+							// Observe in the content's realm so delivery follows that document's layout cycle.
+							const resizeObserver = new contentWindow.ResizeObserver(postSize);
 							resizeObserver.observe(docEl);
 							postSize();
 						}

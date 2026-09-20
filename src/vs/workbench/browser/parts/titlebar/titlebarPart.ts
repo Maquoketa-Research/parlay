@@ -59,6 +59,7 @@ import { IsCompactTitleBarContext, TitleBarVisibleContext } from '../../../commo
 import { ServiceCollection } from '../../../../platform/instantiation/common/serviceCollection.js';
 import { WORKBENCH_MENU_MOTION_CLASS, workbenchMenuCloseAnimation } from '../../actions/menuMotion.js';
 import { ParlayAccountWidget } from './parlayAccount.js';
+import { ParlayToolbar } from './parlayToolbar.js';
 
 export interface ITitleVariable {
 	readonly name: string;
@@ -232,13 +233,18 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 	readonly minimumWidth: number = 0;
 	readonly maximumWidth: number = Number.POSITIVE_INFINITY;
 
+	protected get hasStackedHeader(): boolean {
+		return !this.isAuxiliary && this.configurationService.getValue<boolean>('parlay.stackedHeader') !== false;
+	}
+
+	protected get secondaryRowHeight(): number {
+		return this.hasStackedHeader ? (isMacintosh && isNative ? 36 : 26) : 0;
+	}
+
 	get minimumHeight(): number {
 		const wcoEnabled = isWeb && isWCOEnabled();
 		let value = this.isCommandCenterVisible || wcoEnabled ? DEFAULT_CUSTOM_TITLEBAR_HEIGHT : 30;
-		// Parlay: a second row for the menu when the header is stacked (parlay.css lays it out)
-		if (!this.isAuxiliary && this.configurationService.getValue<boolean>('parlay.stackedHeader') !== false) {
-			value += 26;
-		}
+		value += this.secondaryRowHeight;
 		if (wcoEnabled) {
 			value = Math.max(value, getWCOTitlebarAreaRect(getWindow(this.element))?.height ?? 0);
 		}
@@ -271,6 +277,7 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 	private rightContent!: HTMLElement;
 
 	protected readonly customMenubar = this._register(new MutableDisposable<CustomMenubarControl>());
+	private readonly parlayToolbar = this._register(new MutableDisposable<ParlayToolbar>());
 	private readonly customMenubarDisposables = this._register(new DisposableStore());
 	protected appIcon: HTMLElement | undefined;
 	private appIconBadge: HTMLElement | undefined;
@@ -385,15 +392,15 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 			this.updateStyles();
 		}
 
-		// Custom menu bar (disabled if auxiliary)
-		if (!this.isAuxiliary && !hasNativeMenu(this.configurationService, this.titleBarStyle) && (!isMacintosh || isWeb)) {
-			if (event.affectsConfiguration(MenuSettings.MenuBarVisibility)) {
-				if (this.currentMenubarVisibility === 'compact') {
-					this.uninstallMenubar();
-				} else {
-					this.installMenubar();
-				}
+		// Mac uses project actions in the second row; its menus remain in the system menu bar.
+		if (event.affectsConfiguration(MenuSettings.MenuBarVisibility) || event.affectsConfiguration('parlay.stackedHeader')) {
+			if (this.shouldShowCustomMenubar) {
+				this.installMenubar();
+			} else {
+				this.uninstallMenubar();
 			}
+			this.updateParlayToolbar();
+			this._onDidChange.fire(undefined);
 		}
 
 		// Actions
@@ -458,6 +465,19 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 		this.onMenubarVisibilityChanged(false);
 	}
 
+	private updateParlayToolbar(): void {
+		if (!this.rootContainer) {
+			return;
+		}
+		if (isMacintosh && isNative && this.hasStackedHeader && hasCustomTitlebar(this.configurationService, this.titleBarStyle)) {
+			if (!this.parlayToolbar.value) {
+				this.parlayToolbar.value = this.instantiationService.createInstance(ParlayToolbar, this.rootContainer);
+			}
+		} else {
+			this.parlayToolbar.clear();
+		}
+	}
+
 	protected onMenubarVisibilityChanged(visible: boolean): void {
 		if (isWeb || isWindows || isLinux) {
 			if (this.lastLayoutDimensions) {
@@ -488,19 +508,19 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 		if ((isWindows || isLinux) && !hasNativeTitlebar(this.configurationService, this.titleBarStyle)) {
 			this.appIcon = prepend(this.leftContent, $('a.window-appicon'));
 		}
+		// Parlay's mark also belongs in the Mac header, after the native window controls.
+		if (isMacintosh && !isWeb && !hasNativeTitlebar(this.configurationService, this.titleBarStyle)) {
+			prepend(this.leftContent, $('span.window-appicon', { 'aria-hidden': 'true' }));
+		}
 
 		// Draggable region that we can manipulate for #52522
 		this.dragRegion = prepend(this.rootContainer, $('div.titlebar-drag-region'));
 
 		// Menubar: install a custom menu bar depending on configuration
-		if (
-			!this.isAuxiliary &&
-			!hasNativeMenu(this.configurationService, this.titleBarStyle) &&
-			(!isMacintosh || isWeb) &&
-			this.currentMenubarVisibility !== 'compact'
-		) {
+		if (this.shouldShowCustomMenubar) {
 			this.installMenubar();
 		}
+		this.updateParlayToolbar();
 
 		// Title
 		this.title = append(this.centerContent, $('div.window-title'));
@@ -905,6 +925,10 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 		return getMenuBarVisibility(this.configurationService);
 	}
 
+	private get shouldShowCustomMenubar(): boolean {
+		return !this.isAuxiliary && (!isMacintosh || isWeb) && this.currentMenubarVisibility !== 'compact' && !hasNativeMenu(this.configurationService, this.titleBarStyle);
+	}
+
 	private get layoutControlEnabled(): boolean {
 		return this.configurationService.getValue<boolean>(LayoutSettings.LAYOUT_ACTIONS) !== false;
 	}
@@ -931,10 +955,10 @@ export class BrowserTitlebarPart extends Part implements ITitlebarPart {
 	}
 
 	get hasZoomableElements(): boolean {
-		const hasMenubar = !(this.currentMenubarVisibility === 'hidden' || this.currentMenubarVisibility === 'compact' || (!isWeb && isMacintosh));
+		const hasMenubar = this.shouldShowCustomMenubar && this.currentMenubarVisibility !== 'hidden';
 		const hasCommandCenter = this.isCommandCenterVisible;
 		const hasToolBarActions = this.globalActionsEnabled || this.layoutControlEnabled || this.editorActionsEnabled || this.activityActionsEnabled;
-		return hasMenubar || hasCommandCenter || hasToolBarActions;
+		return hasMenubar || hasCommandCenter || hasToolBarActions || !!this.parlayToolbar.value;
 	}
 
 	get preventZoom(): boolean {

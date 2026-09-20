@@ -34,42 +34,42 @@
       {
         "command": "parlay.claude.explain",
         "title": "Explain this",
-        "category": "Claude"
+        "category": "Chat"
       },
       {
         "command": "parlay.claude.fix",
         "title": "Fix this",
-        "category": "Claude"
+        "category": "Chat"
       },
       {
         "command": "parlay.claude.validate",
         "title": "Add server-side validation",
-        "category": "Claude"
+        "category": "Chat"
       },
       {
         "command": "parlay.claude.pcall",
         "title": "Wrap DataStore calls in pcall",
-        "category": "Claude"
+        "category": "Chat"
       },
       {
         "command": "parlay.claude.extract",
         "title": "Extract to ModuleScript",
-        "category": "Claude"
+        "category": "Chat"
       },
       {
         "command": "parlay.claude.test",
         "title": "Write a test",
-        "category": "Claude"
+        "category": "Chat"
       },
       {
         "command": "parlay.claude.ab",
         "title": "Make an A/B variant",
-        "category": "Claude"
+        "category": "Chat"
       },
       {
         "command": "parlay.ask",
-        "title": "Ask about the selection…",
-        "category": "Claude"
+        "title": "Ask about the selection\u2026",
+        "category": "Chat"
       },
       {
         "command": "parlay.claude.match-assets",
@@ -109,6 +109,21 @@
       {
         "command": "parlay.studio.add",
         "title": "Add Roblox Studio project",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.project.select",
+        "title": "Choose game project",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.scriptSync",
+        "title": "Set up Script Sync",
+        "category": "Parlay"
+      },
+      {
+        "command": "parlay.studio.open",
+        "title": "Open Roblox Studio",
         "category": "Parlay"
       },
       {
@@ -156,8 +171,13 @@
         "icon": "$(arrow-swap)"
       },
       {
+        "command": "parlay.aqua.show",
+        "title": "Open Aqua",
+        "category": "Parlay"
+      },
+      {
         "command": "parlay.aqua.pair",
-        "title": "Pair Roblox Studio with Aqua",
+        "title": "Pair Project with Aqua",
         "category": "Parlay",
         "icon": "$(plug)"
       },
@@ -180,8 +200,9 @@
       },
       {
         "command": "parlay.aqua.landing",
-        "title": "Show the Aqua pairing page",
-        "category": "Parlay"
+        "title": "Back to Aqua",
+        "category": "Parlay",
+        "icon": "$(arrow-left)"
       },
       {
         "command": "parlay.chat.open",
@@ -196,6 +217,12 @@
         "icon": "$(add)"
       },
       {
+        "command": "parlay.chat.history",
+        "title": "Chat: conversation history",
+        "category": "Parlay",
+        "icon": "$(history)"
+      },
+      {
         "command": "parlay.chat.useClaude",
         "title": "Chat: continue in Claude",
         "category": "Parlay",
@@ -203,7 +230,7 @@
       },
       {
         "command": "parlay.chat.useGpt",
-        "title": "Chat: continue in GPT",
+        "title": "Chat: continue in Codex",
         "category": "Parlay",
         "icon": "$(hubot)"
       }
@@ -293,19 +320,9 @@
       ],
       "view/title": [
         {
-          "command": "parlay.chat.new",
-          "when": "view == parlay.chat",
-          "group": "navigation@1"
-        },
-        {
-          "command": "parlay.chat.useGpt",
-          "when": "view == parlay.chat && parlay.chat.agent == claude",
-          "group": "navigation@2"
-        },
-        {
-          "command": "parlay.chat.useClaude",
-          "when": "view == parlay.chat && parlay.chat.agent == gpt",
-          "group": "navigation@2"
+          "command": "parlay.aqua.landing",
+          "when": "view == parlay.aqua",
+          "group": "navigation@0"
         },
         {
           "command": "parlay.agents.open",
@@ -373,13 +390,14 @@
       ],
       "parlay-aqua": [
         {
-          "id": "parlay.aqua.issues",
-          "name": "Issues"
-        },
-        {
           "type": "webview",
           "id": "parlay.aqua",
-          "name": "Evidence"
+          "name": "Aqua"
+        },
+        {
+          "id": "parlay.aqua.issues",
+          "name": "Issues",
+          "visibility": "hidden"
         }
       ],
       "parlay-meshy": [
@@ -441,17 +459,21 @@
         "parlay.claudeCommand": {
           "type": "string",
           "default": "claude",
-          "description": "Command used to start Claude Code in the agent terminal."
+          "description": "Command used to start Claude Code in the agent terminal.",
+          "scope": "machine",
+          "restricted": true
         },
         "parlay.claudeArgs": {
           "type": "string",
           "default": "--permission-mode acceptEdits",
-          "description": "Arguments Claude Code starts with in the agent terminal (the permission mode: acceptEdits, auto, plan, bypassPermissions…)."
+          "description": "Arguments Claude Code starts with in the agent terminal (the permission mode: acceptEdits, auto, plan, bypassPermissions\u2026)."
         },
         "parlay.codexCommand": {
           "type": "string",
           "default": "codex",
-          "description": "Command used to start Codex (GPT) in the agent terminal. When it is not on PATH, the newest codex.exe the Codex desktop app installed under %LOCALAPPDATA%\\OpenAI\\Codex\\bin is used."
+          "description": "Executable used for Codex in Chat and the agent terminal. Parlay also finds common macOS CLI locations and the bundled CLI in an existing Codex desktop installation.",
+          "scope": "machine",
+          "restricted": true
         },
         "parlay.codexArgs": {
           "type": "string",
@@ -462,7 +484,7 @@
           "type": "boolean",
           "default": false,
           "scope": "application",
-          "description": "Draw the window over Windows 11 acrylic so the Parlay Glass theme is real glass. Set automatically when that theme is chosen; applies to windows opened afterwards. Needs the Parlay build."
+          "description": "Use native macOS vibrancy or Windows 11 acrylic behind Parlay Glass. Follows the selected theme immediately; requires the Parlay build."
         },
         "parlay.aquaRepo": {
           "type": "string",
@@ -472,12 +494,12 @@
         "parlay.robloxClientId": {
           "type": "string",
           "default": "3251110438441385889",
-          "description": "Client ID of the Roblox OAuth 2.0 app Parlay signs in as; the default is Parlay's own app. Only change it to use an app you registered yourself (Creator Dashboard → Open Cloud → OAuth 2.0 Apps) for Parlay: Sign in to Roblox. Register both redirect URLs http://localhost:53682/callback and http://localhost:53683/callback. Empty: the sign-in command walks you through the setup."
+          "description": "Client ID of the Roblox OAuth 2.0 app Parlay signs in as; the default is Parlay's own app. Only change it to use an app you registered yourself (Creator Dashboard \u2192 Open Cloud \u2192 OAuth 2.0 Apps) for Parlay: Sign in to Roblox. Register both redirect URLs http://localhost:53682/callback and http://localhost:53683/callback. Empty: the sign-in command walks you through the setup."
         },
         "parlay.discordClientId": {
           "type": "string",
           "default": "",
-          "description": "Client ID of the Discord application Parlay signs in as (Discord Developer Portal → Applications → OAuth2) for Parlay: Sign in to Discord. Register both redirect URLs http://localhost:53682/callback and http://localhost:53683/callback. Empty: the sign-in command walks you through the setup."
+          "description": "Client ID of the Discord application Parlay signs in as (Discord Developer Portal \u2192 Applications \u2192 OAuth2) for Parlay: Sign in to Discord. Register both redirect URLs http://localhost:53682/callback and http://localhost:53683/callback. Empty: the sign-in command walks you through the setup."
         },
         "parlay.robloxCreatorId": {
           "type": "string",
@@ -506,7 +528,13 @@
         "parlay.stackedHeader": {
           "type": "boolean",
           "default": true,
-          "description": "Two-row header: the mark and Parlay above the menu bar. On by default in Parlay; a change applies at once."
+          "description": "Two-row header: project actions below the title on macOS, and an in-window menu row on Windows and Linux. A change applies at once."
+        },
+        "parlay.roundedChrome": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Use rounded panels, inset surfaces, and pill-shaped tabs and buttons. Turn off for the classic flat editor layout."
         },
         "parlay.imageModel": {
           "type": "string",
@@ -527,6 +555,42 @@
           "type": "string",
           "default": "Maquoketa-Research",
           "description": "GitHub owner whose repos Add Roblox Studio project looks for (a repo named after the place is cloned; otherwise git init points origin at it)."
+        },
+        "parlay.claude.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID or alias. Empty uses the agent default.",
+          "scope": "window"
+        },
+        "parlay.claude.effort": {
+          "type": "string",
+          "default": "",
+          "description": "Thinking effort. Empty uses the model default.",
+          "scope": "window"
+        },
+        "parlay.claude.fast": {
+          "type": "boolean",
+          "default": false,
+          "description": "Request fast mode. Uses additional quota when supported by the model and account.",
+          "scope": "window"
+        },
+        "parlay.codex.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model ID or alias. Empty uses the agent default.",
+          "scope": "window"
+        },
+        "parlay.codex.effort": {
+          "type": "string",
+          "default": "",
+          "description": "Thinking effort. Empty uses the model default.",
+          "scope": "window"
+        },
+        "parlay.codex.fast": {
+          "type": "boolean",
+          "default": false,
+          "description": "Request fast mode. Uses additional quota when supported by the model and account.",
+          "scope": "window"
         }
       }
     },
@@ -551,7 +615,7 @@
       "workbench.editor.tabSizing": "shrink",
       "workbench.startupEditor": "none",
       "workbench.secondarySideBar.defaultVisibility": "visible",
-      "window.titleSeparator": "  ·  ",
+      "window.titleSeparator": "  \u00b7  ",
       "parlay.stackedHeader": true,
       "luau-lsp.sourcemap.autogenerate": false,
       "luau-lsp.plugin.enabled": true
@@ -564,13 +628,18 @@
       },
       {
         "view": "parlay.aqua.issues",
-        "contents": "Asking Aqua…",
+        "contents": "Asking Aqua\u2026",
         "when": "parlay.aqua.state == loading"
       },
       {
         "view": "parlay.aqua.issues",
-        "contents": "Aqua does not watch this folder's place yet. Pairing tells Aqua which game the open Studio place is; Parlay then lists its issues here, each one a click from the line.\n[Pair with Aqua](command:parlay.aqua.pair)\n[Refresh](command:parlay.aqua.refresh)",
-        "when": "parlay.aqua.state == noGame"
+        "contents": "Open your game's Script Sync folder to see its Aqua issues and work on its scripts.\n[Open Game Folder](command:workbench.action.files.openFolder)",
+        "when": "workbenchState == empty"
+      },
+      {
+        "view": "parlay.aqua.issues",
+        "contents": "Connect this game's place using the pairing page below. Its issues will appear here.",
+        "when": "parlay.aqua.state == noGame && workbenchState != empty"
       },
       {
         "view": "parlay.aqua.issues",
@@ -579,7 +648,7 @@
       },
       {
         "view": "parlay.aqua.issues",
-        "contents": "This Aqua wants a sign-in. Parlay signs in with your Roblox account through Aqua's token exchange; until Aqua has that route the list cannot load here, and the dashboard below takes its own sign-in.\n[Sign in to Aqua](command:parlay.aqua.signIn)",
+        "contents": "Sign in to Aqua to load this game's issues. You can also open the dashboard below.\n[Sign in to Aqua](command:parlay.aqua.signIn)",
         "when": "parlay.aqua.state == signIn"
       },
       {
@@ -592,7 +661,7 @@
   "scripts": {
     "compile": "gulp compile-extension:parlay-ide",
     "watch": "gulp watch-extension:parlay-ide",
-    "check": "node tools/check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs && node --no-warnings tools/aqua-check.mjs && node --no-warnings tools/chat-check.mjs"
+    "check": "node tools/check.mjs && node --no-warnings tools/sourcemap-check.mjs && node --no-warnings tools/studio-discovery-check.mjs && node --no-warnings tools/mac-studio-sync-check.mjs && node --no-warnings tools/handoff-check.mjs && node --no-warnings tools/rbxmx-check.mjs && node --no-warnings tools/aqua-check.mjs && node --no-warnings tools/aqua-pairing-check.mjs && node --no-warnings tools/aqua-identity-check.mjs && node --no-warnings tools/chat-check.mjs && node --no-warnings tools/chat-view-check.mjs && node --no-warnings tools/agent-options-check.mjs"
   },
   "devDependencies": {
     "@types/node": "24.x",

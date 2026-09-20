@@ -8,9 +8,11 @@ import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import { exe } from "./agents";
+import type { Agent } from "./handoff";
 import { SCOPES as ROBLOX_SCOPES } from "./roblox-auth";
 
-type Msg = { cmd: string } | { clear: string } | { shell: string };
+type Msg = { cmd: string } | { clear: string } | { shell: string } | { agent: Agent; args: string[] };
 // icon: a codicon for the header menu; brand: a mark in media/brands for the page (CC0 from simpleicons, Meshy's favicon)
 interface Row { title: string; status: string; ok: boolean; note?: string; avatar?: string; icon: string; brand?: string; actions: { label: string; msg: Msg; quiet?: boolean }[] }
 
@@ -23,16 +25,17 @@ export function registerAccounts(ctx: vscode.ExtensionContext) {
 	};
 	ctx.subscriptions.push(vscode.authentication.onDidChangeSessions(() => void render()), ctx.secrets.onDidChange(() => void render()));
 	onCli = () => void render();
-	void refreshCli(vscode.workspace.getConfiguration("parlay").get<string>("claudeCommand", "claude"));   // warm the cache at startup
+	void refreshCli(exe("claude"));   // warm the cache at startup
 	// one action, from the page or from the header menu
 	const act = async (m: Msg) => {
 		try {
 			if ("cmd" in m) { await vscode.commands.executeCommand(m.cmd); }
 			else if ("clear" in m) { await ctx.secrets.delete(m.clear); }
+			else if ("agent" in m) { vscode.window.createTerminal({ name: "Parlay sign-in", shellPath: exe(m.agent), shellArgs: m.args }).show(); }
 			else if ("shell" in m) { const t = vscode.window.createTerminal({ name: "Parlay sign-in" }); t.show(); t.sendText(m.shell); }
 		} catch (e) { void vscode.window.showErrorMessage(`Parlay: ${(e as Error).message}`); }
 		// CLIs need a moment; sessions and keys redraw on their own events too
-		setTimeout(() => { cliState.at = 0; void refreshCli(vscode.workspace.getConfiguration("parlay").get<string>("claudeCommand", "claude")); void render(); }, 1500);
+		setTimeout(() => { cliState.at = 0; void refreshCli(exe("claude")); void render(); }, 1500);
 	};
 	// the header's avatar menu (parlayAccount.ts in the workbench) asks for the rows and runs the actions
 	// the brand marks go along as data URIs: the header popover is workbench code with no access to extension files
@@ -75,7 +78,7 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 		try { return await vscode.authentication.getSession(provider, scopes, { silent: true }); } catch { return undefined; }   // provider absent = not linked
 	};
 	const has = async (k: string) => !!(await ctx.secrets.get(k));
-	const claudeCmd = vscode.workspace.getConfiguration("parlay").get<string>("claudeCommand", "claude");
+	const claudeCmd = exe("claude");
 	// sessions and keys are milliseconds; the two CLI status calls are seconds, so they come from the cache below
 	const [roblox, discord, robloxKey, meshyKey, openaiKey] = await Promise.all([
 		session("roblox", ROBLOX_SCOPES), session("discord", ["identify"]),
@@ -107,14 +110,14 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 		{
 			title: "Claude", status: claude.status, ok: claude.ok, note: "Claude Code, the agent behind every Parlay action.", icon: "sparkle", brand: "claude.svg",
 			actions: claude.ok
-				? [{ label: "Log out", msg: { shell: `${claudeCmd} auth logout` }, quiet: true }]
-				: [{ label: claude.installed ? "Log in" : "Install Claude Code", msg: claude.installed ? { shell: `${claudeCmd} auth login` } : { shell: "npm install -g @anthropic-ai/claude-code" } }],
+				? [{ label: "Log out", msg: { agent: "claude", args: ["auth", "logout"] }, quiet: true }]
+				: [{ label: claude.installed ? "Log in" : "Install Claude Code", msg: claude.installed ? { agent: "claude", args: ["auth", "login"] } : { shell: "npm install -g @anthropic-ai/claude-code" } }],
 		},
 		{
 			title: "GPT", status: codex.status, ok: codex.ok, icon: "hubot", brand: "openai.svg", note: openaiKey ? "OpenAI API key set: concept drafts and texture painting." : "OpenAI API key not set: concept drafts and texture painting need one.",
 			actions: [
-				codex.ok ? { label: "Log out of Codex", msg: { shell: "codex logout" }, quiet: true }
-					: { label: codex.installed ? "Log in to Codex" : "Install Codex", msg: codex.installed ? { shell: "codex login" } : { shell: "npm install -g @openai/codex" } },
+				codex.ok ? { label: "Log out of Codex", msg: { agent: "gpt", args: ["logout"] }, quiet: true }
+					: { label: codex.installed ? "Log in to Codex" : "Install Codex", msg: codex.installed ? { agent: "gpt", args: ["login"] } : { shell: "npm install -g @openai/codex" } },
 				...keyActions("parlay.openaiApiKey", "parlay.openai.setKey", openaiKey).map((a) => ({ ...a, label: a.label.replace("key", "OpenAI key") })),
 			],
 		},
@@ -123,7 +126,7 @@ async function rows(ctx: vscode.ExtensionContext): Promise<Row[]> {
 
 // a CLI's own answer about who is logged in; "installed" false when the command is not on PATH
 function cli(cmd: string, args: string[]): Promise<{ code: number; out: string; installed: boolean }> {
-	return new Promise((res) => execFile(cmd, args, { shell: true, windowsHide: true, timeout: 15000 }, (e, out, err) => {
+	return new Promise((res) => execFile(cmd, args, { shell: process.platform === "win32", windowsHide: true, timeout: 15000 }, (e, out, err) => {
 		const text = String(out ?? "") + String(err ?? "");
 		const code = (e as { code?: number } | null)?.code ?? 0;
 		res({ code: typeof code === "number" ? code : 1, out: text, installed: !/not recognized|not found|ENOENT/i.test(text) || code === 0 });
@@ -141,7 +144,7 @@ async function claudeStatus(cmd: string): Promise<{ ok: boolean; status: string;
 }
 
 async function codexStatus(): Promise<{ ok: boolean; status: string; installed: boolean }> {
-	const r = await cli("codex", ["login", "status"]);
+	const r = await cli(exe("gpt"), ["login", "status"]);
 	if (!r.installed) return { ok: false, status: "Codex CLI is not installed", installed: false };
 	const ok = r.code === 0 && /logged in/i.test(r.out) && !/not logged in/i.test(r.out);
 	return { ok, installed: true, status: ok ? r.out.trim().split(/\r?\n/)[0].slice(0, 80) : "Not logged in" };

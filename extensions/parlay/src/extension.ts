@@ -1,9 +1,7 @@
 // Parlay: Claude actions on the code under your cursor (right-click, editor title, and a lens over the
 // selection), Aqua and Sonar in the right-hand panel with a Start button when they are down, a Script Sync
 // status light, the asset matcher, and the switch that turns the Glass theme into real glass.
-// Every action is a Claude Code skill (skills/*/SKILL.md) run in the agent terminal (agents.ts: Claude Code or
-// Codex in the Terminal view, one tab that swaps with a handoff note), so the code Claude writes lands in the
-// Script Sync folder and shows up in the editor live.
+// Editor actions use the selected agent in Parlay Chat with bundled skill instructions and a snapshot of the selected code.
 import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as fs from "fs";
@@ -18,16 +16,20 @@ import { startSourcemap } from "./sourcemap";
 import { addStudioProject } from "./studio";
 import { installStudioPlugin } from "./studioPlugin";
 import { registerAccounts } from "./accounts";
-import { registerAgents, send } from "./agents";
+import { registerProjectToolbar } from "./projectToolbar";
+import { registerAgents } from "./agents";
 import { registerChat } from "./chat";
+
+let sendToChat: ReturnType<typeof registerChat>;
 
 const ACTIONS = ["explain", "fix", "validate", "pcall", "extract", "test", "ab"] as const;
 const GLASS_THEME = "Parlay Glass";
 const LUAU = [{ language: "luau" }, { language: "lua" }, { pattern: "**/*.luau" }];
 
 export function activate(ctx: vscode.ExtensionContext) {
-	registerAgents(ctx);   // the agent terminal every send() below types into
-	registerChat(ctx);     // the Chat tab: the same two agents headless, one transcript (chat.ts)
+	registerProjectToolbar(ctx);
+	registerAgents(ctx);   // explicitly opened agent terminals remain available
+	sendToChat = registerChat(ctx);     // the Chat tab: the same two agents headless, one transcript (chat.ts)
 	for (const key of ACTIONS) {
 		ctx.subscriptions.push(vscode.commands.registerCommand(`parlay.claude.${key}`, (range?: vscode.Range) => runSkill(ctx, key, range)));
 	}
@@ -41,12 +43,16 @@ export function activate(ctx: vscode.ExtensionContext) {
 	// game is known, with a Start button when a local Aqua is down), Meshy, and Sonar.
 	const aqua = new UrlView("aquaUrl", "Aqua", startAqua, vscode.Uri.joinPath(ctx.extensionUri, "media", "aqua.png"), aquaStrip);
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.aqua", aqua));
+	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.aqua.show", async () => {
+		aqua.showLanding();
+		await vscode.commands.executeCommand("parlay.aqua.focus");
+	}));
 	registerAqua(ctx, () => aqua.refresh(), () => aqua.showDashboard());   // Pair with Aqua (aqua.ts), from the landing page or the view's title
 	registerAquaIssues(ctx, {   // the issues tree (aquaIssues.ts) drives the panel under it
 		showEvidence: (body) => aqua.showEvidence(body), showLanding: () => aqua.showLanding(), showDashboard: () => aqua.showDashboard(),
-		fix: async (line) => { await installSkills(ctx, false); send(line); },
+		fix: async (line) => { await dispatchSkill(ctx, line); },
 	});
-	const meshy = new MeshyView(ctx, async (assetId, name) => { await installSkills(ctx, false); send(`/parlay-insert-asset ${assetId} ${clean(name)}`); });
+	const meshy = new MeshyView(ctx, async (assetId, name) => { await dispatchSkill(ctx, `/parlay-insert-asset ${assetId} ${clean(name)}`); });
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.meshy", meshy, { webviewOptions: { retainContextWhenHidden: true } }));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.meshy.setKey", () => meshy.setKey("meshy")));
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.roblox.setKey", () => meshy.setKey("roblox")));
@@ -62,8 +68,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.commands.registerCommand("parlay.claude.insert-asset", async () => {
 		const id = await vscode.window.showInputBox({ prompt: "Roblox asset id to insert into the open Studio", placeHolder: "1234567890" });
 		if (!id?.trim()) return;
-		await installSkills(ctx, false);
-		send(`/parlay-insert-asset ${clean(id.trim())}`);
+		await dispatchSkill(ctx, `/parlay-insert-asset ${clean(id.trim())}`);
 	}));
 	ctx.subscriptions.push(vscode.window.registerWebviewViewProvider("parlay.sonar", new UrlView("sonarUrl", "Sonar")));
 	// Accounts: every login and key on one page (the account in the header opens it)
@@ -80,7 +85,8 @@ export function activate(ctx: vscode.ExtensionContext) {
 		void ctx.globalState.update("layoutV2Done", true);
 		void (async () => {
 			await vscode.commands.executeCommand("workbench.action.positionPanelBottom");
-			await vscode.commands.executeCommand("parlay.aqua.focus");
+			await vscode.commands.executeCommand("workbench.action.closePanel");
+			await vscode.commands.executeCommand("parlay.chat.focus");
 		})();
 	}
 	void ensureSeleneConfig();
@@ -100,7 +106,7 @@ export function activate(ctx: vscode.ExtensionContext) {
 	ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration("workbench.colorTheme")) void syncGlass(); }));
 
 	const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	status.command = "parlay.installSkills";
+	status.command = "parlay.scriptSync";
 	ctx.subscriptions.push(status);
 	void refreshStatus(status);
 	const timer = setInterval(() => void refreshStatus(status), 30_000);
@@ -119,7 +125,7 @@ async function firstRun() {
 	for (const [k, v] of Object.entries(want)) {
 		if (cfg.inspect(k)?.globalValue === undefined) await cfg.update(k, v, vscode.ConfigurationTarget.Global);
 	}
-	await vscode.commands.executeCommand("parlay.aqua.focus");   // opens the Parlay sidebar on the right
+	await vscode.commands.executeCommand("parlay.chat.focus");   // opens the Parlay sidebar even without a game folder
 }
 
 // Selene only parses Luau syntax (type annotations, `::`, string interpolation) when the project's selene.toml
@@ -138,26 +144,36 @@ async function ensureSeleneConfig() {
 
 // ---- the actions --------------------------------------------------------------------------------
 
-function target(range?: vscode.Range): string | undefined {
+function target(range?: vscode.Range): { label: string; text: string } | undefined {
 	const ed = vscode.window.activeTextEditor;
 	if (!ed) { void vscode.window.showInformationMessage("Open a script first."); return; }
 	const rel = vscode.workspace.asRelativePath(ed.document.uri, false).replace(/\\/g, "/");
 	const r = range ?? ed.selection;
-	return `${rel}:${r.start.line + 1}-${r.end.line + 1}`;
+	const text = ed.document.getText(r.isEmpty ? undefined : r);
+	if (text.length > 20000) { void vscode.window.showInformationMessage("Select a smaller section for Chat (up to 20,000 characters)."); return; }
+	return { label: `${rel}:${r.isEmpty ? 1 : r.start.line + 1}-${r.isEmpty ? ed.document.lineCount : r.end.line + 1}`, text };
+}
+
+// Both agents get the bundled instructions directly; no CLI-specific slash-command support needed.
+async function dispatchSkill(ctx: vscode.ExtensionContext, command: string, context?: { label: string; text: string }) {
+	const match = /^\/(parlay-[a-z-]+)\s*([\s\S]*)$/.exec(command);
+	if (!match) { await sendToChat(command, context); return; }
+	const file = path.join(ctx.extensionPath, "skills", match[1], "SKILL.md");
+	const instructions = fs.readFileSync(file, "utf8").replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "");
+	const label = match[1].slice("parlay-".length).replace(/-/g, " ");
+	await sendToChat(`${label[0].toUpperCase()}${label.slice(1)} ${match[2]}`, context, `Run the ${match[1]} action. Arguments: ${match[2]}. ${context ? `Target ($0): ${context.label}. Additional question ($1): ${match[2].slice(context.label.length).trim() || "none"}. Use the attached editor snapshot for the selected code, including unsaved edits.` : ""}\n\n${instructions}`);
 }
 
 async function runSkill(ctx: vscode.ExtensionContext, key: string, range?: vscode.Range) {
-	const t = target(range); if (!t) return;
-	await installSkills(ctx, false);
-	send(`/parlay-${key} ${t}`);
+	const selection = target(range); if (!selection) return;
+	await dispatchSkill(ctx, `/parlay-${key} ${selection.label}`, selection);
 }
 
 async function ask(ctx: vscode.ExtensionContext) {
-	const t = target(); if (!t) return;
-	const q = await vscode.window.showInputBox({ prompt: `Ask Claude about ${t}`, placeHolder: "What does this do when two players buy at once?" });
+	const selection = target(); if (!selection) return;
+	const q = await vscode.window.showInputBox({ prompt: `Ask about ${selection.label}`, placeHolder: "What does this do when two players buy at once?" });
 	if (!q) return;
-	await installSkills(ctx, false);
-	send(`/parlay-explain ${t} ${clean(q)}`);
+	await dispatchSkill(ctx, `/parlay-explain ${selection.label} ${q}`, selection);
 }
 
 // Screenshot in, six in-scene candidates out (skills/parlay-match-assets). Empty path = capture from Studio.
@@ -167,8 +183,7 @@ async function matchAssets(ctx: vscode.ExtensionContext) {
 		placeHolder: "C:\\Users\\you\\Pictures\\spawn.png",
 	});
 	if (p === undefined) return;
-	await installSkills(ctx, false);
-	send(`/parlay-match-assets ${p.trim() ? clean(p.trim()) : "capture"}`);
+	await dispatchSkill(ctx, `/parlay-match-assets ${p.trim() ? clean(p.trim()) : "capture"}`);
 }
 
 const clean = (s: string) => s.replace(/["\r\n]/g, "'");
@@ -199,7 +214,7 @@ class SelectionLens implements vscode.CodeLensProvider {
 		const range = new vscode.Range(ed.selection.start.line, 0, ed.selection.start.line, 0);
 		const sel = new vscode.Range(ed.selection.start, ed.selection.end);
 		return [
-			new vscode.CodeLens(range, { title: "Claude: Explain", command: "parlay.claude.explain", arguments: [sel] }),
+			new vscode.CodeLens(range, { title: "Explain", command: "parlay.claude.explain", arguments: [sel] }),
 			new vscode.CodeLens(range, { title: "Fix", command: "parlay.claude.fix", arguments: [sel] }),
 			new vscode.CodeLens(range, { title: "Validate on server", command: "parlay.claude.validate", arguments: [sel] }),
 			new vscode.CodeLens(range, { title: "Ask…", command: "parlay.ask" }),
@@ -210,7 +225,7 @@ class SelectionLens implements vscode.CodeLensProvider {
 // ---- glass --------------------------------------------------------------------------------------
 
 // parlay.glass is what the fork reads (fork/patches/parlay-glass.patch): the main process swaps the window's
-// acrylic and the workbench its transparency class as soon as the setting changes, so the theme switch is live.
+// acrylic (Windows) or vibrancy (macOS) and the workbench transparency class when the theme changes.
 async function syncGlass() {
 	const cfg = vscode.workspace.getConfiguration();
 	const want = cfg.get<string>("workbench.colorTheme") === GLASS_THEME;
@@ -229,6 +244,7 @@ class UrlView implements vscode.WebviewViewProvider {
 	// the issues tree hands over (aquaIssues.ts), shown whenever the folder's game is known.
 	private mode: "landing" | "dashboard" | "evidence" = "landing";
 	private evidence = "";
+	private stayOnLanding = false;
 	// logo: shown on the landing and placeholder pages, from the extension's media folder.
 	// strip: the state line and next step (the Aqua pairing state, aqua.ts); drawn above the live page too.
 	constructor(private setting: string, private label: string, private start?: () => boolean, private logo?: vscode.Uri, private strip?: () => Promise<Strip>) {}
@@ -239,8 +255,8 @@ class UrlView implements vscode.WebviewViewProvider {
 		void this.strip().then((s) => this.view?.webview.postMessage({ type: "strip", ...s }));
 	}
 	// Show the live page (the dashboard), for when the pairing needs it or the user asks
-	showDashboard() { this.mode = "dashboard"; void this.render?.(); }
-	showLanding() { this.mode = "landing"; void this.render?.(); }
+	showDashboard() { this.stayOnLanding = false; this.mode = "dashboard"; void this.render?.(); }
+	showLanding() { this.stayOnLanding = true; this.mode = "landing"; void this.render?.(); }
 	// The evidence page: a body (styles included) whose [data-goto] and [data-cmd] elements run Parlay commands.
 	showEvidence(body: string) { this.mode = "evidence"; if (body) this.evidence = body; void this.render?.(); }
 	resolveWebviewView(view: vscode.WebviewView) {
@@ -265,7 +281,7 @@ const b=e.target.closest("[data-cmd]");if(b)v.postMessage({type:"command",comman
 			// the landing page: logo, state, one button; the dashboard takes over once every open place is paired
 			if (this.strip && this.mode === "landing") {
 				const s = up ? await this.strip() : { text: `${this.label} is unreachable at ${u}.`, paired: false };
-				if (s.paired) this.mode = "dashboard";
+				if (s.paired && !this.stayOnLanding) this.mode = "dashboard";
 				else {
 					const nonce = Math.random().toString(36).slice(2);
 					const logo = this.logo ? `<img class="logo" src="${view.webview.asWebviewUri(this.logo)}" alt="">` : "";
@@ -273,16 +289,17 @@ const b=e.target.closest("[data-cmd]");if(b)v.postMessage({type:"command",comman
 						: (this.start && isLocal(u) ? `<button id="s" ${starting ? "disabled" : ""}>${starting ? "Starting…" : `Start ${this.label}`}</button>` : "");
 					view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${view.webview.cspSource}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
 <style>
-body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px/1.5 var(--vscode-font-family);color:var(--vscode-descriptionForeground);background:transparent}
-.c{text-align:center;max-width:36ch;padding:0 16px}
-.logo{width:128px;height:128px;object-fit:contain;margin-bottom:18px}
+html,body{margin:0;padding:0;width:100%;height:100%;box-sizing:border-box;overflow:auto}
+body{display:flex;font:13px/1.5 var(--vscode-font-family);color:var(--vscode-descriptionForeground);background:transparent}
+.c{box-sizing:border-box;text-align:center;width:100%;max-width:36ch;padding:24px 16px;margin:auto}
+.logo{width:72px;height:72px;object-fit:contain;margin-bottom:14px}
 h1{font-size:20px;font-weight:600;margin:0 0 6px;color:var(--vscode-foreground)}
 p{margin:0 0 18px;font-size:12px}
 button{padding:9px 24px;border:0;border-radius:999px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer;font:inherit;font-size:13px;font-weight:600}
 button:hover{background:var(--vscode-button-hoverBackground)}button[disabled]{opacity:.6;cursor:default}
 a{display:block;margin-top:16px;font-size:12px;color:var(--vscode-textLink-foreground);cursor:pointer}a:hover{text-decoration:underline}
 </style>
-<div class="c">${logo}<h1>${this.label}</h1><p>${(s.text || `Pair your Roblox Studio place with ${this.label}.`).replace(/[<&]/g, (c) => c === "<" ? "&lt;" : "&amp;")}</p>${primary}${up ? `<a id="d">Open the dashboard</a>` : ""}</div>
+<div class="c">${logo}<h1>${this.label}</h1><p>${(s.text || `Pair your project with ${this.label}.`).replace(/[<&]/g, (c) => c === "<" ? "&lt;" : "&amp;")}</p>${primary}${up ? `<a id="d">Open the dashboard</a>` : ""}</div>
 <script nonce="${nonce}">const v=acquireVsCodeApi();document.getElementById("p")?.addEventListener("click",(e)=>v.postMessage({type:"command",command:e.currentTarget.dataset.cmd}));document.getElementById("s")?.addEventListener("click",()=>v.postMessage({type:"start"}));document.getElementById("d")?.addEventListener("click",()=>v.postMessage({type:"dashboard"}));</script>`;
 					return;
 				}
@@ -292,15 +309,20 @@ a{display:block;margin-top:16px;font-size:12px;color:var(--vscode-textLink-foreg
 				const nonce = Math.random().toString(36).slice(2);
 				view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
 <style>
-html,body{margin:0;height:100vh;background:transparent}body{display:flex;flex-direction:column}iframe{flex:1;width:100%;border:0}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:transparent}body{display:flex;flex-direction:column}iframe{flex:1;min-height:0;width:100%;border:0}
 #strip{display:none;align-items:center;gap:10px;padding:6px 10px;font:12px/1.4 var(--vscode-font-family);color:var(--vscode-descriptionForeground);border-bottom:1px solid var(--vscode-panel-border)}
-#strip.on{display:flex}#t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#navigation{display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0}
+#home{border:0;border-radius:4px;padding:4px 7px;background:transparent;color:var(--vscode-foreground);font:12px var(--vscode-font-family);cursor:pointer}
+#home:hover{background:var(--vscode-toolbar-hoverBackground)}#home:focus-visible{outline:1px solid var(--vscode-focusBorder)}
+#strip.on{display:flex}#t{flex:1;min-width:0;overflow-wrap:anywhere}
 #strip button{padding:3px 10px;border:0;border-radius:999px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer;white-space:nowrap}
 </style>
+${this.strip ? `<nav id="navigation" aria-label="Aqua navigation"><button id="home" title="Return to Aqua in Parlay">← Back to Aqua</button></nav>` : ""}
 <div id="strip"><span id="t"></span><button id="b" hidden></button></div>
 <iframe src="${u}" allow="clipboard-write"></iframe>
 <script nonce="${nonce}">const v=acquireVsCodeApi(),s=document.getElementById("strip"),t=document.getElementById("t"),b=document.getElementById("b");let cmd="";
 window.addEventListener("message",(e)=>{const m=e.data;if(m?.type!=="strip")return;t.textContent=m.text;s.className=m.text?"on":"";b.hidden=!m.action;b.textContent=m.action?.label??"";cmd=m.action?.command??"";});
+document.getElementById("home")?.addEventListener("click",()=>v.postMessage({type:"landing"}));
 b.addEventListener("click",()=>cmd&&v.postMessage({type:"command",command:cmd}));</script>`;
 				this.refresh();
 				return;
@@ -312,8 +334,9 @@ b.addEventListener("click",()=>cmd&&v.postMessage({type:"command",command:cmd}))
 			const logo = this.logo ? `<img class="logo" src="${view.webview.asWebviewUri(this.logo)}" alt="">` : "";
 			view.webview.html = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${view.webview.cspSource}; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'">
 <style>
-body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px/1.5 var(--vscode-font-family);color:var(--vscode-descriptionForeground);background:transparent}
-.c{text-align:center;max-width:32ch}
+html,body{margin:0;padding:0;width:100%;height:100%;box-sizing:border-box;overflow:auto}
+body{display:flex;font:13px/1.5 var(--vscode-font-family);color:var(--vscode-descriptionForeground);background:transparent}
+.c{box-sizing:border-box;text-align:center;width:100%;max-width:32ch;padding:24px 16px;margin:auto;overflow-wrap:anywhere}
 .logo{width:72px;height:72px;object-fit:contain;margin-bottom:14px;opacity:.95}
 b{display:block;color:var(--vscode-foreground);font-weight:600;margin-bottom:6px}
 code{font-family:var(--vscode-editor-font-family);font-size:12px}
@@ -327,6 +350,7 @@ button[disabled]{opacity:.6;cursor:default}
 			// the strip's button and the evidence page run Parlay commands (only ours: the page is an iframe of a web app)
 			if (m?.type === "command" && typeof m.command === "string" && m.command.startsWith("parlay.")) { void vscode.commands.executeCommand(m.command, ...(Array.isArray(m.args) ? m.args : [])); return; }
 			if (m?.type === "dashboard") { this.showDashboard(); return; }
+			if (m?.type === "landing") { this.showLanding(); return; }
 			if (m?.type !== "start" || !this.start) return;
 			if (!this.start()) return;
 			void render(true);
@@ -351,6 +375,12 @@ button[disabled]{opacity:.6;cursor:default}
 async function refreshStatus(status: vscode.StatusBarItem) {
 	const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	if (!folder) { status.hide(); return; }
+	if (process.platform !== "win32") {
+		status.text = "$(sync) Script Sync";
+		status.tooltip = "Check Script Sync in Roblox Studio. Choose Script Sync > Set up folders automatically to configure sync on Mac. Check active sync and any conflicts in Studio.";
+		status.show();
+		return;
+	}
 	let on = false;
 	if (process.platform === "win32") {
 		const text = await new Promise<string>((res) =>

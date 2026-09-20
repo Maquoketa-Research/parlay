@@ -12,7 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { api, aquaIsLocal, aquaSignIn, aquaUrl, detail, Game, gameForPlace, sessionHeaders } from "./aqua";
 import { applyHunks, candidates, esc, firstLoc, linkify, Loc, mirrorCandidates, parseDiff, pathText, shortLoc } from "./aquaText";
-import { listStudiosViaWindows, log, readSyncRecord, syncRecordName } from "./studio";
+import { listStudiosViaProcesses, log, readSyncRecord, syncRecordName } from "./studio";
 
 // ---- Aqua's shapes (db/rows.py Issue and Patch, verify.py gather()) ------------------------------
 
@@ -129,7 +129,7 @@ class AquaIssues implements vscode.TreeDataProvider<Row> {
 		let found: string | undefined;
 		for (const id of mine) if (await names(id)) { found = id; break; }
 		found ??= mine[0];
-		if (!found) for (const s of await listStudiosViaWindows().catch(() => [])) {
+		if (!found) for (const s of await listStudiosViaProcesses().catch(() => [])) {
 			if (s.placeId && await names(s.placeId)) { found = s.placeId; break; }
 		}
 		if (found) await this.ctx.workspaceState.update("aquaPlaceId", found); else this.missedAt = Date.now();

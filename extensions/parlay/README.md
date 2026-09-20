@@ -9,10 +9,10 @@ VS Code today; the fork (`fork/README.md`) turns it into the standalone **Parlay
 
 ## What it does
 
-- **Right-click, then Claude** on any Luau: Explain this, Ask about the selection, Fix this, Add server-side
+- **Right-click, then Chat** on any Luau: Explain this, Ask about the selection, Fix this, Add server-side
   validation, Wrap DataStore calls in pcall, Extract to ModuleScript, Write a test, Make an A/B variant.
   The same menu sits on the editor title, and a lens appears over any multi-line selection (Explain, Fix,
-  Validate, Ask). Each is a Claude Code skill (`skills/parlay-*/SKILL.md`) run in a terminal named Claude,
+  Validate, Ask). Each uses a bundled skill (`skills/parlay-*/SKILL.md`) in Chat with the selected agent,
   on the file and line range you selected. The code lands in the file; with Script Sync on, it lands in Studio.
 - **Parlay sidebar** on the right (the secondary side bar, its own container, open by default, no hide button):
   - **Aqua** (`parlay.aquaUrl`): the issues Aqua holds against this folder's game, one click from the script
@@ -61,9 +61,17 @@ npm run package            # parlay-ide-0.0.1.vsix
 code --install-extension parlay-ide-0.0.1.vsix
 ```
 
-Open a Script Sync folder (or `aqua/fixtures/sample_game`), select some lines, right-click, Claude.
+Open a Script Sync folder (or `aqua/fixtures/sample_game`), select some lines, right-click, Chat.
 `bash tools/baketest/run.sh` checks the Meshy paint bake headless in Edge (torus knot, tinted views, front reads red).
-First use copies the skills to `~/.claude/skills/`; **Parlay: Install Claude skills** re-copies them.
+Chat loads bundled skills directly. **Parlay: Install Claude skills** optionally copies them to `~/.claude/skills/` for standalone use.
+
+Chat's Model, Thinking and Fast controls save separate preferences for Codex and Claude. Changes apply
+on the next Chat turn and to newly launched agent terminals; available effort levels and fast-mode
+support depend on the model and account. Fast mode can use additional quota.
+
+Both agents receive Caveman lite and Ponytail full instructions on every session launch, including
+resumed sessions. The pinned upstream skills and licenses live in `agent-modes/`; each `SOURCE.md`
+records its repository and revision. No upstream hooks or scripts are executed.
 
 ## Layout
 

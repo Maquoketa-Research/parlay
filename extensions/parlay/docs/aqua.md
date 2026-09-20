@@ -1,3 +1,42 @@
+# Direct pairing in Parlay (September 20, 2026)
+
+Parlay is the pairing client; it does not install or depend on the Aqua Studio plugin.
+Open the game project and choose **Pair with Aqua**. Parlay resolves the place from
+native Script Sync mappings or the saved project association. If none is known, choose
+an open Studio place by name. It never guesses from an unrelated open window or asks
+for numeric IDs. Studio MCP supplies the current account when available; otherwise
+Parlay uses its Roblox sign-in session or the previous pairing identity. Sign-in is
+required when no account identity is available. Dashboard approval remains mandatory.
+The place must be registered on the game's Setup page in Aqua.
+
+Parlay uses the same handshake as the current Aqua Studio client:
+
+1. `POST /api/studio/pair` with `placeId`, `universeId`, `placeName`, and `studioUserId`.
+2. Display the returned code in Parlay; the user approves the matching code in Aqua.
+3. Long-poll `GET /api/studio/pair/{id}?wait=10` until approved, denied, cancelled, or expired.
+4. Validate the returned credential with `GET /api/studio/ping?place_id=...` and `X-Aqua-Key`.
+5. Store the credential in VS Code SecretStorage, scoped to Aqua URL, place, and user.
+   Keep the selected place metadata in workspaceState; never put credentials in webviews.
+
+The account ID is a claim, not authentication. Aqua requires dashboard approval by that
+account and enforces game membership. Parlay never calls the approval endpoint itself.
+An approved response has `key: string` and `game: string`. Hosted Aqua issues a scoped
+user/place token, not the game's shared ingest key. Registered places alone do not
+establish a Parlay pairing; status checks require a stored, accepted credential.
+
+This replaces the pairing/install flow only. Exporting Studio instances, applying changes,
+and runtime relay capabilities are separate integrations; pairing does not implement them.
+Dashboard session authentication for the Issues API remains separate from this credential.
+
+Verified against `Maquoketa-Research/aqua` pairing/studio routes and Studio client.
+
+---
+
+## Historical design notes (superseded for pairing)
+
+The notes below describe the previous plugin-supervision design and proposals. Plugin
+installation, key ownership, and pairing instructions below no longer describe Parlay.
+
 # Aqua inside Parlay: issues, evidence, fixes, pairing
 
 Sep 17 2026. Read from the Aqua checkout at `~/Documents/GitHub/aqua` (`main` = 0569d7e) and the other

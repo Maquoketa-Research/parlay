@@ -121,7 +121,79 @@ Remove-Item "Cert:\CurrentUser\My\$($c.Thumbprint)"
 ```
 ## macOS
 
-Nobody here has a Mac, so the Mac build is a GitHub Actions job: `.github/workflows/mac.yml` runs
+### Local Mac development
+
+To run from a checkout, use the Node version in `.nvmrc`, Python 3 with setuptools, and Xcode command line
+tools. This builds the editor and its extensions without the release build's minification step:
+
+```bash
+npm ci --no-audit --no-fund
+VSIX_TARGET="darwin-$(node -p 'process.arch')" bash build/parlay/fetch-builtins.sh
+npm run gulp copy-codicons compile-api-proposal-names compile-extension-point-names
+npm run transpile-client
+npm run build-fast-extensions
+node build/lib/preLaunch.ts
+codesign --force --deep --sign - .build/electron/Parlay.app
+codesign --verify --deep --strict .build/electron/Parlay.app
+```
+
+`fetch-builtins.sh` updates the local VSIX hashes in `product.json`; these platform-specific/generated hash
+changes should not be committed as source changes.
+
+After preparation, double-click `build/parlay/run-darwin.command` in Finder, or run it with a project folder:
+
+```bash
+bash build/parlay/run-darwin.command /path/to/game
+```
+
+The launcher also recognizes an official Node distribution extracted under
+`.build/toolchains/node-v<version>-darwin-<arch>/`, so a repo-local toolchain works from Finder. It reuses
+compiled outputs; after editing sources, rerun `npm run transpile-client` and `npm run build-fast-extensions`
+before reopening the app. This is a local development app, not a signed distributable installer.
+
+The launcher keeps its profile in `.build/parlay-local`. For local editing without OAuth build credentials,
+set `"parlay.requireSignIn": false` in `.build/parlay-local/User/settings.json`. Roblox account operations still
+require a configured OAuth app and sign-in.
+
+For the classic Windows appearance (flat panels, rectangular tabs, gray title bar, blue status bar), use:
+
+```json
+{
+  "workbench.colorTheme": "Dark+",
+  "parlay.roundedChrome": false
+}
+```
+
+With `parlay.stackedHeader` enabled (the default), macOS uses the second row for a game project picker,
+Script Sync setup, Changes, Problems, Open Studio, Aqua, and Chat. File, Edit, and the other standard menus
+stay in the macOS system menu bar. The Parlay logo sits left of the native window buttons in the top row.
+Open Studio launches Roblox Studio for
+playtesting; it does not start or stop a game. Turning the setting off restores a single title row.
+
+Choose **Parlay Glass** with Preferences: Color Theme for macOS vibrancy behind the sidebar, title bar, and
+panels. The editor stays opaque for readability. Switching to another theme restores solid chrome; the
+Windows version uses acrylic. macOS accessibility settings can reduce the transparency effect.
+
+### Parlay Chat
+
+**Chat** is Parlay's own sidebar interface for Claude Code and Codex. It uses the agents' existing CLI
+logins; there is no separate Chat account. The composer shows connection status and provides sign-in and
+refresh actions. macOS discovery checks PATH, common local/Homebrew locations, and the Codex CLI bundled
+with an existing desktop installation. Explicit `parlay.claudeCommand` and `parlay.codexCommand` settings
+still take priority.
+
+Attach the active file or selected code with the paperclip (up to 20,000 characters), then send with Enter.
+Shift+Enter adds a line. Drafts survive hiding/reloading the view; a refused send keeps the draft. You can
+copy messages and code blocks, expand tool output, and switch agents within a conversation. Claude streams
+text; Codex currently delivers completed message events. Chat requires an open, trusted project to run agents.
+
+**New chat** archives the current conversation. **Conversation history** reopens saved chats for this project,
+including each agent's session identifiers. Transcripts and attached code are stored under Parlay's extension
+global storage, in `chat/`. The interface follows Dark, Paper, and Glass themes.
+
+### Release builds
+
+The release Mac build is a GitHub Actions job: `.github/workflows/mac.yml` runs
 `build/parlay/build-darwin.sh` on a hosted runner (`macos-14`, Apple silicon; `macos-15-intel` when `arch` is
 `x64`). It starts on every `v*` tag, so `release.sh` starting the Windows release starts the Mac one, and by hand
 from Actions > Parlay (macOS) > Run workflow (inputs: `arch`, and `release` to upload to the GitHub release
@@ -170,7 +242,31 @@ lets Squirrel install updates.
 
 **Not done yet on Mac.** The extension activates cleanly (its Windows-only paths are behind `process.platform`
 checks or `LOCALAPPDATA` guards) but Studio integration is Windows-shaped: Studio's local plugins live in
-`~/Documents/Roblox/Plugins` on a Mac (the luau-lsp and Aqua plugin installers look in `%LOCALAPPDATA%\Roblox\Plugins`),
+`~/Documents/Roblox/Plugins` on a Mac (the luau-lsp installer looks in `%LOCALAPPDATA%\Roblox\Plugins`),
 the Studio MCP is started through `%LOCALAPPDATA%\Roblox\mcp.bat` and the Script Sync record and open-Studio list are
-read from the registry and PowerShell, and the Codex fallback looks for `codex.exe`. Each says so instead of
+read from the registry and PowerShell. Each says so instead of
 failing, and each is a follow-up.
+
+### Mac automatic Script Sync setup
+
+Use **Script Sync → Set up folders automatically…** for an open project, or
+**Add Roblox Studio Project** to create/open its folder. Confirm the published
+place ID, save the place, and quit Studio with **⌘Q** when prompted. Closing only
+the document window does not stop Studio's cached preference writes.
+
+Parlay reads Studio's existing `File_Sync_Persistence_Record_V1` slot, preserves
+all current mappings, adds missing core services, writes the three relevant keys
+through `defaults`/CFPreferences, verifies them, and reopens the place. A JSON
+backup of the original keys is stored in Parlay's extension global storage under
+`sync-backups`; its full path is logged. Failed writes roll back while Studio is
+still closed. No direct plist replacement or preference-daemon termination is used.
+
+StarterGui, StarterPlayerScripts and StarterCharacterScripts need real UniqueIds.
+Parlay looks for a matching recovery file or Open Cloud IDs; otherwise select a
+saved binary `.rbxl` copy with the same Workspace ID, or choose **Core Services
+Only**. Existing mappings, including mappings to other folders, are retained.
+Studio's conflict dialog remains authoritative when local files already exist.
+
+Validation covers guards, merging, backup and rollback with fixtures, and native
+CFPreferences round-tripping in an isolated test domain. The real Studio
+close/write/reopen cycle still needs a saved project run to verify export behavior.

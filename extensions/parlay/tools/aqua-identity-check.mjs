@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { chooseProjectIdentity, robloxId } from '../src/aquaIdentity.ts';
+const current = { placeId: '123', universeId: '456', name: 'Current project' };
+assert.equal(chooseProjectIdentity([current], { placeId: '999' }), current);
+assert.equal(chooseProjectIdentity([current, { ...current }]).placeId, '123');
+assert.equal(chooseProjectIdentity([current, { placeId: '999' }], current), undefined, 'ambiguous mappings must not silently pick a place');
+assert.equal(chooseProjectIdentity([], current), current);
+assert.equal(chooseProjectIdentity([], { placeId: '0' }), undefined);
+assert.equal(robloxId('123'), '123');
+for (const invalid of ['0', '', 'undefined', '123abc', undefined, null]) assert.equal(robloxId(invalid), undefined);
+console.log('Aqua identity: project associations, cached identity and ambiguous mappings passed');

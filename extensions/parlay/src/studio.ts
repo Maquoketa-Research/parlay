@@ -10,6 +10,8 @@ import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { parseMacStudioProcesses, macStudiosWithTitles } from "./studioDiscovery";
+import { readMacPreferences, macRecordNames, macEntries, macStudioRunning, writeMacSync } from "./macStudioSync";
 import { readPlaceIds } from "./rbxl";
 import { SCOPES as ROBLOX_SCOPES } from "./roblox-auth";
 
@@ -27,21 +29,41 @@ type Call = (method: string, params: unknown) => Promise<any>;
 
 export function studioSession<T>(fn: (call: Call) => Promise<T>, timeoutMs = 20000): Promise<T> {
 	return new Promise((resolve, reject) => {
-		const bat = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "mcp.bat");
-		if (!fs.existsSync(bat)) return reject(new Error("Roblox Studio MCP not installed (expected %LOCALAPPDATA%\\Roblox\\mcp.bat)"));
-		const child = spawn("cmd.exe", ["/d", "/s", "/c", bat], { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
-		let buf = ""; let nextId = 1; const pending = new Map<number, (v: any) => void>();
-		const call: Call = (method, params) => new Promise((res) => { const id = nextId++; pending.set(id, res); child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"); });
-		// kill the tree: child is cmd.exe, and killing only it leaves StudioMCP.exe running forever
-		const done = (err?: Error, value?: T) => { clearTimeout(t); if (child.pid) execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => { }); err ? reject(err) : resolve(value as T); };
-		const t = setTimeout(() => done(new Error("Studio MCP timed out; is another client (Claude Code) connected to Studio?")), timeoutMs);
-		child.on("error", (e) => done(e));
+		const windows = process.platform === "win32";
+		const executable = windows
+			? path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "mcp.bat")
+			: process.platform === "darwin" ? ["/Applications", path.join(os.homedir(), "Applications")]
+				.map(dir => path.join(dir, "RobloxStudio.app", "Contents", "MacOS", "StudioMCP"))
+				.find(file => fs.existsSync(file)) : undefined;
+		if (!executable || !fs.existsSync(executable)) return reject(new Error("Roblox Studio MCP was not found. Install or update Roblox Studio."));
+		const child = spawn(windows ? "cmd.exe" : executable, windows ? ["/d", "/s", "/c", executable] : ["--stdio"], { windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
+		let buf = ""; let nextId = 1; let finished = false;
+		const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+		const call: Call = (method, params) => new Promise((resolve, reject) => {
+			if (finished) { reject(new Error("Studio MCP session closed")); return; }
+			const id = nextId++; pending.set(id, { resolve, reject });
+			child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+		});
+		const done = (err?: Error, value?: T) => {
+			if (finished) return;
+			finished = true; clearTimeout(t);
+			for (const waiter of pending.values()) waiter.reject(err ?? new Error("Studio MCP session closed"));
+			pending.clear();
+			// Windows launches a batch wrapper; macOS launches the proxy directly.
+			if (windows && child.pid) execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
+			else child.kill();
+			err ? reject(err) : resolve(value as T);
+		};
+		const t = setTimeout(() => done(new Error("Studio MCP timed out; is another client connected to Studio?")), timeoutMs);
+		child.on("error", e => done(e));
+		child.stdin.on("error", e => done(e));
+		child.on("exit", () => done(new Error("Studio MCP exited before answering.")));
 		child.stdout.on("data", (d) => {
 			buf += d.toString();
 			let i; while ((i = buf.indexOf("\n")) >= 0) {
 				const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
 				if (!line) continue;
-				try { const msg = JSON.parse(line); if (msg.id && pending.has(msg.id)) { pending.get(msg.id)!(msg); pending.delete(msg.id); } } catch { /* not json */ }
+				try { const msg = JSON.parse(line); if (msg.id && pending.has(msg.id)) { const waiter = pending.get(msg.id)!; pending.delete(msg.id); waiter.resolve(msg); } } catch { /* not json */ }
 			}
 		});
 		(async () => {
@@ -66,14 +88,18 @@ let lastListError = "";
 export async function listStudios(): Promise<Studio[]> {
 	// the MCP server is the source of truth (instance id and place id straight from Studio); the windows and
 	// their logs are the backup, and fill in any window the server did not report
+	lastListError = "";
 	const t0 = Date.now();
-	const [mcp, win] = await Promise.allSettled([listStudiosViaMcp(), listStudiosViaWindows()]);
+	const [mcp, win] = await Promise.allSettled([listStudiosViaMcp(), listStudiosViaProcesses()]);
 	const studios: Studio[] = mcp.status === "fulfilled" ? mcp.value : [];
 	if (mcp.status === "rejected") log.appendLine(`Studio MCP: ${(mcp.reason as Error).message}`);   // seat taken or server down
 	const viaWindows: Studio[] = win.status === "fulfilled" ? win.value : [];
 	if (win.status === "rejected") { lastListError = (win.reason as Error).message; log.appendLine(`Studio windows: ${lastListError}`); }
 	log.appendLine(`listed Studios in ${Date.now() - t0} ms: mcp ${studios.length}, windows ${viaWindows.map((w) => `${w.name} (${w.placeId || "no place id"})`).join(", ") || "none"}`);
+	const hasMcpStudios = studios.length > 0;
 	for (const w of viaWindows) {
+		// On Mac the process fallback has no place identity; prefer the authoritative MCP list.
+		if (process.platform === "darwin" && hasMcpStudios) break;
 		const known = studios.some((s) => (w.placeId && s.placeId === w.placeId) || s.name.toLowerCase() === w.name.toLowerCase());
 		if (!known) studios.push(w);
 	}
@@ -83,7 +109,20 @@ export async function listStudios(): Promise<Studio[]> {
 // Each Studio window is a process; its log in %LOCALAPPDATA%\Roblox\logs is named with the process start time
 // (…_20260916T011322Z_Studio_XXXXX_last.log) and carries "placeid: N" and "universeid: N" near the top. So a
 // window title plus a start time gives the place id, offline, for published and unpublished places alike.
-export async function listStudiosViaWindows(): Promise<Studio[]> {
+export async function listStudiosViaProcesses(): Promise<Studio[]> {
+	if (process.platform === "darwin") {
+		// No Accessibility/Automation permission needed. A process proves Studio is running,
+		// but historical logs cannot reliably prove which place is still open.
+		const out = await new Promise<string>((resolve, reject) => execFile("/bin/ps", ["-axo", "pid=,comm="], { timeout: 3000 }, (error, stdout) => error ? reject(error) : resolve(stdout)));
+		const processes = parseMacStudioProcesses(out);
+		if (!processes.length) return [];
+		// Quartz supplies document titles without scripting Studio or taking its MCP seat.
+		const script = 'ObjC.import("CoreGraphics"); JSON.stringify(ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(0, 0))).filter(w => /roblox/i.test(w.kCGWindowOwnerName)).map(w => ({pid:w.kCGWindowOwnerPID,title:w.kCGWindowName,layer:w.kCGWindowLayer})))';
+		try {
+			const titles = await new Promise<string>((resolve, reject) => execFile("/usr/bin/osascript", ["-l", "JavaScript", "-e", script], { timeout: 3000, maxBuffer: 1 << 20 }, (error, stdout) => error ? reject(error) : resolve(stdout)));
+			return macStudiosWithTitles(processes, JSON.parse(titles));
+		} catch { return processes; }
+	}
 	if (process.platform !== "win32") return [];
 	const out = await powershell("Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.MainWindowTitle + '|' + $_.StartTime.ToUniversalTime().ToString('yyyyMMddTHHmmss') }");
 	let logs: ReturnType<typeof studioLogs> = [];
@@ -202,7 +241,7 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	let chosen: Studio | undefined;
 	if (studios.length) {
 		const item = await vscode.window.showQuickPick(
-			studios.map((s) => ({ label: s.name, description: s.placeId ? `placeId ${s.placeId}` : `${s.detail ? s.detail + " · " : ""}no place id found (right-click path)`, s })),
+			studios.map((s) => ({ label: s.name, description: s.placeId ? `placeId ${s.placeId}` : `${s.detail ? s.detail + " · " : ""}place ID unavailable`, s })),
 			{ placeHolder: "Which open Roblox Studio is the project?", ignoreFocusOut: true });
 		chosen = item?.s;
 		log.appendLine(chosen ? `picked ${chosen.name} placeId=${chosen.placeId || "none"}` : "picker dismissed");
@@ -211,6 +250,17 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 		const name = await vscode.window.showInputBox({ prompt: "Name of the Roblox place", placeHolder: "100 Fogs" });
 		if (!name) return;
 		chosen = { id: "", name, placeId: "" };
+	}
+
+	if (process.platform === "darwin" && /^Roblox Studio \(\d+\)$/.test(chosen.name) && !chosen.id && !chosen.placeId) {
+		const name = await vscode.window.showInputBox({ prompt: "Studio is running, but its place name is unavailable. What is your project called?", ignoreFocusOut: true });
+		if (!name?.trim()) return;
+		chosen = { ...chosen, name: name.trim() };
+	}
+
+	if (process.platform === "darwin") {
+		await configureMacSync(ctx, undefined, chosen);
+		return;
 	}
 
 	// the folder Studio already syncs to, else the one Parlay made for this place before, else a fresh one
@@ -230,7 +280,7 @@ export async function addStudioProject(ctx: vscode.ExtensionContext) {
 	const existing = (record ? await readSyncRecord(record) : []).filter((e) => fs.existsSync(e.filePath.replace(/\//g, "\\").replace(/\\+/g, "\\")));
 	const missing = SCRIPT_CONTAINERS.filter((c) => !existing.some((e) => e.className === c));
 	log.appendLine(`folder ${folder} (${synced ? "already syncing" : "new"}); record ${record ?? "none"}; ${existing.length} live entries; missing ${missing.join(", ") || "nothing"}`);
-	if (chosen.placeId && missing.length) {
+	if (process.platform === "win32" && chosen.placeId && missing.length) {
 		// The zero-click path. Studio keeps a per-place record of what it syncs and resumes it when the place
 		// opens; it accepts entries we write (any id, the service by class name) but only in the slot it named
 		// itself, and it (re)writes that slot when the place closes. So: the user closes the place, Parlay writes
@@ -308,6 +358,7 @@ function powershell(script: string): Promise<string> {
 
 // the record Studio made for this place (it makes one when the place opens); undefined when it never has
 export async function syncRecordName(placeId: string): Promise<string | undefined> {
+	if (process.platform === "darwin") return macRecordNames(await readMacPreferences(), placeId)[0];
 	if (process.platform !== "win32") return undefined;
 	const out = await powershell(`(Get-Item '${STUDIO_KEY}').GetValueNames() | Where-Object { $_ -like 'File_Sync_Persistence_Record_V1:${placeId}:*' -and $_ -notlike '*_timeLastUsed' -and $_ -notlike '*_lastUsedDir' }`);
 	return out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
@@ -316,6 +367,7 @@ export async function syncRecordName(placeId: string): Promise<string | undefine
 interface SyncEntry { className: string; filePath: string; scriptId?: string; status: string }
 
 export async function readSyncRecord(record: string): Promise<SyncEntry[]> {
+	if (process.platform === "darwin") return macEntries((await readMacPreferences())[record]);
 	const out = await powershell(`(Get-ItemProperty '${STUDIO_KEY}').'${record}'`);
 	// entries without a scriptId are ones Studio ignores; treat them as absent so they get rewritten with one
 	try { const v = JSON.parse(out); return Array.isArray(v) ? v.filter((e) => e && e.className && e.filePath && e.scriptId) : []; } catch { return []; }
@@ -359,7 +411,7 @@ async function starterIds(ctx: vscode.ExtensionContext, studio: Studio, slot: st
 	// a local place: the window title is the file
 	if (/\.rbxlx?$/i.test(studio.name) && fs.existsSync(studio.name)) { const r = fromFile(studio.name); if (r.out.size) return r.out; }
 	// Studio's Auto-Recovery copies, newest first, the one whose Workspace is this place's slot guid
-	const dir = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "RobloxStudio", "AutoSaves");
+	const dir = process.platform === "darwin" ? path.join(os.homedir(), "Library", "Application Support", "Roblox", "RobloxStudio", "AutoSaves") : path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "RobloxStudio", "AutoSaves");
 	if (fs.existsSync(dir) && slotGuid) {
 		const files = fs.readdirSync(dir).filter((f) => /_AutoRecovery_\d+\.rbxlx?$/i.test(f)).map((f) => path.join(dir, f))
 			.map((f) => ({ f, t: fs.statSync(f).mtimeMs })).sort((a, b) => b.t - a.t).slice(0, 12);
@@ -419,7 +471,7 @@ async function openCloudStarterIds(auth: Record<string, string>[], universe: str
 async function waitForPlaceClose(name: string, token: vscode.CancellationToken): Promise<boolean> {
 	const started = Date.now();
 	while (Date.now() - started < 10 * 60_000 && !token.isCancellationRequested) {
-		const open = await listStudiosViaWindows();
+		const open = await listStudiosViaProcesses();
 		if (!open.some((s) => s.name.toLowerCase() === name.toLowerCase())) return true;
 		await new Promise((r) => setTimeout(r, 2000));
 	}
@@ -428,7 +480,7 @@ async function waitForPlaceClose(name: string, token: vscode.CancellationToken):
 
 // Studio's edit link needs the universe (experience) id as well as the place id; Roblox answers this publicly
 async function universeIdFor(placeId: string): Promise<string | undefined> {
-	const r = await fetch(`https://apis.roblox.com/universes/v1/places/${placeId}/universe`);
+	const r = await fetch(`https://apis.roblox.com/universes/v1/places/${placeId}/universe`, { signal: AbortSignal.timeout(8000) });
 	if (!r.ok) return undefined;
 	const j = (await r.json()) as { universeId?: number | string | null };
 	return j.universeId !== undefined && j.universeId !== null ? String(j.universeId) : undefined;
@@ -441,4 +493,90 @@ async function selectScriptContainers(studioId: string): Promise<boolean> {
 		const r = await call("tools/call", { name: "execute_luau", arguments: { studio_id: studioId, datamodel_type: "Edit", code } });
 		return !r?.error && !r?.result?.isError;
 	}, 15000);
+}
+
+
+// macOS keeps the same per-place records in CFPreferences rather than the registry.
+// Quit the whole app: closing a document leaves the process and its cached preferences alive.
+let configuringMac = false;
+export async function configureMacSync(ctx: vscode.ExtensionContext, targetFolder?: string, selected?: Studio) {
+	if (configuringMac) return;
+	configuringMac = true;
+	try {
+		let studio = selected;
+		if (!studio) {
+			const studios = await listStudios();
+			studio = (await vscode.window.showQuickPick(studios.map(s => ({ label: s.name, description: s.placeId, studio: s })), { title: "Set up Script Sync", placeHolder: "Choose the open Studio place" }))?.studio;
+			if (!studio) { if (!studios.length) void vscode.window.showInformationMessage("Open the place in Roblox Studio, then set up Script Sync again."); return; }
+		}
+		let prefs = await readMacPreferences();
+		const records = macRecordNames(prefs);
+		const placeId = studio.placeId || await vscode.window.showInputBox({ title: "Set up Script Sync", prompt: `Confirm the Roblox place ID for “${studio.name}”`, value: ctx.workspaceState.get<string>("aquaPlaceId") ?? (records.length === 1 ? records[0].split(":")[1] : ""), validateInput: value => /^[1-9]\d*$/.test(value.trim()) ? undefined : "Enter the numeric place ID.", ignoreFocusOut: true });
+		if (!placeId) return;
+		studio = { ...studio, placeId: placeId.trim() };
+		let record = macRecordNames(prefs, studio.placeId)[0];
+		if (!record) throw new Error("Studio has no sync record for this place yet. Open the published place in Studio, then try again.");
+		const previous = ctx.globalState.get<{ folder: string }>(`studioProject:${studio.placeId}`);
+		const mapped = [...new Set(macEntries(prefs[record]).map(entry => path.dirname(entry.filePath)))];
+		const folder = targetFolder ?? previous?.folder ?? (mapped.length === 1 ? mapped[0] : undefined) ?? path.join(cfg("projectsDir", "") || path.join(os.homedir(), "Documents", "Parlay"), slug(studio.name));
+		const universe = studio.universeId ?? await universeIdFor(studio.placeId).catch(() => undefined);
+		// Recovery files may disappear on clean exit, so read their IDs before quitting.
+		const real = await starterIds(ctx, studio, record, universe).catch(() => new Map<string, string>());
+		const existing = macEntries(prefs[record]);
+		const unavailable = STARTERS.filter(c => !real.has(c) && !existing.some(e => e.className === c));
+		if (unavailable.length) {
+			const answer = await vscode.window.showInformationMessage(`To include ${unavailable.join(", ")}, Parlay needs their IDs from a saved copy of this place (.rbxl).`, { modal: true, detail: "Save a copy from Studio first, then choose it here. Existing mappings are preserved. You can also continue with the four core script services." }, "Choose Saved Place…", "Core Services Only");
+			if (!answer) return;
+			if (answer === "Choose Saved Place…") {
+				const files = await vscode.window.showOpenDialog({ title: "Choose a saved copy of this place", canSelectMany: false, filters: { "Roblox place": ["rbxl"] } });
+				if (!files?.[0]) return;
+				const ids = readPlaceIds(files[0].fsPath);
+				if (ids.workspace?.toLowerCase() !== record.split(":")[2].toLowerCase()) throw new Error("That file belongs to a different place. No sync preferences were changed.");
+				for (const c of STARTERS) { const id = ids.byClass.get(c)?.[0]; if (id) real.set(c, id); }
+				if (unavailable.some(c => !real.has(c))) throw new Error("The saved place does not contain all Starter container IDs. Save a current copy or choose Core Services Only.");
+			}
+		}
+		const go = await vscode.window.showInformationMessage(`Set up Script Sync for “${studio.name}”?`, { modal: true, detail: `Destination: ${folder}\nSave your place, then quit Roblox Studio with ⌘Q. Parlay will update its sync settings and reopen the place. Existing mappings stay in place; a backup is saved before writing.` }, "Wait for Studio to Quit");
+		if (!go) return;
+		const closed = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: "Save your place, then quit Roblox Studio (⌘Q)…", cancellable: true }, async (_p, token) => {
+			const end = Date.now() + 10 * 60_000;
+			while (Date.now() < end) {
+				if (token.isCancellationRequested) return false;
+				if (!await macStudioRunning()) return !token.isCancellationRequested;
+				await new Promise(resolve => setTimeout(resolve, 1000));
+			}
+			throw new Error("Timed out waiting for Studio to quit. No sync preferences were changed.");
+		});
+		if (!closed) return;
+		await new Promise(resolve => setTimeout(resolve, 1500));
+		prefs = await readMacPreferences();
+		const latest = macRecordNames(prefs, studio.placeId)[0];
+		if (!latest || latest !== record) throw new Error("Studio changed this place’s sync record. Run setup again so Parlay can read its current IDs.");
+		const ids = new Map<string, string>(SCRIPT_CONTAINERS.map(c => [c, randomUUID()]));
+		for (const [name, id] of real) ids.set(name, id);
+		fs.mkdirSync(folder, { recursive: true });
+		const result = await writeMacSync(record, folder, ids, path.join(ctx.globalStorageUri.fsPath, "sync-backups"));
+		log.info(`Mac Script Sync configured; backup: ${result.backup}`);
+		await ctx.globalState.update(`studioProject:${studio.placeId}`, { folder, name: studio.name, placeId: studio.placeId, universeId: universe, added: Date.now() });
+		if (universe) await vscode.env.openExternal(vscode.Uri.parse(`roblox-studio:1+launchmode:edit+task:EditPlace+placeId:${studio.placeId}+universeId:${universe}`));
+		void vscode.window.showInformationMessage(`Script Sync configured for ${result.entries.map(e => e.className).join(", ")}. ${universe ? "Studio is reopening; resolve any sync conflicts there." : "Reopen this place in Studio to start syncing."}`);
+		if (!targetFolder) await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(folder), { forceNewWindow: false });
+	} catch (error) { void vscode.window.showErrorMessage(`Script Sync: ${(error as Error).message}`); }
+	finally { configuringMac = false; }
+}
+
+
+// Read only: use the same identity Studio's own Aqua plugin would put in its request.
+export async function studioIdentity(studio: Studio): Promise<{ placeId: string; universeId: string; studioUserId: string; name: string } | undefined> {
+	if (!studio.id) return undefined;
+	return studioSession(async call => {
+		const result = await call("tools/call", { name: "execute_luau", arguments: { studio_id: studio.id, datamodel_type: "Edit", code: "return game:GetService('HttpService'):JSONEncode({placeId=tostring(game.PlaceId),universeId=tostring(game.GameId),studioUserId=tostring(game:GetService('StudioService'):GetUserId()),name=game.Name})" } });
+		if (result?.error || result?.result?.isError) return undefined;
+		try {
+			let value = JSON.parse(toolText(result));
+			if (typeof value === "string") value = JSON.parse(value);
+			if (!value || !/^[1-9]\d*$/.test(value.placeId) || !/^[1-9]\d*$/.test(value.studioUserId)) return undefined;
+			return { placeId: String(value.placeId), universeId: String(value.universeId ?? ""), studioUserId: String(value.studioUserId), name: String(value.name ?? studio.name) };
+		} catch { return undefined; }
+	}, 6000);
 }

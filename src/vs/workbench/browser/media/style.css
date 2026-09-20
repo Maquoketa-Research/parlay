@@ -415,30 +415,30 @@ body.parlay-glass,
 .vs .monaco-workbench, .hc-light .monaco-workbench { --parlay-edge: rgba(0, 0, 0, 0.08); }
 
 /* the side surfaces float: a small transparent inset shows the root (glass, or the theme base) around them */
-.monaco-workbench .part.sidebar,
-.monaco-workbench .part.auxiliarybar,
-.monaco-workbench .part.panel {
+.monaco-workbench.parlay-rounded .part.sidebar,
+.monaco-workbench.parlay-rounded .part.auxiliarybar,
+.monaco-workbench.parlay-rounded .part.panel {
 	clip-path: inset(6px round var(--parlay-radius));
 }
-.monaco-workbench .part.sidebar > .content,
-.monaco-workbench .part.auxiliarybar > .content,
-.monaco-workbench .part.panel > .content {
+.monaco-workbench.parlay-rounded .part.sidebar > .content,
+.monaco-workbench.parlay-rounded .part.auxiliarybar > .content,
+.monaco-workbench.parlay-rounded .part.panel > .content {
 	box-shadow: inset 0 0 0 1px var(--parlay-edge);
 	border-radius: var(--parlay-radius);
 }
 
 /* editor groups are cards; the code itself stays exactly where the editor puts it */
-.monaco-workbench .part.editor > .content .editor-group-container {
+.monaco-workbench.parlay-rounded .part.editor > .content .editor-group-container {
 	border-radius: 10px;
 	overflow: hidden;
 	box-shadow: inset 0 0 0 1px var(--parlay-edge);
 }
-.monaco-workbench .part.editor > .content .editor-group-container > .title {
+.monaco-workbench.parlay-rounded .part.editor > .content .editor-group-container > .title {
 	border-bottom: 1px solid var(--parlay-edge) !important;
 }
 
 /* tabs: quiet pills in the strip, no hard dividers */
-.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab {
+.monaco-workbench.parlay-rounded .part.editor > .content .editor-group-container > .title .tabs-container > .tab {
 	border-radius: 8px;
 	margin: 4px 2px 0;
 	--editor-group-tab-height: 27px;   /* the label's line-height and the close button size off the pill, not the 35px strip */
@@ -447,31 +447,31 @@ body.parlay-glass,
 	border-right: 0 !important;
 	border-left: 0 !important;
 }
-.monaco-workbench .part.editor > .content .editor-group-container > .title .tabs-container > .tab.active {
+.monaco-workbench.parlay-rounded .part.editor > .content .editor-group-container > .title .tabs-container > .tab.active {
 	border-top: 0 !important;
 }
 
 /* titles and headers: small caps, wider tracking, like the mockup */
-.monaco-workbench .part > .title > .title-label h2,
-.monaco-workbench .part > .composite.title > .title-label h2,
-.monaco-workbench .pane-header > .title {
+.monaco-workbench.parlay-rounded .part > .title > .title-label h2,
+.monaco-workbench.parlay-rounded .part > .composite.title > .title-label h2,
+.monaco-workbench.parlay-rounded .pane-header > .title {
 	font-size: 11px;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 }
 
 /* controls: pills and soft inputs everywhere */
-.monaco-workbench .monaco-button,
-.monaco-workbench .monaco-text-button { border-radius: 999px !important; }
-.monaco-workbench .monaco-inputbox { border-radius: 8px; }
-.monaco-workbench .quick-input-widget { border-radius: 14px; overflow: hidden; }
-.monaco-workbench .notifications-toasts .notification-toast { border-radius: 12px; overflow: hidden; }
-.monaco-workbench .monaco-menu-container .monaco-menu { border-radius: 12px; overflow: hidden; }
-.monaco-workbench .monaco-hover { border-radius: 10px; }
-.monaco-workbench .suggest-widget { border-radius: 10px; overflow: hidden; }
-.monaco-workbench .editor-widget.find-widget { border-radius: 10px; }
+.monaco-workbench.parlay-rounded .monaco-button,
+.monaco-workbench.parlay-rounded .monaco-text-button { border-radius: 999px !important; }
+.monaco-workbench.parlay-rounded .monaco-inputbox { border-radius: 8px; }
+.monaco-workbench.parlay-rounded .quick-input-widget { border-radius: 14px; overflow: hidden; }
+.monaco-workbench.parlay-rounded .notifications-toasts .notification-toast { border-radius: 12px; overflow: hidden; }
+.monaco-workbench.parlay-rounded .monaco-menu-container .monaco-menu { border-radius: 12px; overflow: hidden; }
+.monaco-workbench.parlay-rounded .monaco-hover { border-radius: 10px; }
+.monaco-workbench.parlay-rounded .suggest-widget { border-radius: 10px; overflow: hidden; }
+.monaco-workbench.parlay-rounded .editor-widget.find-widget { border-radius: 10px; }
 
-/* title bar: the mark at the far left, the menu, then "Parlay" in bold and the file beside it.
+/* title bar: the mark at the far left, the menu, then the window title.
    titlebarpart.css is bundled after this file at equal specificity, so the layout rules carry !important.
    The mark is inlined twice: sky blue for dark themes, navy for light ones (no plate). Regenerate the data
    URIs from fork/logo.png with tools/icons.py if the logo changes. */
@@ -492,17 +492,19 @@ body.parlay-glass,
 	flex: 0 1 auto !important; width: auto !important; max-width: none !important; margin: 0 8px 0 10px !important; justify-content: flex-start !important;
 }
 .monaco-workbench .part.titlebar > .titlebar-container.has-center > .titlebar-right { flex: 1 1 auto !important; width: auto !important; }
+/* macOS keeps its menu in the system menu bar. Reserve the native traffic-light area
+   before the left-aligned title; Parlay's compact flex layout otherwise collapses it. */
+.monaco-workbench.mac:not(.web):not(.fullscreen) .part.titlebar > .titlebar-container {
+	padding-left: 80px;
+}
 .monaco-workbench .part.titlebar > .titlebar-container > .titlebar-center > .window-title {
 	margin-left: 0 !important; margin-right: 0 !important; font-weight: 400 !important; font-size: 12px !important; opacity: 0.85;
 }
-.monaco-workbench .part.titlebar > .titlebar-container > .titlebar-center > .window-title::before {
-	content: "Parlay"; font-weight: 700; letter-spacing: 0.02em; margin-right: 14px; opacity: 1;
-}
 
-/* stacked header (setting parlay.stackedHeader; the title bar part adds 26px and workbench.ts adds the class):
-   row 1 = mark, "Parlay" and the file, window controls; row 2 = the menu bar. The DOM is untouched. */
+
+/* Stacked header: title and window controls above menus on Windows/Linux or project actions on Mac. */
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container {
-	display: grid !important; grid-template-columns: auto 1fr auto; grid-template-rows: 30px 26px; align-items: center;
+	display: grid !important; grid-template-columns: auto 1fr auto; grid-template-rows: var(--parlay-title-row-height, 30px) var(--parlay-secondary-row-height, 26px); align-items: center;
 }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-left { display: contents !important; }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { grid-row: 1; grid-column: 1; }
@@ -510,15 +512,43 @@ body.parlay-glass,
 	grid-row: 2; grid-column: 1 / -1; order: 0; height: 26px; align-items: center; padding-left: 4px;
 }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-left > .menubar .menubar-menu-button { height: 26px !important; line-height: 26px !important; }
-.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-center { grid-row: 1; grid-column: 2; height: 30px !important; }
-.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right { grid-row: 1; grid-column: 3; height: 30px !important; align-self: start; }
+.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-center { grid-row: 1; grid-column: 2; height: var(--parlay-title-row-height, 30px) !important; }
+.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right { grid-row: 1; grid-column: 3; height: var(--parlay-title-row-height, 30px) !important; align-self: start; }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-center > .window-title::before { font-size: 13px; }
-/* the account and settings icons centre in the 30px first row, level with the window buttons */
-.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container { height: 30px !important; display: flex !important; align-items: center !important; }
+/* the account and settings icons centre in the first row, level with the window buttons */
+.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container { height: var(--parlay-title-row-height, 30px) !important; display: flex !important; align-items: center !important; }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .monaco-action-bar,
-.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .actions-container { height: 30px !important; align-items: center !important; }
-.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item { height: 30px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .actions-container { height: var(--parlay-title-row-height, 30px) !important; align-items: center !important; }
+.monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item { height: var(--parlay-title-row-height, 30px) !important; display: flex !important; align-items: center !important; justify-content: center !important; }
 .monaco-workbench.parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right > .action-toolbar-container .action-item .action-label { height: auto !important; line-height: normal !important; margin: 0 !important; padding: 0 6px !important; }
+
+/* The mark leads the native Mac controls. Its 40px column matches the native button inset. */
+.monaco-workbench.mac:not(.web).parlay-stacked .part.titlebar > .titlebar-container { padding-left: 0; }
+.monaco-workbench.mac:not(.web):not(.fullscreen).parlay-stacked .part.titlebar > .titlebar-container { grid-template-columns: 40px 80px 1fr auto; }
+.monaco-workbench.mac:not(.web):not(.fullscreen).parlay-stacked .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon { grid-column: 1; }
+.monaco-workbench.mac:not(.web):not(.fullscreen).parlay-stacked .part.titlebar > .titlebar-container > .titlebar-center { grid-column: 3; }
+.monaco-workbench.mac:not(.web):not(.fullscreen).parlay-stacked .part.titlebar > .titlebar-container > .titlebar-right { grid-column: 4; }
+
+.monaco-workbench .part.titlebar .parlay-project-toolbar {
+	grid-row: 2; grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0;
+	height: 36px; box-sizing: border-box; padding: 3px 10px; border-top: 1px solid var(--vscode-titleBar-border, transparent);
+	-webkit-app-region: no-drag; position: relative; z-index: 2501;
+}
+.monaco-workbench .part.titlebar .parlay-project-toolbar button {
+	display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 8px;
+	border: 0; border-radius: 5px; background: transparent; color: inherit; font: inherit; font-size: 12px;
+	white-space: nowrap; cursor: pointer; flex-shrink: 0;
+}
+.monaco-workbench .part.titlebar .parlay-project-toolbar button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
+.monaco-workbench .part.titlebar .parlay-project-toolbar button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.monaco-workbench .part.titlebar .parlay-project-toolbar button:disabled { opacity: .45; cursor: default; }
+.monaco-workbench .part.titlebar .parlay-project-toolbar .project-picker { justify-content: flex-start; min-width: 80px; max-width: 320px; flex-shrink: 1; }
+.monaco-workbench .part.titlebar .parlay-project-toolbar .project-picker .label { overflow: hidden; text-overflow: ellipsis; }
+.monaco-workbench .part.titlebar .parlay-project-toolbar .codicon { font-size: 14px; flex-shrink: 0; }
+.monaco-workbench .part.titlebar .parlay-project-toolbar .toolbar-spacer { flex: 1; }
+.monaco-workbench .part.titlebar .parlay-project-toolbar.compact button:not(.project-picker) .label { display: none; }
+.monaco-workbench .part.titlebar .parlay-project-toolbar.compact { gap: 4px; }
+.monaco-workbench.parlay-gated .part.titlebar .parlay-project-toolbar { visibility: hidden; }
 
 /* the sign-in gate (contrib/parlay/browser/parlayGate.contribution.ts): under the title bar, under notifications
    (2545), the quick input (2550) and dialogs (2575), above everything else */
@@ -602,3 +632,21 @@ body.parlay-glass,
 
 /* the activity bar rides at the bottom of the sidebar (setting); keep its icons calm */
 .monaco-workbench .part.sidebar > .composite.title .actions-container .action-item .action-label { opacity: 0.85; }
+
+/* Parlay: a simple prompt mark keeps the Terminal tab readable at sidebar size. */
+.monaco-workbench .action-label.codicon-terminal-view-icon::before {
+	content: '';
+	display: block;
+	width: 16px;
+	height: 16px;
+	background-color: currentColor;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m3.5 4.5 5.5 5.5-5.5 5.5M11 15.5h6' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.monaco-workbench .parlay-project-toolbar .codicon-parlay-aqua {
+	width: 16px;
+	height: 16px;
+	background-color: currentColor;
+	mask: url('./parlay-aqua.png') center / contain no-repeat;
+}
+.monaco-workbench .parlay-project-toolbar .codicon-parlay-aqua::before { content: none; }

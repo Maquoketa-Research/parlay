@@ -1,12 +1,13 @@
 """Generate Parlay's brand assets from build/parlay/logo.png (the spade, blue on transparency) straight into
 the tree: the Windows app icon and tiles, the Inno Setup wizard bitmaps, the in-app title-bar icon (an SVG
 wrapping a PNG), the two title-bar data URIs in style.css (light blue on dark themes, the logo's own blue on
-light themes) and the empty-editor letterpress SVGs.
+light themes). Empty-editor letterpress assets use the clean vector in logo.svg.
 
 Run: python build/parlay/icons.py
 """
+from __future__ import annotations
 import base64, io, os, re
-from PIL import Image
+from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -50,12 +51,39 @@ def svg_with_png(im: Image.Image, size: int) -> str:
             f'width="{size}" height="{size}"><image width="{size}" height="{size}" xlink:href="data:image/png;base64,{png_b64(im, size)}"/></svg>\n')
 
 
+def watermark_svg(rgb: tuple[int, int, int], alpha: float) -> str:
+    """Use real paths so the empty-editor logo stays crisp at any display scale."""
+    with open(os.path.join(HERE, "logo.svg"), encoding="utf-8") as source:
+        svg = source.read()
+    color = "#" + "".join(f"{channel:02x}" for channel in rgb)
+    return svg.replace('<svg ', f'<svg opacity="{alpha}" ', 1).replace("#003880", color)
+
+
 def on_plate(mark: Image.Image, size: tuple[int, int], mark_h: int, top: int | None = None) -> Image.Image:
     im = Image.new("RGB", size, PLATE)
     m = mark.resize((int(mark.width * mark_h / mark.height), mark_h), Image.LANCZOS)
     y = (size[1] - m.height) // 2 if top is None else top
     im.paste(m, ((size[0] - m.width) // 2, y), m)
     return im
+
+
+def mac_icon(mark: Image.Image) -> Image.Image:
+    """A blue app tile gives macOS a deliberate backing instead of its grey legacy-icon plate."""
+    size = 1024
+    tile = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    mask = Image.new("L", tile.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle((64, 64, 960, 960), radius=196, fill=255)
+    gradient = Image.new("RGBA", tile.size)
+    draw = ImageDraw.Draw(gradient)
+    top, bottom = (35, 109, 210), (9, 36, 85)
+    for y in range(size):
+        t = min(1, max(0, (y - 64) / 896))
+        color = tuple(round(a + (b - a) * t) for a, b in zip(top, bottom))
+        draw.line((0, y, size, y), fill=color + (255,))
+    tile.paste(gradient, (0, 0), mask)
+    glyph = recolour(mark, (223, 238, 255)).resize((720, 720), Image.LANCZOS)
+    tile.alpha_composite(glyph, (152, 152))
+    return tile
 
 
 def replace_data_uri_after(css: str, selector_start: str, b64: str) -> str:
@@ -75,7 +103,7 @@ if __name__ == "__main__":
     mark.resize((70, 70), Image.LANCZOS).save(os.path.join(WIN32, "code_70x70.png"))
     mark.resize((150, 150), Image.LANCZOS).save(os.path.join(WIN32, "code_150x150.png"))
     # macOS: the app bundle icon (build/lib/electron.ts points at it); Pillow writes every icns size from this master
-    mark.resize((1024, 1024), Image.LANCZOS).save(os.path.join(ROOT, "resources", "darwin", "code.icns"), format="ICNS")
+    mac_icon(mark).save(os.path.join(ROOT, "resources", "darwin", "code.icns"), format="ICNS")
     for pct in (100, 125, 150, 175, 200, 225, 250):
         s = pct / 100
         on_plate(mark, (round(164 * s), round(314 * s)), round(96 * s), top=round(40 * s)).save(os.path.join(WIN32, f"inno-big-{pct}.bmp"))
@@ -88,11 +116,8 @@ if __name__ == "__main__":
     css = replace_data_uri_after(css, ".monaco-workbench.vs .part.titlebar > .titlebar-container > .titlebar-left > .window-appicon", png_b64(mark, 64))
     open(STYLE, "w", encoding="utf-8", newline="").write(css)
 
-    # the watermark in an empty editor group
-    for name, im in {"letterpress-dark": recolour(mark, SKY, 0.28), "letterpress-hcDark": recolour(mark, SKY, 0.6),
-                     "letterpress-light": recolour(mark, (0x00, 0x38, 0x80), 0.18), "letterpress-hcLight": recolour(mark, (0x00, 0x38, 0x80), 0.6)}.items():
-        open(os.path.join(EDITOR_MEDIA, f"{name}.svg"), "w", encoding="utf-8", newline="\n").write(svg_with_png(im, 256))
-
-    preview = os.path.join(os.environ.get("TEMP", "."), "parlay-icon-preview.png")
-    on_plate(mark, (600, 300), 200).save(preview)
-    print("icons written to resources/win32, code-icon.svg, style.css data URIs, letterpress SVGs; preview:", preview)
+    # Vector watermarks: do not downsample to a bitmap before Retina rendering.
+    for name, rgb, alpha in [("letterpress-dark", SKY, 0.28), ("letterpress-hcDark", SKY, 0.6),
+                             ("letterpress-light", (0x00, 0x38, 0x80), 0.18), ("letterpress-hcLight", (0x00, 0x38, 0x80), 0.6)]:
+        with open(os.path.join(EDITOR_MEDIA, f"{name}.svg"), "w", encoding="utf-8", newline="\n") as output:
+            output.write(watermark_svg(rgb, alpha))

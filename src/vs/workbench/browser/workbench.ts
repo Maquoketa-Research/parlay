@@ -248,7 +248,11 @@ export class Workbench extends Layout {
 				this.mainContainer.classList.toggle('parlay-glass', glass);
 				this.mainContainer.ownerDocument.body.classList.toggle('parlay-glass', glass);
 			}
-			// Parlay: the two-row header is the default; follow the setting live and relayout
+			// Parlay: switch between rounded surfaces and the classic flat editor layout.
+			if (e.affectsConfiguration('parlay.roundedChrome')) {
+				this.mainContainer.classList.toggle('parlay-rounded', configurationService.getValue<boolean>('parlay.roundedChrome') !== false);
+			}
+			// Parlay: the two-row header is the default; follow the setting live and relayout.
 			if (e.affectsConfiguration('parlay.stackedHeader')) {
 				this.mainContainer.classList.toggle('parlay-stacked', configurationService.getValue<boolean>('parlay.stackedHeader') !== false);
 				this.layout();
@@ -384,6 +388,7 @@ export class Workbench extends Layout {
 		]);
 
 		this.mainContainer.classList.add(...workbenchClasses);
+		this.mainContainer.classList.toggle('parlay-rounded', configurationService.getValue<boolean>('parlay.roundedChrome') !== false);
 
 		// Parlay: glass chrome marks the root so style.css can make it transparent
 		if (configurationService.getValue<boolean>('parlay.glass') === true) {

@@ -12,6 +12,7 @@ export interface Entry {
 	open?: boolean;     // assistant bubble still being streamed into
 	error?: boolean;    // tool card whose result was an error
 	at: number;
+	context?: { label: string; text: string };
 }
 
 // What one event did beyond the entries: the turn ended (with an error when it failed), a session id was
