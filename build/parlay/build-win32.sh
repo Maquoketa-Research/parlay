@@ -34,8 +34,10 @@ export BUILD_SOURCEVERSION="$(git rev-parse HEAD)"
 echo "== Parlay ${RELEASE_VERSION} from ${BUILD_SOURCEVERSION:0:9}  $(date)"
 echo "== node $(node --version)  npm $(npm --version)"
 
-restore() { git checkout -q -- package.json product.json 2>/dev/null || true; rm -f extensions/parlay/secrets.json; }
+restore() { git checkout -q -- package.json product.json build/win32/code.iss 2>/dev/null || true; rm -f extensions/parlay/secrets.json; }
 trap restore EXIT
+# PARLAY_FAST_INSTALLER=1: lzma2/fast instead of lzma for the setup exe (about 40 s instead of 200 s, a bigger download)
+[[ -z "${PARLAY_FAST_INSTALLER:-}" ]] || sed -i 's/^Compression=lzma$/Compression=lzma2\/fast/' build/win32/code.iss
 node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.RELEASE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
 # The OAuth client secrets ride in the build, never in the tree: ~/.parlay/<provider>-client-secret (one line each)
@@ -57,8 +59,23 @@ if [[ "$MODE" != "--pack-only" ]]; then
     echo "$LOCK_HASH" > node_modules/.parlay-lock
   fi
 
-  echo "== compile and minify  $(date)"
-  npm run gulp vscode-min-prepack
+  # The core compile is 224 s of a 13 min build and most builds change only the extension. When src/ and build/
+  # are exactly what the last prepack compiled (committed tree ids plus any uncommitted diff), only the built-in
+  # extensions are rebuilt (about 25 s); the compiled core in out-build / out-vscode-min is reused.
+  # (build/parlay is left out of the key: these scripts do not affect what the compiler produces)
+  CORE_KEY="$({ git rev-parse HEAD:src; git ls-tree HEAD build/ | grep -v ' build/parlay$'; git diff HEAD -- src build ':(exclude)build/parlay'; } | sha1sum | cut -c1-40)"
+  mkdir -p .build/parlay
+  if [[ -f .build/parlay/core-key && "$(cat .build/parlay/core-key)" == "$CORE_KEY" && -d out-vscode-min && "${FORCE_CORE:-}" == "" ]]; then
+    echo "== core unchanged: extensions only  $(date)   (FORCE_CORE=1 to recompile)"
+    npm run gulp clean-extensions-build
+    npm run gulp compile-non-native-extensions-build
+    npm run gulp compile-extension-media-build
+  else
+    echo "== compile and minify  $(date)"
+    rm -f .build/parlay/core-key
+    npm run gulp vscode-min-prepack
+    echo "$CORE_KEY" > .build/parlay/core-key
+  fi
 fi
 
 if tasklist 2>/dev/null | grep -q "^Parlay.exe"; then
