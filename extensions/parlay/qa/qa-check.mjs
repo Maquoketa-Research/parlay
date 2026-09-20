@@ -76,7 +76,7 @@ assert.match(r.stdout, /Play stopped/);
 
 const stepsLog = fs.readFileSync(path.join(out, "stepsLog.jsonl"), "utf8").trimEnd().split("\n").map((l) => JSON.parse(l));
 assert.equal(stepsLog.length, report.steps, "one stepsLog line per step");
-assert.deepEqual(Object.keys(stepsLog[0]).sort(), ["action", "errorGroups", "newLines", "outcome", "screenshot", "step", "stuck"]);
+assert.deepEqual(Object.keys(stepsLog[0]).sort(), ["action", "errorGroups", "newLines", "outcome", "screenshot", "step", "stuck", "suspect"]);
 assert.equal(stepsLog[0].errorGroups, 1);
 assert.equal(stepsLog[9].screenshot, "step-10.png");
 

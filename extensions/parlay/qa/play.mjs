@@ -254,7 +254,7 @@ export async function main(argv = process.argv.slice(2)) {
 			if (newGroups || suspect || step % 10 === 0) file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : suspect ? `suspect-step-${step}` : `step-${step}`);
 			if (newGroups) for (const e of report.errors.slice(-newGroups)) e.screenshot = file;
 			if (suspect) report.suspects.push({ step, probability: wrong, screenshot: file, console: recent, actionsBefore: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
-			stepsLog({ step, action, outcome: entry.result, newLines, errorGroups: report.errors.length, stuck: streak >= 5, screenshot: file });
+			stepsLog({ step, action, outcome: entry.result, newLines, errorGroups: report.errors.length, stuck: streak >= 5, suspect, screenshot: file });
 			log(`step ${step}: ${describe(action)} → ${entry.result}; +${newLines.length} lines; ${report.errors.length} error groups${streak >= 5 ? "; stuck" : ""}${action.jev ? `; jev wrong ${wrong.toFixed(2)}` : ""}${suspect ? "; suspect" : ""}`);
 			if (pace) await sleep(pace);
 		}

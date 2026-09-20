@@ -1,0 +1,68 @@
+/* Parlay Quality Assurance follows the workbench palette (the same conventions as chat.css). */
+:root { --line: var(--vscode-widget-border, rgba(128,128,128,.2)); --muted: var(--vscode-descriptionForeground); --accent: var(--vscode-textLink-foreground); --card: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+	--red: var(--vscode-charts-red, var(--vscode-errorForeground)); --amber: var(--vscode-charts-yellow, var(--vscode-editorWarning-foreground)); --purple: var(--vscode-charts-purple, #b180d7); --green: var(--vscode-charts-green, var(--vscode-testing-iconPassed, #73c991)); }
+* { box-sizing: border-box; } [hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; color: var(--vscode-foreground); background: transparent; font: 13px/1.5 var(--vscode-font-family); }
+body { display: flex; flex-direction: column; }
+button, input, select { font: inherit; color: inherit; } button { cursor: pointer; border: 0; background: transparent; padding: 0; } button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+header { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 6px 14px; border-bottom: 1px solid var(--line); }
+header .mark { display: flex; color: var(--accent); } header .mark svg { width: 22px; height: 22px; stroke-width: 2; }
+header h1 { flex: 1; min-width: 0; margin: 0; font-size: 13px; font-weight: 600; line-height: 1.2; }
+header h1 small { display: block; margin-top: 2px; font-size: 11px; font-weight: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 5px; color: var(--muted); } .icon-button:hover { color: var(--vscode-foreground); background: var(--vscode-toolbar-hoverBackground); }
+
+main { flex: 1; min-height: 0; overflow: auto; padding: 14px; scrollbar-width: thin; scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
+section { margin-bottom: 20px; } h2 { display: flex; gap: 6px; align-items: baseline; margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); } h2 span { font-weight: normal; letter-spacing: 0; text-transform: none; }
+.card { border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: 12px; }
+.field { display: grid; gap: 5px; margin-bottom: 12px; } .field label { font-size: 11px; color: var(--muted); }
+select, input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid var(--vscode-input-border, var(--line)); border-radius: 5px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); } input::placeholder { color: var(--vscode-input-placeholderForeground); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--vscode-input-background); }
+.seg button { flex: 1; min-width: 0; padding: 6px 4px; color: var(--muted); border-right: 1px solid var(--line); line-height: 1.3; } .seg button:last-child { border-right: 0; }
+.seg button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); } .seg button[aria-pressed=true] { color: var(--vscode-foreground); background: var(--vscode-toolbar-hoverBackground); font-weight: 600; }
+.seg button small { display: block; font-size: 10px; font-weight: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.primary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px 12px; border-radius: 6px; font-weight: 600; background: var(--vscode-button-background); color: var(--vscode-button-foreground); } .primary:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
+.primary.stop { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); } .primary.stop:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); } .primary.stop svg rect { fill: currentColor; stroke: none; }
+.note { margin: 8px 0 0; font-size: 11px; color: var(--muted); } .note a { color: var(--accent); cursor: pointer; } .note a:hover { text-decoration: underline; }
+.hint { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); font-size: 12px; } .hint svg { margin-top: 2px; }
+
+.live { display: grid; gap: 10px; }
+.live .title { display: flex; align-items: baseline; gap: 8px; } .live .title b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .live .title span { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; } .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 1s linear; }
+.counts { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; } .chip b { font-size: 13px; color: var(--vscode-foreground); }
+.chip.red b { color: var(--red); } .chip.purple b { color: var(--purple); } .chip.amber b { color: var(--amber); } .chip.green { border-color: var(--green); color: var(--green); }
+.status { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); min-height: 1.4em; } .status span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.status i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex: none; animation: pulse 1.2s infinite; }
+
+.step { display: grid; grid-template-columns: 3.4ch 1fr; gap: 2px 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12px; } .step:first-child { border-top: 0; }
+.step .n { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; } .step .a { min-width: 0; overflow-wrap: anywhere; } .step .a span { color: var(--muted); }
+.step .tags, .step pre, .step img { grid-column: 2; }
+.tag { display: inline-block; margin: 2px 4px 0 0; padding: 0 6px; border-radius: 3px; font-size: 10px; font-weight: 600; line-height: 16px; color: var(--vscode-foreground); background: var(--vscode-toolbar-hoverBackground); }
+.tag.red { color: var(--red); } .tag.amber { color: var(--amber); } .tag.purple { color: var(--purple); }
+pre { margin: 6px 0 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--vscode-textCodeBlock-background); font: 11px/1.5 var(--vscode-editor-font-family); white-space: pre-wrap; word-break: break-word; max-height: 12em; overflow: auto; }
+img.shot { display: block; max-width: 100%; max-height: 150px; margin-top: 6px; border: 1px solid var(--line); border-radius: 6px; object-fit: cover; object-position: top; cursor: zoom-in; } img.shot.big { max-height: none; object-fit: contain; cursor: zoom-out; }
+
+.verdict { display: flex; align-items: center; gap: 10px; } .verdict svg { width: 24px; height: 24px; } .verdict.green svg { color: var(--green); } .verdict.red svg { color: var(--red); } .verdict.amber svg { color: var(--amber); } .verdict.purple svg { color: var(--purple); }
+.verdict b { display: block; overflow-wrap: anywhere; } .verdict span { font-size: 11px; color: var(--muted); }
+.verdict + .counts { margin-top: 10px; }
+.finding { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--red); border-radius: 6px; background: var(--card); font-size: 12px; }
+.finding.purple { border-left-color: var(--purple); } .finding.amber { border-left-color: var(--amber); }
+.finding .t { font-weight: 600; overflow-wrap: anywhere; } .finding .m { margin-top: 2px; font-size: 11px; color: var(--muted); }
+.finding details { margin-top: 6px; } .finding summary { cursor: pointer; font-size: 11px; color: var(--muted); } .finding .before { margin-top: 6px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.btn { padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; background: var(--vscode-button-background); color: var(--vscode-button-foreground); } .btn:hover { background: var(--vscode-button-hoverBackground); }
+.btn.alt { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); } .btn.alt:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.report { margin-top: 10px; } .report summary { cursor: pointer; font-size: 12px; color: var(--muted); } .md { margin-top: 6px; font-size: 12px; }
+.md h2 { display: block; margin: 10px 0 4px; font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--vscode-foreground); } .md h3, .md h4 { margin: 8px 0 2px; font-size: 12px; } .md ul { margin: 0; padding-left: 16px; } .md p { margin: 0 0 6px; } .md pre { max-height: 20em; } .md code { font-family: var(--vscode-editor-font-family); font-size: 11px; }
+
+.run { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 8px; border-radius: 5px; text-align: left; font-size: 12px; } .run:hover { background: var(--vscode-list-hoverBackground); }
+.run.on { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); } .run.on .d span, .run.on .c { color: inherit; opacity: .8; }
+.run .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; } .run .dot.red { background: var(--red); } .run .dot.amber { background: var(--amber); } .run .dot.gray { background: var(--muted); }
+.run .d { flex: 1; min-width: 0; } .run .d b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .run .d span { font-size: 11px; color: var(--muted); }
+.run .c { font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+@keyframes pulse { 0%, 80%, 100% { opacity: .25 } 40% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

@@ -236,29 +236,29 @@
       },
       {
         "command": "parlay.qa.run",
-        "title": "QA: play the open place",
+        "title": "Quality Assurance: play test the open place",
         "category": "Parlay",
         "icon": "$(play)"
       },
       {
         "command": "parlay.qa.stop",
-        "title": "QA: stop the run",
+        "title": "Quality Assurance: stop the run",
         "category": "Parlay",
         "icon": "$(debug-stop)"
       },
       {
         "command": "parlay.qa.open",
-        "title": "Open QA",
+        "title": "Open Quality Assurance",
         "category": "Parlay"
       },
       {
         "command": "parlay.typesafe.setKey",
-        "title": "Set TypeSafe API key (Jev, the QA play policy)",
+        "title": "Set TypeSafe API key (Jev, the Quality Assurance player)",
         "category": "Parlay"
       },
       {
         "command": "parlay.aqua.setIngestKey",
-        "title": "Set Aqua ingest key (QA findings)",
+        "title": "Set Aqua ingest key (Quality Assurance findings)",
         "category": "Parlay"
       }
     ],
@@ -417,7 +417,7 @@
         },
         {
           "id": "parlay-qa",
-          "title": "QA",
+          "title": "Quality Assurance",
           "icon": "media/qa.svg"
         }
       ]
@@ -460,7 +460,7 @@
         {
           "type": "webview",
           "id": "parlay.qa",
-          "name": "QA"
+          "name": "Quality Assurance"
         }
       ]
     },

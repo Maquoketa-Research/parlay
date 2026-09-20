@@ -43,6 +43,7 @@ class QaView implements vscode.WebviewViewProvider {
 	private report?: Report;       // its report once written: the findings' buttons work from it
 	private studios: { name: string; placeId: string }[] = [];
 	private tail?: NodeJS.Timeout;
+	private live?: { place: string; minutes: number; policy: string; at: number };   // the run in progress, for the view's clock
 
 	constructor(private readonly ctx: vscode.ExtensionContext, private readonly fix: (line: string) => Promise<void>) {}
 
@@ -56,7 +57,7 @@ class QaView implements vscode.WebviewViewProvider {
 		this.view = view;
 		fs.mkdirSync(this.dir(), { recursive: true });
 		view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.file(this.dir()), vscode.Uri.joinPath(this.ctx.extensionUri, "media")] };
-		view.webview.html = html(view.webview.cspSource, view.webview.asWebviewUri(vscode.Uri.joinPath(this.ctx.extensionUri, "media", "qa.js")).toString());
+		view.webview.html = html(view.webview.cspSource, (f) => view.webview.asWebviewUri(vscode.Uri.joinPath(this.ctx.extensionUri, "media", f)).toString());
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		view.webview.onDidReceiveMessage((m: any) => void this.onMessage(m));
 		view.onDidDispose(() => { this.view = undefined; });
@@ -70,7 +71,7 @@ class QaView implements vscode.WebviewViewProvider {
 			case "stop": this.stop(); break;
 			case "refresh": await this.init(true); break;
 			case "setKey": await vscode.commands.executeCommand("parlay.typesafe.setKey"); break;
-			case "show": this.show(path.join(this.dir(), path.basename(String(m.name)))); break;
+			case "show": this.show(path.join(this.dir(), path.basename(String(m.name))), false); break;
 			case "goto": { const hit = await this.locate(Number(m.i)); if (hit) await reveal(hit.file, hit.line); break; }
 			case "fix": await this.fixWithClaude(Number(m.i)); break;
 			case "md": if (this.out) await vscode.commands.executeCommand("markdown.showPreview", vscode.Uri.file(path.join(this.out, "report.md"))); break;
@@ -83,7 +84,7 @@ class QaView implements vscode.WebviewViewProvider {
 		if ((fresh || !this.studios.length) && !this.child) this.studios = (await listStudios().catch(() => [])).filter((s) => s.placeId).map((s) => ({ name: s.name, placeId: s.placeId }));
 		const hasKey = !!(await this.ctx.secrets.get(TYPESAFE_KEY)) || fs.existsSync(TYPESAFE_KEY_FILE);
 		const form = this.ctx.globalState.get<Form>("qaForm", defaultForm());
-		this.post({ type: "init", studios: this.studios, form: { ...form, policy: hasKey ? form.policy || "jev" : "scripted" }, hasKey, running: !!this.child, runs: this.runs() });
+		this.post({ type: "init", studios: this.studios, form: { ...form, policy: hasKey ? form.policy || "jev" : "scripted" }, hasKey, running: !!this.child, live: this.live, runs: this.runs() });
 	}
 
 	// The palette's Run: the remembered form, with a place picked from the open Studios when none is remembered.
@@ -118,7 +119,8 @@ class QaView implements vscode.WebviewViewProvider {
 		const child = spawn(process.execPath, args, { env, cwd: os.homedir(), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 		this.child = child; this.out = out; this.report = undefined;
 		void vscode.commands.executeCommand("setContext", "parlay.qa.running", true);
-		this.post({ type: "started", place: this.studios.find((s) => s.placeId === form.place)?.name ?? `place ${form.place}`, minutes, policy });
+		this.live = { place: this.studios.find((s) => s.placeId === form.place)?.name ?? `place ${form.place}`, minutes, policy, at: Date.now() };
+		this.post({ type: "started", ...this.live });
 		let buf = "";
 		const onData = (d: Buffer) => {
 			buf += d.toString();
@@ -131,11 +133,11 @@ class QaView implements vscode.WebviewViewProvider {
 			if (this.child !== child) return;
 			if (this.tail) clearInterval(this.tail);
 			flush();
-			this.child = undefined;
+			this.child = undefined; this.live = undefined;
 			void vscode.commands.executeCommand("setContext", "parlay.qa.running", false);
 			if (err) log.error(`QA: the runner did not start: ${err.message}`);
 			log.info(`QA: runner exit ${code ?? "?"}`);
-			this.show(out, code ?? 1, err?.message);
+			this.show(out, true, code ?? 1, err?.message);
 		};
 		child.on("error", (e) => done(null, e));
 		child.on("exit", (code) => done(code));
@@ -154,7 +156,7 @@ class QaView implements vscode.WebviewViewProvider {
 			for (const line of fresh.slice(0, nl).split("\n")) {
 				try {
 					const s = JSON.parse(line);
-					this.post({ type: "step", step: s.step, action: describe(s.action), jev: s.action.jev?.flags?.looksWrong, outcome: s.outcome, newLines: s.newLines ?? [], errorGroups: s.errorGroups, stuck: s.stuck, screenshot: this.shot(out, s.screenshot) });
+					this.post({ type: "step", step: s.step, action: describe(s.action), jev: s.action.jev?.flags?.looksWrong, outcome: s.outcome, newLines: s.newLines ?? [], errorGroups: s.errorGroups, stuck: s.stuck, suspect: !!s.suspect, screenshot: this.shot(out, s.screenshot) });
 				} catch { /* a line still being written */ }
 			}
 		};
@@ -179,7 +181,8 @@ class QaView implements vscode.WebviewViewProvider {
 	}
 
 	// The report of a run folder: the findings with their actions, report.md rendered, the runs list.
-	private show(out: string, code?: number, startFailure?: string) {
+	// final: the run that was in progress just ended (the view closes its live card); false for a previous run.
+	private show(out: string, final: boolean, code?: number, startFailure?: string) {
 		this.out = out;
 		let report: Report | undefined, md = "";
 		try { report = JSON.parse(fs.readFileSync(path.join(out, "report.json"), "utf8")); } catch { /* the runner died before writing one */ }
@@ -191,8 +194,9 @@ class QaView implements vscode.WebviewViewProvider {
 			suspects: (report.suspects ?? []).map((s) => ({ step: s.step, percent: Math.round(s.probability * 100), screenshot: this.shot(out, s.screenshot), console: s.console ?? [], before: s.actionsBefore.map(before) })),
 			stuck: report.stuck.map((s) => `step ${s.step}: ${s.state ?? "?"}`),
 		};
-		this.post({ type: "done", name: path.basename(out), code: code ?? report?.exitCode, failure: startFailure ?? report?.failure, findings,
-			report: report && { place: placeName(report), steps: report.steps, aqua: report.aqua, policy: report.policy ?? "scripted" }, md: render(md), runs: this.runs() });
+		this.post({ type: "done", final, name: path.basename(out), code: code ?? report?.exitCode, failure: startFailure ?? report?.failure, findings,
+			report: report && { place: placeName(report), steps: report.steps, aqua: report.aqua, policy: report.policy ?? "scripted", duration: report.end ? Math.max(0, (Date.parse(report.end) - Date.parse(report.start)) / 1000) : 0 },
+			md: render(md), runs: this.runs() });
 	}
 
 	// Previous runs, newest first: the folder (a timestamp) and the headline counts.
@@ -251,43 +255,39 @@ function render(md: string): string {
 	return out.join("\n");
 }
 
-function html(csp: string, script: string): string {
+// The page: header, the setup card (place, duration, player, Play test), the live card while a run is on (clock,
+// progress, counts, Stop), the result (verdict, findings, the report), the steps feed, previous runs. Styles in
+// media/qa.css, behaviour in media/qa.js.
+function html(csp: string, media: (file: string) => string): string {
+	const shield = `<svg viewBox="0 0 24 24"><path d="M12 2.8l8 3.2v6c0 4.6-3.4 8.2-8 9.6-4.6-1.4-8-5-8-9.6V6L12 2.8z"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg>`;
 	return `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp}; style-src 'unsafe-inline'; script-src ${csp}">
-<style>
-body{margin:0;padding:10px 12px 24px;font:12px/1.5 var(--vscode-font-family);color:var(--vscode-foreground);background:transparent}
-.dim{color:var(--vscode-descriptionForeground)}.err{color:var(--vscode-errorForeground)}.stuck{color:var(--vscode-editorWarning-foreground)}
-.mono{font-family:var(--vscode-editor-font-family);font-size:11px}
-h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px;color:var(--vscode-descriptionForeground)}
-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-input,select{font:inherit;color:var(--vscode-input-foreground);background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,transparent);border-radius:4px;padding:3px 6px}
-#place{flex:1 1 12ch;min-width:10ch}#minutes{width:5ch}
-button{padding:4px 14px;border:0;border-radius:999px;font:inherit;font-weight:600;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground)}button:hover{background:var(--vscode-button-hoverBackground)}
-button.alt{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground)}button.alt:hover{background:var(--vscode-button-secondaryHoverBackground)}button.icon{padding:3px 8px}button[disabled]{opacity:.5;cursor:default}
-a{color:var(--vscode-textLink-foreground);cursor:pointer}a:hover{text-decoration:underline}
-#status{margin:8px 0 4px;min-height:1.5em;overflow-wrap:anywhere}
-.step{padding:3px 0;border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.2))}.step .n{display:inline-block;min-width:3ch;color:var(--vscode-descriptionForeground)}
-pre{margin:4px 0 6px;padding:6px 8px;border-radius:6px;overflow:auto;background:var(--vscode-textCodeBlock-background);font-family:var(--vscode-editor-font-family);font-size:11px;line-height:1.45;white-space:pre-wrap;max-height:12em}
-img.shot{display:block;max-width:100%;max-height:160px;border-radius:4px;margin:4px 0;cursor:zoom-in}img.shot.big{max-height:none;cursor:zoom-out}
-.finding{padding:8px 0;border-top:1px solid var(--vscode-widget-border,rgba(128,128,128,.2))}.finding b{overflow-wrap:anywhere}
-.actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
-.run{display:flex;gap:8px;padding:4px 0;cursor:pointer}.run:hover{background:var(--vscode-list-hoverBackground)}.run .c{margin-left:auto;white-space:nowrap}
-#md h2{font-size:14px;margin:10px 0 4px}#md h3{text-transform:none;letter-spacing:0;font-size:12px;color:var(--vscode-foreground);margin:10px 0 2px}#md h4{font-size:12px;margin:8px 0 2px}#md ul{margin:0;padding-left:16px}#md p{margin:0 0 6px}
-details summary{cursor:pointer;margin:12px 0 4px;font-weight:600}
-</style></head><body>
-<form id="f">
-<input id="place" list="studios" placeholder="place id" title="An open Studio place, or a place id for the runner to open" required pattern="\\d+"><datalist id="studios"></datalist>
-<button type="button" id="refresh" class="alt icon" title="Look for open Studio places again">↻</button>
-<label title="How long to play"><input id="minutes" type="number" min="1" max="240" step="1" value="5"> min</label>
-<select id="policy" title="Who decides what the player does next"><option value="jev">Jev (TypeSafe)</option><option value="scripted">Scripted</option></select>
-<button type="submit" id="run">Run</button><button type="button" id="stop" class="alt" hidden>Stop</button>
-</form>
-<div id="nokey" class="dim" hidden>Scripted only: <a id="setkey">set a TypeSafe key</a> and Jev picks the actions and flags what looks wrong.</div>
-<div id="status" class="dim">Pick an open Studio place and Run. The runner takes Studio's MCP seat while it plays.</div>
-<div id="steps"></div>
-<div id="result" hidden><h3 id="headline"></h3><div id="findings"></div><details><summary>Full report</summary><div id="md"></div><a id="open">Open report.md</a></details></div>
-<h3>Previous runs</h3><div id="runs" class="dim">None yet.</div>
-<script src="${script}"></script>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp}; style-src ${csp}; script-src ${csp}">
+<link rel="stylesheet" href="${media("qa.css")}"></head><body>
+<header><span class="mark">${shield}</span><h1>Quality Assurance<small>Jev plays your game and reports what breaks</small></h1>
+<button id="refresh" class="icon-button" title="Look for open Studio places again"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button></header>
+<main>
+<section id="setup"><div class="card">
+<div class="field"><label for="place">Place</label><select id="place"></select><input id="placeId" type="text" inputmode="numeric" placeholder="Place id, e.g. 90044978600719" hidden>
+<div id="empty" class="note" hidden>No open Studio place found. Open one in Studio and refresh, or enter a place id and the runner opens it.</div></div>
+<div class="field"><label>Duration</label><div class="seg" id="minutes"><button data-v="2">2 min</button><button data-v="5">5 min</button><button data-v="10">10 min</button><button data-v="20">20 min</button></div></div>
+<div class="field"><label>Player</label><div class="seg" id="policy"><button data-v="jev">Jev<small>by TypeSafe</small></button><button data-v="scripted">Scripted<small>walk, click, interact</small></button></div></div>
+<button id="run" class="primary"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>Play test</button>
+<p class="note" id="keynote"></p>
+<p class="note">Takes Studio's MCP seat while it plays and stops Play on its way out.</p>
+</div></section>
+<section id="live" hidden><div class="card live">
+<div class="title"><b id="liveplace"></b><span id="clock"></span></div>
+<div class="bar"><i id="bar"></i></div>
+<div class="counts"><span class="chip">steps <b id="c-steps">0</b></span><span class="chip red">errors <b id="c-err">0</b></span><span class="chip purple">suspects <b id="c-sus">0</b></span><span class="chip amber">stuck <b id="c-stuck">0</b></span></div>
+<div class="status" id="status"></div>
+<button id="stop" class="primary stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop after this step</button>
+</div></section>
+<section id="result" hidden><h2>Result</h2><div class="card"><div class="verdict" id="verdict"></div><div class="counts" id="rcounts"></div></div><div id="findings"></div>
+<details class="report"><summary>Full report</summary><div class="md" id="md"></div><div class="actions"><button class="btn alt" id="open">Open report.md</button></div></details></section>
+<section id="feed" hidden><h2>Steps <span id="feedcount"></span></h2><div id="steps"></div></section>
+<section><h2>Previous runs</h2><div id="runs"></div></section>
+</main>
+<script src="${media("qa.js")}"></script>
 </body></html>`;
 }
 

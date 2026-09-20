@@ -1,4 +1,4 @@
-// The QA view's page (src/qa.ts html()): the form, the live steps, the findings with their actions, the runs.
+// The Quality Assurance page (src/qa.ts html()): setup, the live run, the result with its findings, previous runs.
 // Everything it shows comes from the extension as messages; every click goes back as one.
 (() => {
 	const vs = acquireVsCodeApi();
@@ -6,21 +6,68 @@
 	const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
 	const msg = (m) => `data-msg='${esc(JSON.stringify(m))}'`;
 	const shot = (src) => src ? `<img class="shot" src="${esc(src)}" alt="screenshot" title="Click to enlarge">` : "";
-	const before = (b) => b.length ? `<div class="dim">Before: ${esc(b.join("; "))}</div>` : "";
-	let running = false;
-	const setRunning = (on) => { running = on; $("run").hidden = on; $("stop").hidden = !on; $("refresh").disabled = on; };
-
-	$("f").onsubmit = (e) => {
-		e.preventDefault();
-		if (running) return;
-		$("steps").innerHTML = ""; $("result").hidden = true;
-		vs.postMessage({ type: "run", place: $("place").value.trim(), minutes: Number($("minutes").value), policy: $("policy").value });
+	const before = (b) => b.length ? `<div class="before">Before: ${esc(b.join("; "))}</div>` : "";
+	const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+	const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+	const when = (iso) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+	const ICON = {
+		ok: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg>',
+		bad: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>',
+		eye: '<svg viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="3"/></svg>',
+		fail: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>',
 	};
-	$("stop").onclick = () => vs.postMessage({ type: "stop" });
+	const main = document.querySelector("main");
+
+	const form = { minutes: 5, policy: "jev" };
+	let hasKey = false, running = false, timer, live = { at: 0, total: 0 }, current = "";
+	const counts = { steps: 0, err: 0, sus: 0, stuck: 0 };
+	let wasStuck = false;
+
+	const placeValue = () => $("place").value === "__id" ? $("placeId").value.trim() : $("place").value;
+	function paint() {
+		for (const b of $("minutes").children) b.setAttribute("aria-pressed", String(Number(b.dataset.v) === form.minutes));
+		for (const b of $("policy").children) b.setAttribute("aria-pressed", String(b.dataset.v === form.policy));
+		$("keynote").innerHTML = form.policy === "jev"
+			? (hasKey ? "Jev by TypeSafe picks every action and flags what looks wrong to a player." : `Jev needs a TypeSafe key. <a id="setkey">Set one</a> (typesafe.ai), or play scripted.`)
+			: "A fixed script walks, clicks and interacts. Errors and stuck spots still count; nothing judges the screen.";
+		$("placeId").hidden = $("place").value !== "__id";
+		$("run").disabled = running || (form.policy === "jev" && !hasKey) || !/^\d+$/.test(placeValue());
+	}
+	function setCounts() { $("c-steps").textContent = counts.steps; $("c-err").textContent = counts.err; $("c-sus").textContent = counts.sus; $("c-stuck").textContent = counts.stuck; }
+	function tick() {
+		const s = Math.min((Date.now() - live.at) / 1000, live.total);
+		$("clock").textContent = `${clock(s)} / ${clock(live.total)}`;
+		$("bar").style.width = `${live.total ? (s / live.total) * 100 : 0}%`;
+	}
+	function status(text) { $("status").innerHTML = `<i></i><span title="${esc(text)}">${esc(text)}</span>`; }
+	function start(m) {
+		running = true; live = { at: m.at, total: m.minutes * 60 }; current = "";
+		Object.assign(counts, { steps: 0, err: 0, sus: 0, stuck: 0 }); wasStuck = false;
+		$("liveplace").textContent = `${m.place} · ${m.policy === "jev" ? "Jev" : "scripted"}`;
+		status("Starting the runner…"); $("steps").innerHTML = ""; $("feedcount").textContent = ""; setCounts(); tick();
+		$("setup").hidden = true; $("result").hidden = true; $("live").hidden = false; $("feed").hidden = false; $("stop").disabled = false;
+		clearInterval(timer); timer = setInterval(tick, 1000);
+		paint();
+	}
+	function finish() {
+		running = false; clearInterval(timer);
+		$("live").hidden = true; $("setup").hidden = false;
+		paint();
+	}
+
+	$("minutes").onclick = $("policy").onclick = (e) => {
+		const b = e.target.closest("button"); if (!b) return;
+		if (b.parentElement.id === "minutes") form.minutes = Number(b.dataset.v); else form.policy = b.dataset.v;
+		paint();
+	};
+	$("place").onchange = () => { paint(); if (!$("placeId").hidden) $("placeId").focus(); };
+	$("placeId").oninput = paint;
+	$("run").onclick = () => { if (!running) vs.postMessage({ type: "run", place: placeValue(), minutes: form.minutes, policy: form.policy }); };
+	$("stop").onclick = () => { $("stop").disabled = true; vs.postMessage({ type: "stop" }); };
 	$("refresh").onclick = () => vs.postMessage({ type: "refresh" });
-	$("setkey").onclick = () => vs.postMessage({ type: "setKey" });
 	$("open").onclick = () => vs.postMessage({ type: "md" });
 	document.addEventListener("click", (e) => {
+		if (e.target.id === "setkey") { vs.postMessage({ type: "setKey" }); return; }
 		if (e.target.matches("img.shot")) { e.target.classList.toggle("big"); return; }
 		const b = e.target.closest("[data-msg]");
 		if (b) vs.postMessage(JSON.parse(b.dataset.msg));
@@ -28,52 +75,73 @@
 
 	window.addEventListener("message", ({ data: m }) => {
 		if (m.type === "init") {
-			$("studios").innerHTML = m.studios.map((s) => `<option value="${esc(s.placeId)}">${esc(s.name)}</option>`).join("");
-			if (!$("place").value) $("place").value = m.form.place || m.studios[0]?.placeId || "";
-			$("minutes").value = m.form.minutes;
-			$("policy").querySelector("option[value=jev]").disabled = !m.hasKey;
-			$("policy").value = m.form.policy;
-			$("nokey").hidden = m.hasKey;
-			if (!m.studios.length && !m.running) $("status").textContent = "No open Studio place found. Open one in Studio and ↻, or type a place id and the runner opens it.";
-			setRunning(m.running);
-			runs(m.runs);
+			hasKey = m.hasKey;
+			const opts = m.studios.map((s) => `<option value="${esc(s.placeId)}">${esc(s.name)}  ·  ${esc(s.placeId)}</option>`);
+			$("place").innerHTML = opts.join("") + `<option value="__id">Enter a place id…</option>`;
+			const remembered = m.form.place, known = m.studios.some((s) => s.placeId === remembered);
+			const v = known ? remembered : m.studios[0]?.placeId || "__id";
+			if (v === "__id" && remembered) $("placeId").value = remembered;
+			$("place").value = v;
+			$("empty").hidden = !!opts.length;
+			form.minutes = [2, 5, 10, 20].includes(m.form.minutes) ? m.form.minutes : 5;
+			form.policy = m.form.policy === "scripted" || !hasKey ? "scripted" : "jev";
+			if (m.live) start(m.live); else if (!m.running) finish();
+			paint(); runs(m.runs);
 		} else if (m.type === "started") {
-			setRunning(true);
-			$("status").textContent = `Playing ${m.place} for ${m.minutes} min with the ${m.policy} policy…`;
+			start(m);
 		} else if (m.type === "out") {
-			$("status").textContent = m.text;
+			status(m.text);
 		} else if (m.type === "step") {
+			const newErr = m.errorGroups > counts.err;
+			counts.steps = m.step; counts.err = m.errorGroups; if (m.suspect) counts.sus++; if (m.stuck && !wasStuck) counts.stuck++; wasStuck = !!m.stuck; setCounts();
+			const tags = [newErr ? `<span class="tag red">new error</span>` : "", m.stuck ? `<span class="tag amber">stuck</span>` : "", m.suspect ? `<span class="tag purple">suspect</span>` : "",
+				m.jev !== undefined ? `<span class="tag">looks wrong ${Math.round(m.jev * 100)}%</span>` : ""].join("");
+			const nearBottom = main.scrollHeight - main.scrollTop - main.clientHeight < 80;
 			const d = document.createElement("div");
 			d.className = "step";
-			d.innerHTML = `<span class="n">${m.step}</span> ${esc(m.action)} <span class="dim">→ ${esc(m.outcome)} · +${m.newLines.length} lines</span> <span class="${m.errorGroups ? "err" : "dim"}">${m.errorGroups} error${m.errorGroups === 1 ? "" : "s"}</span>`
-				+ (m.stuck ? ` <span class="stuck">stuck</span>` : "") + (m.jev !== undefined ? ` <span class="dim">jev wrong ${Math.round(m.jev * 100)}%</span>` : "")
-				+ (m.newLines.length ? `<pre class="mono">${esc(m.newLines.join("\n"))}</pre>` : "") + shot(m.screenshot);
+			d.innerHTML = `<div class="n">${m.step}</div><div class="a">${esc(m.action)} <span>→ ${esc(m.outcome)}${m.newLines.length ? ` · +${plural(m.newLines.length, "line")}` : ""}</span></div>`
+				+ (tags ? `<div class="tags">${tags}</div>` : "") + (m.newLines.length ? `<pre>${esc(m.newLines.join("\n"))}</pre>` : "") + shot(m.screenshot);
 			$("steps").appendChild(d);
-			d.scrollIntoView({ block: "end" });
+			$("feedcount").textContent = `(${m.step})`;
+			if (nearBottom) main.scrollTop = main.scrollHeight;
 		} else if (m.type === "done") {
-			setRunning(false);
-			done(m);
-			runs(m.runs);
+			if (m.final) finish();
+			current = m.name;
+			result(m); runs(m.runs);
+			if (!m.final) $("result").scrollIntoView({ block: "start" });
 		}
 	});
 
-	function done(m) {
-		const r = m.report, f = m.findings;
-		$("result").hidden = false;
-		$("status").textContent = m.failure ? `Runner failure: ${m.failure}` : r ? `Done: exit ${m.code}. Aqua: ${r.aqua ?? "not attempted"}` : `Exit ${m.code}, no report written.`;
-		$("headline").textContent = r ? `${r.place} · ${r.steps} steps · ${r.policy} · ${f.errors.length} error groups · ${f.stuck.length} stuck · ${f.suspects.length} suspects` : m.name;
-		$("findings").innerHTML = !f ? "" : [
-			...f.errors.map((e, i) => `<div class="finding"><b>${e.count}× ${esc(e.message)}</b><div class="dim">${esc(e.side)} · steps ${esc(e.steps)}</div>`
-				+ (e.trace.length ? `<pre class="mono">${esc(e.trace.join("\n"))}</pre>` : "") + before(e.before) + shot(e.screenshot)
-				+ `<div class="actions">${e.loc ? `<button ${msg({ type: "goto", i })}>Open in editor</button><button class="alt" ${msg({ type: "fix", i })}>Fix with Claude</button>` : `<span class="dim">Names no script and line.</span>`}</div></div>`),
-			...f.suspects.map((s) => `<div class="finding"><b>Suspect at step ${s.step}: Jev ${s.percent}% "looks wrong"</b>` + (s.console.length ? `<pre class="mono">${esc(s.console.join("\n"))}</pre>` : "") + before(s.before) + shot(s.screenshot) + `</div>`),
-			...f.stuck.map((s) => `<div class="finding"><b class="stuck">Stuck: ${esc(s)}</b></div>`),
-		].join("") || `<div class="finding dim">No findings.</div>`;
+	function result(m) {
+		const r = m.report, f = m.findings || { errors: [], suspects: [], stuck: [] };
+		const errs = f.errors.length, sus = f.suspects.length, stuck = f.stuck.length;
+		const [cls, icon, head, sub] = m.failure ? ["amber", ICON.fail, "The runner failed", m.failure]
+			: !r ? ["amber", ICON.fail, `Exit ${m.code ?? "?"}`, "No report was written."]
+			: errs ? ["red", ICON.bad, `${plural(errs, "error group")} in ${r.place}`, "Script errors a player would hit. Open each in the editor or hand it to Claude."]
+			: sus ? ["purple", ICON.eye, `Nothing crashed, ${plural(sus, "suspect")}`, "No script errors, but Jev thought these moments looked wrong. Check the screenshots."]
+			: stuck ? ["amber", ICON.fail, "Nothing crashed, but the player got stuck", "Same spot and a silent console for five steps: walls, pits, dead ends."]
+			: ["green", ICON.ok, `Clean run in ${r.place}`, "No script errors, nothing suspect, never stuck."];
+		$("verdict").className = `verdict ${cls}`;
+		$("verdict").innerHTML = `${icon}<div><b>${esc(head)}</b><span>${esc(sub)}</span></div>`;
+		$("rcounts").innerHTML = r ? [`<span class="chip">${plural(r.steps, "step")}</span>`, `<span class="chip">${clock(r.duration)}</span>`, `<span class="chip">${r.policy === "jev" ? "Jev" : "scripted"}</span>`,
+			`<span class="chip${r.aqua === "ok" ? " green" : ""}" title="${esc(r.aqua ?? "")}">${r.aqua === "ok" ? "sent to Aqua" : r.aqua ? "Aqua: " + esc(r.aqua) : "not sent to Aqua"}</span>`].join("") : "";
+		$("findings").innerHTML = [
+			...f.errors.map((e, i) => `<div class="finding"><div class="t">${e.count > 1 ? `${e.count}× ` : ""}${esc(e.message)}</div><div class="m">${esc(e.side)} · steps ${esc(e.steps)}</div>`
+				+ (e.trace.length ? `<details><summary>Stack</summary><pre>${esc(e.trace.join("\n"))}</pre></details>` : "") + before(e.before) + shot(e.screenshot)
+				+ `<div class="actions">${e.loc ? `<button class="btn" ${msg({ type: "goto", i })}>Open in editor</button><button class="btn alt" ${msg({ type: "fix", i })}>Fix with Claude</button>` : `<span class="m">Names no script and line.</span>`}</div></div>`),
+			...f.suspects.map((s) => `<div class="finding purple"><div class="t">Looked wrong to Jev (${s.percent}%) at step ${s.step}</div>`
+				+ (s.console.length ? `<details><summary>Console</summary><pre>${esc(s.console.join("\n"))}</pre></details>` : "") + before(s.before) + shot(s.screenshot) + `</div>`),
+			...f.stuck.map((s) => `<div class="finding amber"><div class="t">Player stuck</div><div class="m">${esc(s)}</div></div>`),
+		].join("");
 		$("md").innerHTML = m.md;
+		$("result").hidden = false;
 	}
 
 	function runs(list) {
-		$("runs").innerHTML = list.length ? list.map((r) => `<div class="run" ${msg({ type: "show", name: r.name })}><span>${esc(r.start.slice(0, 16).replace("T", " "))}</span><span class="dim">${esc(r.place)} · ${esc(r.policy)}</span>`
-			+ `<span class="c ${r.errors || r.stuck ? "err" : "dim"}">${r.exit === 1 ? "failed" : `${r.errors} err · ${r.stuck} stuck · ${r.suspects} sus`}</span></div>`).join("") : "None yet.";
+		$("runs").innerHTML = list.length ? list.map((r) => {
+			const dot = r.exit === 1 ? "gray" : r.errors ? "red" : r.suspects || r.stuck ? "amber" : "green";
+			const c = r.exit === 1 ? "failed" : [r.errors && `${r.errors} err`, r.suspects && `${r.suspects} sus`, r.stuck && `${r.stuck} stuck`].filter(Boolean).join(" · ") || "clean";
+			return `<button class="run${r.name === current ? " on" : ""}" ${msg({ type: "show", name: r.name })}><i class="dot ${dot}"></i><div class="d"><b>${esc(r.place)}</b><span>${esc(when(r.start))} · ${r.policy === "jev" ? "Jev" : "scripted"} · ${plural(r.steps, "step")}</span></div><span class="c">${esc(c)}</span></button>`;
+		}).join("") : `<div class="hint">${ICON.eye}<span>Runs land here with their findings and screenshots.</span></div>`;
 	}
 })();

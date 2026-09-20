@@ -330,10 +330,10 @@ action had no effect, something looks wrong for a player. The choice maps back t
 ride on it as `action.jev`, and a step where "looks wrong" is 0.7 or more without a console error becomes a
 *suspect* (screenshot, its own report section, no effect on the exit code). Numbers and safety rules stay in
 code; Jev is literal and text-only. Any failure falls back to the scripted policy, logged once (401/422 for the
-rest of the run; 429/529 retried twice). The key: `PARLAY_TYPESAFE_API_KEY` (the QA view passes the key from
+rest of the run; 429/529 retried twice). The key: `PARLAY_TYPESAFE_API_KEY` (the Quality Assurance view passes the key from
 SecretStorage this way), else the file `~/.parlay/typesafe-api-key` (one line), else `TYPESAFE_API_KEY`.
 
-**The QA view** (`src/qa.ts`, the QA container in Parlay's sidebar) runs the same runner from the editor: an
+**The Quality Assurance view** (`src/qa.ts`, the Quality Assurance container in Parlay's secondary sidebar) runs the same runner from the editor: an
 open Studio place from `listStudios()` (or a typed place id), minutes, the policy (Jev when a key is stored, else
 scripted, with a Set TypeSafe key link), Run and Stop. The runner is a node child of Parlay writing
 `<globalStorage>/qa/<timestamp>/`, with `PARLAY_AQUA_URL` from the `parlay.aquaUrl` setting and
