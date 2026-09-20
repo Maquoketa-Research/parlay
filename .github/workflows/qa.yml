@@ -1,0 +1,49 @@
+# QA on the self-hosted QA box (build/parlay/qa-box.ps1): the runner lives in the logged-in desktop session,
+# so Roblox Studio can be driven and played. Start with a smoke job that proves the box; the play agents hang
+# off this workflow as they land.
+name: Parlay QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      place:
+        description: Roblox place id to test (empty = whatever Studio has open)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parlay-qa
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, windows, qa, studio]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+      - name: The box
+        run: |
+          "runner: $env:COMPUTERNAME  user: $env:USERNAME  session: $((Get-Process -Id $PID).SessionId)"
+          "node: $(node --version 2>$null)  git: $(git --version)"
+          "studio installed: $(Test-Path "$env:LOCALAPPDATA\Roblox\Versions")"
+          "studio mcp: $(Test-Path "$env:LOCALAPPDATA\Roblox\mcp.bat")"
+          "parlay installed: $(Test-Path "$env:LOCALAPPDATA\Programs\Parlay\Parlay.exe")"
+          "claude: $(Test-Path "$env:USERPROFILE\.local\bin\claude.exe")"
+      - name: Open Studio windows (the same read Parlay does)
+        run: |
+          Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue |
+            Where-Object { $_.MainWindowTitle } |
+            ForEach-Object { "  " + $_.MainWindowTitle + "  (since " + $_.StartTime.ToString("HH:mm:ss") + ")" }
+          if (-not (Get-Process -Name RobloxStudioBeta,RobloxStudio -ErrorAction SilentlyContinue)) { "  none open (fine for the smoke test)" }
+      - name: Desktop available
+        run: |
+          # a runner started as a service reports session 0 and cannot show Studio; the logon task gives a real session
+          $s = (Get-Process -Id $PID).SessionId
+          if ($s -eq 0) { throw "runner is in session 0 (a service). Register it through qa-box.ps1 so it runs in the logged-in desktop." }
+          "desktop session $s: ok"

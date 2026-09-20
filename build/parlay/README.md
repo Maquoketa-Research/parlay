@@ -270,3 +270,26 @@ Studio's conflict dialog remains authoritative when local files already exist.
 Validation covers guards, merging, backup and rollback with fixtures, and native
 CFPreferences round-tripping in an isolated test domain. The real Studio
 close/write/reopen cycle still needs a saved project run to verify export behavior.
+
+## QA box
+
+The Studio automation and play agents run on a dedicated Windows PC, not on a developer's machine. `qa-box.ps1`
+(run elevated) installs the tools (git, gh, Tailscale, node, Roblox Studio, Claude Code), turns off sleep, clones
+this repo to `~\parlay-qa\parlay`, installs the latest Parlay release and configures a GitHub Actions self-hosted
+runner with labels `self-hosted, windows, qa, studio`. `.github/workflows/qa.yml` targets those labels; its smoke
+job proves the box.
+
+Three things the script leaves to a person, because they are remote access and autostart:
+
+1. Tailscale: `& "C:\Program Files\Tailscale	ailscale.exe" up`, then tell the driver the machine's Tailscale name.
+2. OpenSSH server, reachable over Tailscale only, with the driver's public key (an administrator's keys live in
+   `%ProgramData%\sshdministrators_authorized_keys`):
+   ```powershell
+   Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0; Set-Service sshd -StartupType Automatic; Start-Service sshd
+   New-NetFirewallRule -DisplayName "SSH (Tailscale)" -Direction Inbound -Protocol TCP -LocalPort 22 -RemoteAddress 100.64.0.0/10 -Action Allow
+   Add-Content "$env:ProgramData\sshdministrators_authorized_keys" "<driver public key>"; icacls "$env:ProgramData\sshdministrators_authorized_keys" /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F"
+   ```
+3. The runner at logon, in the desktop session (never `svc.cmd install`: a service has no desktop and Studio
+   cannot play): Task Scheduler, trigger "At log on" for the QA user, action `~\parlay-qaunnerun.cmd`, no time
+   limit, restart on failure. Keep the box logged in (auto sign-in) so the task has a desktop.
+
