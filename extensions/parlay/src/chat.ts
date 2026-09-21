@@ -10,7 +10,7 @@ import { ChildProcess, spawn } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import { agentBrief, argsOf, exe, onPath, writeBrief } from "./agents";
+import { syncRootArgs, agentBrief, argsOf, exe, onPath, writeBrief } from "./agents";
 import { Entry, applyClaude, applyCodex } from "./chatEvents";
 import { Agent, Turn, claudeTranscript, other, renderTurns } from "./handoff";
 import { agentStatus, AgentStatus } from "./agentStatus";
@@ -279,7 +279,7 @@ class ChatView implements vscode.WebviewViewProvider {
 		const id = resume ? old! : crypto.randomUUID();
 		const brief = writeBrief();
 		const args = ["-p", "--output-format", "stream-json", "--input-format", "stream-json", "--verbose", "--include-partial-messages",
-			...argsOf("claude"), ...optionArgs("claude"), ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id];
+			...argsOf("claude"), ...optionArgs("claude"), ...syncRootArgs(), ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id];
 		const p = spawn(exe("claude"), args, { cwd: ws, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
 		this.claudeOptions = JSON.stringify(agentOptions("claude"));
 		this.claude = p; this.store.claude = id;

@@ -78,6 +78,13 @@ export function send(line: string) {
 const state = (): State => ctx.workspaceState.get<State>("agents") ?? { agent: "claude" };
 const cwd = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 const cfg = (k: string, d: string) => vscode.workspace.getConfiguration("parlay").get<string>(k, d);
+// Every place's Script Sync folder lives under one root (parlay.projectsDir, else ~/Documents/Parlay). Claude may
+// read and edit there beyond the open workspace, so a QA fix for another place's scripts is not "outside the
+// allowed working directory".
+export function syncRootArgs(): string[] {
+	const root = cfg("projectsDir", "") || path.join(os.homedir(), "Documents", "Parlay");
+	return fs.existsSync(root) ? ["--add-dir", root] : [];
+}
 export const argsOf = (a: Agent) => cfg(a === "claude" ? "claudeArgs" : "codexArgs", DEFAULT_ARGS[a]).split(/\s+/).filter(Boolean);
 
 function refresh() {
@@ -155,7 +162,7 @@ function options(s: State, a: Agent, prompt?: string): vscode.TerminalOptions {
 	if (a === "claude") {
 		const id = resume ? old!.id : crypto.randomUUID();
 		const brief = writeBrief();
-		shellArgs = [...args, ...optionArgs(a), ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id, ...tail];
+		shellArgs = [...args, ...optionArgs(a), ...syncRootArgs(), ...(brief ? ["--append-system-prompt-file", brief] : []), resume ? "--resume" : "--session-id", id, ...tail];
 		s.claude = { id };
 	} else {
 		// the same brief for GPT, as Codex's developer instructions (a TOML string on -c: one argument, no raw newlines)
