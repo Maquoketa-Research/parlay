@@ -236,24 +236,37 @@ the version loaded at open (community-reported, devforum 2025271). So the versio
 | 1 | **Version table.** Page `develop.roblox.com/v2/assets/13772394625/versions?limit=100&sortOrder=Desc` with an editor's cookie; keep rows with `isPublished = true`; stop when `created` is earlier than the first analytics date. Write `version.csv`. Cross-check version numbers and the `published` flag with Open Cloud Assets v1 `ListAssetVersions` (`asset:read`). | documented (deprecated route carries `created` + `isPublished`); Open Cloud routes carry **no date** (documented absence); an undocumented time field in `/history` items **needs live check** | develop.md; assets v1.json; places.md |
 | 2 | **Map wiki labels to version numbers.** Join `timeline\updates_parsed.json` dates to `version.csv` by "latest publish on the wiki date (UTC), else first publish after it"; developer confirms (A7). | inferred | |
 | 3 | **Multi-place check.** `GET https://apis.roblox.com/universes/v1/4777817887/places` once; if more than one place is player-facing, repeat steps 1-2 per place and note which is the start place. | documented endpoint (Experimental) | places.md |
-| 4a | **Open the version, preferred.** Resolve Studio's exe from `HKCU\Software\ROBLOX Corporation\Environments\roblox-studio\clientExe` (today `...\Versions\version-55808de4b1914919\RobloxStudioBeta.exe`, 0.739). Run `RobloxStudioBeta.exe --task EditPlaceRevision --placeId 13772394625 --universeId 4777817887 --placeVersion N`. Never Publish or Save to Roblox from that session. | CLI **documented** ("Opens a specific previous version of the place. Requires --placeVersion"); behaviour on Studio 739, whether the window name carries `(placeId: 13772394625)` for `findStudio` (`qa/play.mjs:82-87`), and "nothing is written to the cloud" are **needs live check** / inferred. Shares an unknown amount of code with Open Local Copy, which regressed repeatedly in 2026 and was hotfixed 2026-08-28 (staff, devforum 4833788) | https://create.roblox.com/docs/en-us/studio/command-line-interface.md |
+| 4a | **Open the version, preferred.** Resolve Studio's exe from `HKCU\Software\ROBLOX Corporation\Environments\roblox-studio\clientExe` (today `...\Versions\version-55808de4b1914919\RobloxStudioBeta.exe`, 0.739). Run `RobloxStudioBeta.exe --task EditPlaceRevision --placeId 13772394625 --universeId 4777817887 --placeVersion N`. Never Publish or Save to Roblox from that session. | CLI **documented** ("Opens a specific previous version of the place. Requires --placeVersion"). **Live-checked 2026-09-21** on Aqua (Studio 0.739): the window opens in ~12 s, loads `assetdelivery.roblox.com/v1/asset/?id=<place>&version=N` (Studio log), and is titled `Place1 (Version N)`; the bridge lists it under that name with **no** `(placeId: ...)` suffix, so `findStudio` by place id cannot see it: identify it as "the bridge id that was not connected before the launch" (`qa/revision-extract.mjs`). Killing the process by pid leaves no save prompt and nothing in the cloud. Gotcha: Studio honours the launcher's show-window flag, so `spawn(..., { windowsHide: true })` produces an invisible Studio that keeps running. Shares an unknown amount of code with Open Local Copy, which regressed repeatedly in 2026 and was hotfixed 2026-08-28 (staff, devforum 4833788) | https://create.roblox.com/docs/en-us/studio/command-line-interface.md |
 | 4b | **Open the version, file route.** Window > Version History > filter Published > ⋮ > Open Local Copy > File > Save to File As `bladeball-vN.rbxl`; sha256 it. Or `GET https://assetdelivery.roblox.com/v2/assetId/13772394625/version/N` with an editor's `.ROBLOSECURITY`, follow `location`, save as `.rbxl`. Open with `--task EditFile --localPlaceFile <abs path>`. | UI documented (filters only cover post-2026-02-27 versions); cookie route **community-reported**; unauthenticated probe returned HTTP 200 with body error 409 "User is not authorized to access Asset" (copylock); whether Open Cloud `asset-delivery-api` with `legacy-asset:manage` serves places **needs live check** | version-history doc; devforum 3391086, 3574403 |
-| 5 | **Stamp the version before Play.** Studio MCP `execute_luau` (`datamodel_type: "Edit"`): `return game.PlaceId..":"..game.PlaceVersion`. Expect `13772394625:N` for 4a; expect `PlaceId 0` for a local `.rbxl` (4b), in which case the version comes from the CLI argument and file name only. Refuse to run if the value disagrees with N. | Edit-mode non-zero is community-reported; equality with N **needs live check**; `PlaceId 0` for a local file is inferred. The extension already runs an Edit-datamodel read of `PlaceId`/`GameId` (`src/studio.ts:573`) | devforum 2025271 |
+| 5 | **Stamp the version before Play.** Studio MCP `execute_luau` (`datamodel_type: "Edit"`): `return game.PlaceId..":"..game.PlaceVersion`. **Live-checked 2026-09-21:** a 4a session reads `PlaceId 0`, `PlaceVersion 0` and `game.Name = "Place1 (Version N)"` in Edit mode, so the version comes from the CLI argument and the session name only; `revision-extract.mjs` refuses a session whose name does not end in `(Version N)`. Expect `PlaceId 0` for a local `.rbxl` (4b) as well. | Edit-mode non-zero PlaceVersion (devforum 2025271) holds for a normally opened place, not for a revision session; `PlaceId 0` for a local file is inferred. The extension already runs an Edit-datamodel read of `PlaceId`/`GameId` (`src/studio.ts:573`) | Aqua v5 run, 2026-09-21 |
 | 6 | **Safety before Play.** Do **not** toggle Game Settings > Security > "Enable Studio Access to API Services": it is a universe-level setting saved to Wiggity's live configuration. The public flag `studioAccessToApisAllowed` is `false` today, so a 4a session cannot reach production DataStores unless the developer changes that. Prefer 4b for Play (a local file has no universe). Additionally set `HttpService.HttpEnabled = false` in the Edit datamodel before Play so old code cannot fire webhooks or analytics. | documented (setting is universe-level; public flag); whether `execute_luau` may write `HttpEnabled` (LocalUserSecurity per the API dump) **needs live check** | game_details.json; api-dump |
 | 7 | **Run.** `node qa/play.mjs --place 13772394625 --universe 4777817887 --place-version N --out .build/qa/bladeball-vN-<ts>` (4a) or without `--place` (4b). `--place-version` is a one-line runner addition (`report.placeVersion ??= a.placeVersion`, next to `qa/play.mjs:293`, which today fills it from the Play server probe and therefore reads 0). Copy `version.csv` row and `.rbxl` sha256 into the run folder. | runner change, not yet written | `qa/play.mjs:283-296`, `qa/probe.server.luau:8` |
 | 8 | **Fresh-player state.** If the shell is gated on DataStore/ProfileStore data, a 4b session sees no profile and may show a first-run shell for free; if the developer's dev-commands include a profile reset, run it before each run (A8.5). | inferred | play-mode-research.md 7.2 (Poop needed `DevCommands ResetData`) |
 | 9 | **Tear down.** Close Studio, discard on the save prompt so no new version lands in Blade Ball's history; delete the `.rbxl` when the version's tests finish (agreement point 6). | inferred | version-history doc (Restore creates a new version) |
 
+**4c. Dialog-free per-version extraction (tested 2026-09-21 on Aqua).** `node qa/revision-extract.mjs --place P
+--universe U --versions 4,7,22` (or `--from A --to B --step S`) opens each version with 4a, finds the window by new
+bridge id, checks that the session name ends in `(Version N)`, reads the tree with read-only Luau one service at a
+time (names, classes, attributes, script `Source`, `Value`, `Text`, part position and size) in chunks of at most
+120 KB (the plugin caps one result near 200 KB), writes `~/Documents/Parlay/data/versions/<place>/vN.json`, and
+kills the Studio process by pid so no save prompt appears. 28-47 s per version on Aqua; versions already on disk are
+skipped. No Luau API writes an `.rbxl`: `PluginManager():ExportPlace(path)` is the OBJ mesh export and opens its
+dialog whatever the argument, and `AssetService:SavePlaceAsync` writes to the cloud (never call it). Byte-exact
+`.rbxl` files therefore still need 4b: manual Save to File As, or the cookie download.
+
 Volume (estimate): Blade Ball publishes weekly plus hotfixes, so 5-15 published versions a month against hundreds
 to thousands of autosaves a month at the documented 4-minute Team Create autosave. Only published versions are
-opened.
+opened. Dave's hand-saved copies so far (`~\Documents\Blade Ball Versions\Place1 (Version N).rbxl`, N = 4, 7, 22,
+31, 36, 80) are 0.2 MB each.
 
-Live-check list for one Studio session on Dave's own place (no Blade Ball access needed, ~15 minutes):
-(a) `EditPlaceRevision` opens and `list_roblox_studios` names the window with `(placeId: ...)`;
-(b) Edit-mode `game.PlaceVersion == N`; (c) Play-mode reads 0; (d) `EditFile` of a saved `.rbxl` reports `PlaceId 0`;
-(e) `execute_luau` can set `HttpEnabled`. With Blade Ball access: (f) Open Cloud `ListAssetVersions` and `/history`
-item shapes for a place; (g) whether `asset-delivery-api` serves a place version; (h) whether a non-owner editor
-can Restore (avoid needing to know: never Restore).
+Live-check results (2026-09-21, one Studio session on Aqua Multi-Place Testing, Studio 0.739):
+(a) answered: `EditPlaceRevision` opens; the bridge lists the window as `Place1 (Version N)` with no `(placeId: ...)`,
+so find it by new bridge id. (b) answered, negative: Edit-mode `game.PlaceVersion` is 0 in a revision session
+(`PlaceId` 0 too); the version is the CLI argument, echoed in the session name. (c) Play-mode reads 0 (earlier, n=5).
+Still open: (d) `EditFile` of a saved `.rbxl` reports `PlaceId 0`; (e) `execute_luau` can set `HttpEnabled`. With
+Blade Ball access: (f) Open Cloud `ListAssetVersions` and `/history` item shapes for a place; (g) whether
+`asset-delivery-api` serves a place version; (h) whether a non-owner editor can Restore (avoid needing to know:
+never Restore).
 
 ---
 
@@ -555,9 +568,11 @@ corrected version; the original is kept here so nobody re-derives it.
 | "We provide `pull.mjs`" | **not yet written** | Section 7 item 5 |
 | Wiki quote "retains copies of all uploaded places" (help article 203313850) | **unverifiable here** | Article returns 403/challenge page to fetchers; no retention policy is documented on create.roblox.com |
 | "Latest update 9 Aug 2026", "Sportskeeda lag 1-15 days" | **partial** | Try Hard Guides example is a 16-day lag; press dates are confirmation only |
+| "`PluginManager():ExportPlace(path)` writes the place to disk" | **refuted (live, 2026-09-21)** | It is Studio's "Export Place" OBJ mesh export: the dialog offers "Object Model Files (*.obj)" and opens whatever path is passed; `pcall` returns ok and no file appears. No Luau API writes an `.rbxl` |
+| "A 4a session reports `13772394625:N`" | **refuted (live, Aqua)** | `PlaceId 0`, `PlaceVersion 0`, `game.Name = "Place1 (Version N)"`; the bridge name carries no `(placeId: ...)`. Version provenance is the CLI argument plus the session name |
+| Launch the Studio CLI with `spawn(..., { windowsHide: true })` | **bug (live)** | Studio honours the launcher's show flag: three invisible Studio processes ran for an hour. Spawn without it and close by pid |
 
-Still open after all checks (needs the developer or a live call): timestamp field in `/history` items; whether
-`EditPlaceRevision` works on Studio 739 and what PlaceId/PlaceVersion the session reports; whether Open Cloud
+Still open after all checks (needs the developer or a live call): timestamp field in `/history` items; whether Open Cloud
 `asset-delivery-api` serves place versions; whether the shell renders with no DataStore; how many places the universe
 has; whether Blade Ball logs funnels, economy or custom events at all; whether the studio restarts servers on
 publish; the R15 conversion's actual status; the labels and dates of the ~10 updates since 2026-07-11.
