@@ -11,7 +11,12 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local gui = player and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
-local out = { viewport = camera and { camera.ViewportSize.X, camera.ViewportSize.Y } or nil, buttons = {}, text = {} }
+-- GUI AbsolutePosition is measured below the topbar (GuiInset, 58 px today) while virtual mouse input takes
+-- viewport pixels, so a click at the raw AbsolutePosition lands 58 px too high (measured: raw 0/4, +inset 3/3).
+-- x, y below are viewport pixels ready to click; inWindow is judged in GUI space (a centre above 0 sits under CoreGui).
+local insetOk, inset = pcall(function() return game:GetService("GuiService"):GetGuiInset() end)
+local insetY = insetOk and inset and inset.Y or 0
+local out = { viewport = camera and { camera.ViewportSize.X, camera.ViewportSize.Y } or nil, inset = insetY, buttons = {}, text = {} }
 
 local function pathOf(inst)
 	local parts = {}
@@ -52,7 +57,9 @@ end
 local function inWindow(g, cx, cy)
 	if camera then
 		local vp = camera.ViewportSize
-		if cx < 0 or cy < 0 or cx > vp.X or cy > vp.Y then return false end
+		-- cy is GUI space: above 0 is the topbar band CoreGui owns (clicks there are refused); the bottom edge is
+		-- the viewport height minus the inset
+		if cx < 0 or cy < 0 or cx > vp.X or cy + insetY > vp.Y then return false end
 	end
 	local o = g.Parent
 	while o and o ~= gui do
@@ -84,7 +91,7 @@ if gui then
 				parent = g.Parent and g.Parent.Name or "",
 				class = g.ClassName,
 				x = cx,
-				y = cy,
+				y = cy + insetY,   -- viewport pixel: what simulate_mouse_input wants
 				interactable = interactable(g),
 				active = g.Active,
 				inWindow = inWindow(g, cx, cy),

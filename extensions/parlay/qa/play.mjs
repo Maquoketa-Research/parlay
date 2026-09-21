@@ -66,6 +66,11 @@ hum.MoveToFinished:Once(function(ok) arrived = ok end)
 local waited = 0
 while arrived == nil and waited < 9 do waited += task.wait(0.25) end
 return if arrived then "arrived" elseif arrived == false then "gave up" else "timeout"`;
+// where a world point is drawn right now, for a ClickDetector click (viewport pixels; on=false when off screen or behind)
+const SCREEN_OF = `local cam = workspace.CurrentCamera
+if not cam then return "{}" end
+local v, on = cam:WorldToViewportPoint(Vector3.new($POS))
+return game:GetService("HttpService"):JSONEncode({ x = math.floor(v.X), y = math.floor(v.Y), on = on and v.Z > 0 })`;
 
 // execute_luau hands back the returned value as text; take the JSON in it even if the server decorates it
 function parseJson(text) {
@@ -104,9 +109,17 @@ async function act(call, action, viewport = [1280, 720], pixels = false) {
 	}
 	if (action.kind === "interact") {
 		const moved = (await call("execute_luau", { ...client, code: MOVE_TO.replace("$POS", action.position.join(", ")) })).text.trim();
+		// a ClickDetector wants the pixel where the part is drawn now, not the viewport centre; and the first virtual
+		// contact at a new position only moves the cursor (measured 0/4 fires), so prime once, then click the asked times
+		let at = null;
+		if (action.class === "ClickDetector") {
+			const s = parseJson((await call("execute_luau", { ...client, code: SCREEN_OF.replace("$POS", action.position.join(", ")) })).text);
+			at = s.on ? { x: s.x, y: s.y } : { x: Math.round(viewport[0] / 2), y: Math.round(viewport[1] / 2) };
+			await call("user_mouse_input", { ...client, actions: [{ action: "mouseButtonClick", ...at }] });
+		}
 		for (let i = 0; i < (action.times ?? 1); i++) {
 			if (action.class === "ProximityPrompt") await call("user_keyboard_input", { ...client, actions: [{ action: "keyDown", key_code: "E" }, { action: "wait", wait_time_ms: 600 }, { action: "keyUp", key_code: "E" }] });
-			else if (action.class === "ClickDetector") await call("user_mouse_input", { ...client, actions: [{ action: "mouseButtonClick", x: Math.round(viewport[0] / 2), y: Math.round(viewport[1] / 2) }] });
+			else if (action.class === "ClickDetector") await call("user_mouse_input", { ...client, actions: [{ action: "mouseButtonClick", ...at }] });
 		}
 		return moved;   // a TouchTransmitter fires on arrival
 	}
