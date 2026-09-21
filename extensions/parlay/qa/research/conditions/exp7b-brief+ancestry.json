@@ -1,0 +1,91 @@
+{
+ "model": "jev-latest",
+ "state": {
+  "player": {
+   "position": [
+    211,
+    109,
+    189
+   ],
+   "health": 100,
+   "state": "Running"
+  },
+  "leaderstats": {
+   "Best Distance": 0,
+   "Coins": 0
+  },
+  "buttonsOnScreen": [
+   "ShopBtn",
+   "IndexBtn",
+   "RebirthBtn",
+   "Skip",
+   "RobuxButton",
+   "CloseButton",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit"
+  ],
+  "interactablesNearby": [],
+  "tried": {
+   "buttons": "5 of 15",
+   "interactables": "0 of 0"
+  },
+  "untried": {
+   "buttons": 10,
+   "interactables": 0
+  },
+  "stepsSinceAnythingNew": 2,
+  "textOnScreen": [
+   "Coins 0",
+   "Best Distance 0",
+   "Shop",
+   "Worlds",
+   "Tier 1",
+   "Tier 2",
+   "Tier 3",
+   "Skip tutorial",
+   "Walk to the toilet"
+  ],
+  "lastActions": [
+   "click \"ShopBtn\" → ok",
+   "click \"IndexBtn\" → ok",
+   "click \"RebirthBtn\" → ok",
+   "click \"Skip\" → ok",
+   "click \"RobuxButton\" → ok"
+  ],
+  "sinceLastAction": {
+   "buttonsAdded": [],
+   "buttonsRemoved": [],
+   "textAdded": [],
+   "textRemoved": [],
+   "statsChanged": false,
+   "healthChanged": false,
+   "consoleLines": 0
+  },
+  "lastConsoleLines": [
+   "[Analytics] (studio, not sent) onboarding Y1ddy step 2 \"Walk\""
+  ],
+  "stepsWithoutChange": 3
+ },
+ "questions": {
+  "next": {
+   "type": "choice",
+   "instructions": "You are play-testing a Roblox game as the UI tester: Press every button and open every menu; walk only to look for more interface. Your task from the developer: buy the cheapest poop in the shop. Work toward it step by step, then keep testing. Pick the next action. Prefer what has not been tried; when the last actions changed nothing, move somewhere else.",
+   "criteria": {
+    "click_5": "Click the \"CloseButton\" TextButton in Shop > Panel",
+    "click_6": "Click the \"Travel\" TextButton in Worlds > World1",
+    "click_7": "Click the \"Travel\" TextButton in Worlds > World2",
+    "click_8": "Click the \"Travel\" TextButton in Worlds > World3",
+    "click_9": "Click the \"Hit\" TextButton in Shop > Tier1",
+    "click_10": "Click the \"Hit\" TextButton in Shop > Tier2",
+    "explore": "Walk somewhere else to look for more interface"
+   }
+  }
+ }
+}

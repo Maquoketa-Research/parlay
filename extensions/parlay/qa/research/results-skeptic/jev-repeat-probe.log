@@ -1,0 +1,18 @@
+Sun Sep 20 21:54:06 CDT 2026
+
+== model sent: jev-1.13.0
+response.model: jev-1.13.0 | calls: 6 | usage[0]: {"input_tokens":1433,"output_tokens":169}
+next.choice: click_8,click_8,click_8,click_8,click_8,click_8 | flips vs first: 0
+next.confidence: 0.490,0.510,0.400,0.610,0.410,0.520
+  p(click_5): 0.120,0.070,0.170,0.070,0.100,0.070 sd 0.0365
+  p(click_4): 0.160,0.210,0.200,0.130,0.270,0.200 sd 0.0435
+  p(explore): 0.040,0.060,0.050,0.050,0.040,0.050 sd 0.0069
+  p(click_6): 0.020,0.020,0.020,0.020,0.030,0.020 sd 0.0037
+  p(click_8): 0.560,0.570,0.490,0.660,0.490,0.590 sd 0.0589
+  p(click_9): 0.070,0.050,0.050,0.050,0.050,0.060 sd 0.0076
+  p(click_7): 0.020,0.020,0.020,0.010,0.020,0.010 sd 0.0047
+  stuck: 0.460,0.480,0.440,0.470,0.450,0.420 sd 0.0197 crosses 0.7: false
+  noEffect: 0.290,0.290,0.300,0.360,0.340,0.290 sd 0.0279 crosses 0.7: false
+  looksWrong: 0.110,0.100,0.100,0.110,0.110,0.090 sd 0.0075 crosses 0.7: false
+  done: 0.020,0.020,0.020,0.020,0.020,0.020 sd 0.0000 crosses 0.7: false
+  deadButton: 0.900,0.900,0.890,0.890,0.870,0.880 sd 0.0107 crosses 0.7: false

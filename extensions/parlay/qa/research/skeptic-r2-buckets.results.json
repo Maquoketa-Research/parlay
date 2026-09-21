@@ -1,0 +1,308 @@
+[
+	{
+		"label": "end real: HUD 5/5 tried, sinceNew 8, text on",
+		"arm": "numeric",
+		"doneTruth": true,
+		"stuckTruth": false,
+		"done": [
+			0.82,
+			0.84,
+			0.82
+		],
+		"stuck": [
+			0.23,
+			0.26,
+			0.23
+		],
+		"tok": 976
+	},
+	{
+		"label": "end real: HUD 5/5 tried, sinceNew 8, text on",
+		"arm": "bucket",
+		"doneTruth": true,
+		"stuckTruth": false,
+		"done": [
+			0.74,
+			0.73,
+			0.75
+		],
+		"stuck": [
+			0.16,
+			0.15,
+			0.16
+		],
+		"tok": 1023
+	},
+	{
+		"label": "end real: HUD 5/5 tried, sinceNew 8, text off",
+		"arm": "numeric",
+		"doneTruth": true,
+		"stuckTruth": false,
+		"done": [
+			0.87,
+			0.88,
+			0.88
+		],
+		"stuck": [
+			0.23,
+			0.26,
+			0.24
+		],
+		"tok": 814
+	},
+	{
+		"label": "end real: HUD 5/5 tried, sinceNew 8, text off",
+		"arm": "bucket",
+		"doneTruth": true,
+		"stuckTruth": false,
+		"done": [
+			0.84,
+			0.82,
+			0.82
+		],
+		"stuck": [
+			0.15,
+			0.15,
+			0.16
+		],
+		"tok": 861
+	},
+	{
+		"label": "end real: 26/26 tried, sinceNew 8",
+		"arm": "numeric",
+		"doneTruth": true,
+		"stuckTruth": false,
+		"done": [
+			0.86,
+			0.87,
+			0.87
+		],
+		"stuck": [
+			0.27,
+			0.29,
+			0.28
+		],
+		"tok": 1062
+	},
+	{
+		"label": "end real: 26/26 tried, sinceNew 8",
+		"arm": "bucket",
+		"doneTruth": true,
+		"stuckTruth": false,
+		"done": [
+			0.77,
+			0.77,
+			0.75
+		],
+		"stuck": [
+			0.14,
+			0.17,
+			0.15
+		],
+		"tok": 1107
+	},
+	{
+		"label": "mid real: 7/26 tried, sinceNew 3",
+		"arm": "numeric",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.02,
+			0.02,
+			0.02
+		],
+		"stuck": [
+			0.46,
+			0.47,
+			0.42
+		],
+		"tok": 1047
+	},
+	{
+		"label": "mid real: 7/26 tried, sinceNew 3",
+		"arm": "bucket",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.03,
+			0.03,
+			0.03
+		],
+		"stuck": [
+			0.11,
+			0.11,
+			0.1
+		],
+		"tok": 1087
+	},
+	{
+		"label": "late real: 25/26 tried, sinceNew 8",
+		"arm": "numeric",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.05,
+			0.05,
+			0.05
+		],
+		"stuck": [
+			0.64,
+			0.67,
+			0.61
+		],
+		"tok": 1041
+	},
+	{
+		"label": "late real: 25/26 tried, sinceNew 8",
+		"arm": "bucket",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.06,
+			0.07,
+			0.06
+		],
+		"stuck": [
+			0.17,
+			0.18,
+			0.18
+		],
+		"tok": 1091
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 5, still 5",
+		"arm": "numeric",
+		"doneTruth": false,
+		"stuckTruth": true,
+		"done": [
+			0.81,
+			0.8,
+			0.79
+		],
+		"stuck": [
+			0.63,
+			0.65,
+			0.6
+		],
+		"tok": 796
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 5, still 5",
+		"arm": "bucket",
+		"doneTruth": false,
+		"stuckTruth": true,
+		"done": [
+			0.76,
+			0.77,
+			0.78
+		],
+		"stuck": [
+			0.74,
+			0.75,
+			0.75
+		],
+		"tok": 849
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 8, still 8",
+		"arm": "numeric",
+		"doneTruth": true,
+		"stuckTruth": true,
+		"done": [
+			0.8,
+			0.79,
+			0.8
+		],
+		"stuck": [
+			0.66,
+			0.65,
+			0.63
+		],
+		"tok": 796
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 8, still 8",
+		"arm": "bucket",
+		"doneTruth": true,
+		"stuckTruth": true,
+		"done": [
+			0.77,
+			0.77,
+			0.75
+		],
+		"stuck": [
+			0.75,
+			0.77,
+			0.74
+		],
+		"tok": 849
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 4, still 4",
+		"arm": "numeric",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.2,
+			0.21,
+			0.21
+		],
+		"stuck": [
+			0.65,
+			0.62,
+			0.59
+		],
+		"tok": 796
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 4, still 4",
+		"arm": "bucket",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.47,
+			0.48,
+			0.48
+		],
+		"stuck": [
+			0.4,
+			0.38,
+			0.37
+		],
+		"tok": 839
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 1, still 1",
+		"arm": "numeric",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.07,
+			0.06,
+			0.06
+		],
+		"stuck": [
+			0.32,
+			0.31,
+			0.33
+		],
+		"tok": 748
+	},
+	{
+		"label": "empty: 0 buttons, sinceNew 1, still 1",
+		"arm": "bucket",
+		"doneTruth": false,
+		"stuckTruth": false,
+		"done": [
+			0.1,
+			0.12,
+			0.11
+		],
+		"stuck": [
+			0.11,
+			0.11,
+			0.1
+		],
+		"tok": 793
+	}
+]

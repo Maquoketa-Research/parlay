@@ -1,0 +1,54 @@
+{
+ "model": "jev-latest",
+ "state": {
+  "player": {
+   "position": [
+    24,
+    4,
+    -32
+   ],
+   "health": 100,
+   "state": "Running"
+  },
+  "buttonsOnScreen": [],
+  "interactablesNearby": [],
+  "tried": {
+   "buttons": "0 of 0",
+   "interactables": "0 of 0"
+  },
+  "untried": {
+   "buttons": 0,
+   "interactables": 0
+  },
+  "stepsSinceAnythingNew": 4,
+  "textOnScreen": [],
+  "lastActions": [
+   "walk forward + jump → ok",
+   "walk left + jump → ok",
+   "walk forward + jump → ok",
+   "walk right + jump → ok",
+   "walk back + jump → ok"
+  ],
+  "sinceLastAction": {
+   "buttonsAdded": [],
+   "buttonsRemoved": [],
+   "textAdded": [],
+   "textRemoved": [],
+   "statsChanged": false,
+   "healthChanged": false,
+   "consoleLines": 0
+  },
+  "lastConsoleLines": [],
+  "stepsWithoutChange": 0
+ },
+ "questions": {
+  "done": {
+   "type": "noul",
+   "instructions": "This test session is complete; nothing useful is left to try.",
+   "criteria": {
+    "true": "untried buttons is 0 and stepsSinceAnythingNew is 5 or more: every button seen has been clicked and no new interface has appeared.",
+    "false": "untried buttons or interactables are above 0, or stepsSinceAnythingNew is small because a new button, interactable or console line just appeared."
+   }
+  }
+ }
+}

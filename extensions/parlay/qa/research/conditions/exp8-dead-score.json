@@ -1,0 +1,105 @@
+{
+ "model": "jev-latest",
+ "state": {
+  "player": {
+   "position": [
+    211,
+    -180,
+    189
+   ],
+   "health": 0,
+   "state": "Dead"
+  },
+  "leaderstats": {
+   "Best Distance": 0,
+   "Coins": 0
+  },
+  "buttonsOnScreen": [
+   "ShopBtn",
+   "IndexBtn",
+   "RebirthBtn",
+   "Skip",
+   "RobuxButton",
+   "CloseButton",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "CloseButton",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit"
+  ],
+  "interactablesNearby": [],
+  "tried": {
+   "buttons": "5 of 26",
+   "interactables": "0 of 0"
+  },
+  "untried": {
+   "buttons": 21,
+   "interactables": 0
+  },
+  "stepsSinceAnythingNew": 2,
+  "textOnScreen": [
+   "Coins 0",
+   "Best Distance 0",
+   "Shop",
+   "Worlds",
+   "Tier 1",
+   "Tier 2",
+   "Tier 3",
+   "Skip tutorial",
+   "Walk to the toilet"
+  ],
+  "lastActions": [
+   "click \"RebirthBtn\" → ok",
+   "click \"Skip\" → ok",
+   "click \"RobuxButton\" → ok",
+   "click \"ShopBtn\" → ok",
+   "click \"Travel\" → ok"
+  ],
+  "sinceLastAction": {
+   "buttonsAdded": [],
+   "buttonsRemoved": [
+    "Travel",
+    "Travel",
+    "Travel",
+    "CloseButton"
+   ],
+   "textAdded": [],
+   "textRemoved": [],
+   "statsChanged": false,
+   "healthChanged": true,
+   "consoleLines": 0
+  },
+  "lastConsoleLines": [
+   "[Analytics] (studio, not sent) onboarding Y1ddy step 2 \"Walk\""
+  ],
+  "stepsWithoutChange": 0
+ },
+ "questions": {
+  "broken": {
+   "type": "score",
+   "instructions": "How broken is the game for a player right now, judging by the last action, sinceLastAction and the console.",
+   "criteria": [
+    "Nothing is wrong: the last action did what it should",
+    "A cosmetic oddity only",
+    "A button or prompt did nothing when used",
+    "A script error, nil or infinite yield in the console",
+    "Unplayable: the player is dead, fell through the floor or is frozen"
+   ]
+  }
+ }
+}

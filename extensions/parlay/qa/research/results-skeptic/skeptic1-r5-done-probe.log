@@ -1,0 +1,5 @@
+Sun Sep 20 21:54:09 CDT 2026
+A cap5 + '5 or more' (today): done 0.83 0.82 0.83
+B cap5 + '8 or more' (R5 fallback, cap unchanged): done 0.13 0.13 0.15
+C state 8 + '8 or more' (cap raised too): done 0.83 0.83 0.83
+D real-game end state + today's q: done 0.72 0.74 0.76

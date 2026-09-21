@@ -1,0 +1,9 @@
+Sun Sep 20 21:54:30 CDT 2026
+D1 tried '0 of 0' + text (today's compact): done 0.7 0.7 0.68
+D2 tried '0 of 0', no text: done 0.83 0.84 0.84
+D3 tried '26 of 26' + text: done 0.84 0.87 0.86
+R3a integers everSeen 26 everTried 26, today's done q: done 0.82 0.82 0.82
+R3b integers everSeen 34 everTried 26 (8 hidden untried), today's done q: done 0.72 0.74 0.72
+R3c integers everSeen 34 everTried 26, done q mentions everTried<everSeen: done 0.05 0.05 0.06
+R3d integers everSeen 26 everTried 26, done q mentions everTried<everSeen: done 0.82 0.8 0.81
+R3e integers, untried.hidden 8 as its own field, today's done q: done 0.43 0.46 0.48

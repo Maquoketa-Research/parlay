@@ -1,0 +1,13 @@
+Sun Sep 20 21:54:15 CDT 2026
+== T1 plain options + task question
+  rep 1: next -> click_5 conf 0.43 P(click_9 Hit Tier1)=0.08 P(click_5 Close)=0.51 P(explore)=0.18 | task -> explore conf 0.54 P(click_9 Hit Tier1)=0.12 P(click_5 Close)=0.23 P(explore)=0.6
+  rep 2: next -> click_5 conf 0.47 P(click_9 Hit Tier1)=0.06 P(click_5 Close)=0.55 P(explore)=0.18 | task -> explore conf 0.5 P(click_9 Hit Tier1)=0.14 P(click_5 Close)=0.24 P(explore)=0.57
+  rep 3: next -> click_5 conf 0.48 P(click_9 Hit Tier1)=0.05 P(click_5 Close)=0.55 P(explore)=0.15 | task -> explore conf 0.62 P(click_9 Hit Tier1)=0.08 P(click_5 Close)=0.2 P(explore)=0.67
+== T2 ancestry options + task question
+  rep 1: next -> click_5 conf 0.43 P(click_9 Hit Tier1)=0.19 P(click_5 Close)=0.51 P(explore)=0.16 | task -> click_9 conf 0.76 P(click_9 Hit Tier1)=0.79 P(click_5 Close)=0.08 P(explore)=0.1
+  rep 2: next -> click_5 conf 0.37 P(click_9 Hit Tier1)=0.24 P(click_5 Close)=0.46 P(explore)=0.17 | task -> click_9 conf 0.74 P(click_9 Hit Tier1)=0.79 P(click_5 Close)=0.07 P(explore)=0.12
+  rep 3: next -> click_5 conf 0.32 P(click_9 Hit Tier1)=0.24 P(click_5 Close)=0.42 P(explore)=0.2 | task -> click_9 conf 0.76 P(click_9 Hit Tier1)=0.8 P(click_5 Close)=0.07 P(explore)=0.11
+== T3 target gone (Hit Tier1/2 tried), task question
+  rep 1: next -> click_6 conf 0.22 P(click_9 Hit Tier1)=0 P(click_5 Close)=0.19 P(explore)=0.31 | task -> explore conf 0.69 P(click_9 Hit Tier1)=0 P(click_5 Close)=0.17 P(explore)=0.75
+  rep 2: next -> click_6 conf 0.19 P(click_9 Hit Tier1)=0 P(click_5 Close)=0.25 P(explore)=0.29 | task -> explore conf 0.7 P(click_9 Hit Tier1)=0 P(click_5 Close)=0.17 P(explore)=0.76
+  rep 3: next -> explore conf 0.17 P(click_9 Hit Tier1)=0 P(click_5 Close)=0.25 P(explore)=0.33 | task -> explore conf 0.64 P(click_9 Hit Tier1)=0 P(click_5 Close)=0.18 P(explore)=0.72

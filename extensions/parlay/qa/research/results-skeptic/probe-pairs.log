@@ -1,0 +1,12 @@
+Sun Sep 20 21:54:19 CDT 2026
+A1 dead click, stepsWithoutChange 0: {"deadButton":0.92,"stuck":0.47,"noEffect":0.26}
+A2 dead click, stepsWithoutChange 5: {"deadButton":0.93,"stuck":0.67,"noEffect":0.31}
+B1 click with textAdded: {"deadButton":0.11,"noEffect":0.31}
+C1 lastClicked interactable=false, today's question: {"deadButton":0.93}
+C2 lastClicked interactable=false, variant question: {"deadButton":0.12}
+C3 lastClicked interactable=true, no lock labels, variant question: {"deadButton":0.7}
+D1 end state with textOnScreen: {"done":0.76}
+D2 end state, textOnScreen empty: {"done":0.86}
+D3 end state, tried '26 of 26' instead of '0 of 0': {"done":0.84}
+E1 choice: 19 Hit options + ShopBtn again: choice click_0 conf 0.61 top-1 0.64 options 19
+E2 choice: 1 Hit option (dedup by name) + explore: choice click_0 conf 0.65 top-1 0.82 options 2

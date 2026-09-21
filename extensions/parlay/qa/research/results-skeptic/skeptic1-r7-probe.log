@@ -1,0 +1,25 @@
+Sun Sep 20 21:54:12 CDT 2026
+== V0 exp7 brief (replication)
+  rep 1: next -> click_5 conf 0.46 P(click_9 Hit Tier1)=0.05 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.53 P(explore)=0.19
+  rep 2: next -> click_5 conf 0.52 P(click_9 Hit Tier1)=0.05 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.59 P(explore)=0.15
+  rep 3: next -> click_5 conf 0.44 P(click_9 Hit Tier1)=0.07 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.51 P(explore)=0.18
+== V1 brief names target, appended to instruction (today's code path)
+  rep 1: next -> click_9 conf 0.69 P(click_9 Hit Tier1)=0.73 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.15 P(explore)=0.04
+  rep 2: next -> click_9 conf 0.75 P(click_9 Hit Tier1)=0.79 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.12 P(explore)=0.03
+  rep 3: next -> click_9 conf 0.67 P(click_9 Hit Tier1)=0.71 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.17 P(explore)=0.05
+== V2 V1 + ancestry option text
+  rep 1: next -> click_9 conf 0.68 P(click_9 Hit Tier1)=0.74 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.2 P(explore)=0.03
+  rep 2: next -> click_9 conf 0.69 P(click_9 Hit Tier1)=0.74 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.2 P(explore)=0.03
+  rep 3: next -> click_9 conf 0.67 P(click_9 Hit Tier1)=0.72 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.22 P(explore)=0.03
+== V3 exp7 brief, no 'move somewhere else' clause
+  rep 1: next -> click_5 conf 0.41 P(click_9 Hit Tier1)=0.13 P(click_10 Hit Tier2)=0.02 P(click_5 Close)=0.5 P(explore)=0.05
+  rep 2: next -> click_5 conf 0.46 P(click_9 Hit Tier1)=0.1 P(click_10 Hit Tier2)=0.02 P(click_5 Close)=0.54 P(explore)=0.04
+  rep 3: next -> click_5 conf 0.44 P(click_9 Hit Tier1)=0.11 P(click_10 Hit Tier2)=0.02 P(click_5 Close)=0.52 P(explore)=0.05
+== V4 exp7 brief + task question (rec option B)
+  rep 1: next -> click_5 conf 0.51 P(click_9 Hit Tier1)=0.05 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.58 P(explore)=0.18 | task -> explore conf 0.52 P(click_9 Hit Tier1)=0.14 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.23 P(explore)=0.59
+  rep 2: next -> click_5 conf 0.43 P(click_9 Hit Tier1)=0.06 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.5 P(explore)=0.2 | task -> explore conf 0.61 P(click_9 Hit Tier1)=0.11 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.19 P(explore)=0.66
+  rep 3: next -> click_5 conf 0.47 P(click_9 Hit Tier1)=0.06 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.55 P(explore)=0.18 | task -> explore conf 0.5 P(click_9 Hit Tier1)=0.17 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.22 P(explore)=0.57
+== V5 V1 brief + task question
+  rep 1: next -> click_9 conf 0.74 P(click_9 Hit Tier1)=0.79 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.13 P(explore)=0.03 | task -> click_9 conf 0.99 P(click_9 Hit Tier1)=1 P(click_10 Hit Tier2)=0 P(click_5 Close)=0 P(explore)=0
+  rep 2: next -> click_9 conf 0.69 P(click_9 Hit Tier1)=0.73 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.16 P(explore)=0.03 | task -> click_9 conf 1 P(click_9 Hit Tier1)=1 P(click_10 Hit Tier2)=0 P(click_5 Close)=0 P(explore)=0
+  rep 3: next -> click_9 conf 0.65 P(click_9 Hit Tier1)=0.7 P(click_10 Hit Tier2)=0.01 P(click_5 Close)=0.18 P(explore)=0.04 | task -> click_9 conf 0.99 P(click_9 Hit Tier1)=1 P(click_10 Hit Tier2)=0 P(click_5 Close)=0 P(explore)=0

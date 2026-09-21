@@ -1,0 +1,113 @@
+{
+ "model": "jev-latest",
+ "state": {
+  "player": {
+   "position": [
+    211,
+    109,
+    189
+   ],
+   "health": 100,
+   "state": "Running"
+  },
+  "leaderstats": {
+   "Best Distance": 0,
+   "Coins": 0
+  },
+  "buttonsOnScreen": [
+   "ShopBtn",
+   "IndexBtn",
+   "RebirthBtn",
+   "Skip",
+   "RobuxButton",
+   "CloseButton",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Travel",
+   "CloseButton",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit"
+  ],
+  "interactablesNearby": [],
+  "tried": {
+   "buttons": "5 of 26",
+   "interactables": "0 of 0"
+  },
+  "untried": {
+   "buttons": 21,
+   "interactables": 0
+  },
+  "stepsSinceAnythingNew": 2,
+  "textOnScreen": [
+   "Coins 0",
+   "Best Distance 0",
+   "Shop",
+   "Worlds",
+   "Tier 1",
+   "Tier 2",
+   "Tier 3",
+   "Skip tutorial",
+   "Walk to the toilet"
+  ],
+  "lastActions": [
+   "click \"ShopBtn\" → ok",
+   "click \"IndexBtn\" → ok",
+   "click \"RebirthBtn\" → ok",
+   "click \"Skip\" → ok",
+   "click \"RobuxButton\" → ok"
+  ],
+  "sinceLastAction": {
+   "buttonsAdded": [],
+   "buttonsRemoved": [],
+   "textAdded": [],
+   "textRemoved": [],
+   "statsChanged": false,
+   "healthChanged": false,
+   "consoleLines": 0
+  },
+  "lastConsoleLines": [
+   "[Analytics] (studio, not sent) onboarding Y1ddy step 2 \"Walk\""
+  ],
+  "stepsWithoutChange": 5
+ },
+ "questions": {
+  "stuck": {
+   "type": "noul",
+   "instructions": "The player appears stuck.",
+   "criteria": {
+    "true": "The last actions changed nothing: same position, same buttons on screen, no new console lines; or the humanoid state is a fall, seat or ragdoll the player cannot leave.",
+    "false": "The player moves, the screen or the console changes, or new content is still being reached."
+   }
+  },
+  "looksWrong": {
+   "type": "noul",
+   "instructions": "Something is broken for a player, beyond the player merely not moving.",
+   "criteria": {
+    "true": "A console line reports an error, a nil or missing object or an infinite yield; a button or prompt did nothing when used; health or stats changed for no reason; the player fell through the floor, or the humanoid state is Dead or Ragdoll without a cause.",
+    "false": "Walking, jumping, standing still, a plain or empty map, and steps that changed nothing are all normal; only the console or the states above count as broken."
+   }
+  },
+  "noEffect": {
+   "type": "noul",
+   "instructions": "The last action did not have its intended effect.",
+   "criteria": {
+    "true": "The last action's outcome says failed, timeout or gave up, or sinceLastAction shows nothing at all after a click or a prompt.",
+    "false": "The last action arrived, clicked or walked as intended and sinceLastAction shows something, or there is no last action yet."
+   }
+  }
+ }
+}

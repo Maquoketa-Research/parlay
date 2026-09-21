@@ -1,0 +1,25 @@
+Sun Sep 20 21:54:37 CDT 2026
+== A newbie goal
+  rep 1: next -> click_close conf 0.78 [click_rebirth=0 click_close=0.84 click_hit=0.1 click_index=0.06] | suggests -> "CLOSE PANEL TO CONTINUE" 0.94 conf 0.93 | lost 0.2
+  rep 2: next -> click_close conf 0.78 [click_close=0.84 click_hit=0.08 click_index=0.08 click_rebirth=0] | suggests -> "CLOSE PANEL TO CONTINUE" 0.97 conf 0.96 | lost 0.18
+  rep 3: next -> click_close conf 0.76 [click_index=0.09 click_rebirth=0 click_close=0.82 click_hit=0.09] | suggests -> "CLOSE PANEL TO CONTINUE" 0.96 conf 0.96 | lost 0.19
+== B explorer goal
+  rep 1: next -> click_index conf 0.42 [click_close=0.27 click_hit=0.11 click_rebirth=0.05 click_index=0.57] | suggests -> "CLOSE PANEL TO CONTINUE" 0.96 conf 0.96 | lost 0.2
+  rep 2: next -> click_index conf 0.44 [click_close=0.24 click_hit=0.12 click_rebirth=0.06 click_index=0.58] | suggests -> "CLOSE PANEL TO CONTINUE" 0.95 conf 0.95 | lost 0.19
+  rep 3: next -> click_index conf 0.43 [click_index=0.57 click_rebirth=0.07 click_close=0.21 click_hit=0.15] | suggests -> "CLOSE PANEL TO CONTINUE" 0.96 conf 0.96 | lost 0.2
+== C ui goal
+  rep 1: next -> click_index conf 0.66 [click_close=0.09 click_index=0.75 click_rebirth=0.07 click_hit=0.09] | suggests -> "CLOSE PANEL TO CONTINUE" 0.96 conf 0.96 | lost 0.18
+  rep 2: next -> click_index conf 0.62 [click_rebirth=0.07 click_close=0.09 click_index=0.72 click_hit=0.12] | suggests -> "CLOSE PANEL TO CONTINUE" 0.96 conf 0.95 | lost 0.2
+  rep 3: next -> click_index conf 0.6 [click_hit=0.11 click_index=0.7 click_close=0.12 click_rebirth=0.07] | suggests -> "CLOSE PANEL TO CONTINUE" 0.97 conf 0.96 | lost 0.19
+== D newbie, CLOSE PANEL banner quoted on CloseButton
+  rep 1: next -> click_close conf 0.91 [click_rebirth=0 click_index=0.04 click_hit=0.03 click_close=0.93] | suggests -> "CLOSE PANEL TO CONTINUE" 0.97 conf 0.96 | lost 0.2
+  rep 2: next -> click_close conf 0.95 [click_close=0.96 click_index=0.02 click_hit=0.02 click_rebirth=0] | suggests -> "CLOSE PANEL TO CONTINUE" 0.97 conf 0.97 | lost 0.19
+  rep 3: next -> click_close conf 0.96 [click_rebirth=0 click_close=0.97 click_hit=0.02 click_index=0.01] | suggests -> "CLOSE PANEL TO CONTINUE" 0.97 conf 0.96 | lost 0.2
+== E newbie, FIRST RUN banner quoted on Hit
+  rep 1: next -> click_close conf 0.6 [click_close=0.71 click_index=0.06 click_hit=0.23 click_rebirth=0] | suggests -> "CLOSE PANEL TO CONTINUE" 0.95 conf 0.94 | lost 0.18
+  rep 2: next -> click_close conf 0.61 [click_close=0.71 click_rebirth=0 click_hit=0.24 click_index=0.05] | suggests -> "CLOSE PANEL TO CONTINUE" 0.97 conf 0.97 | lost 0.18
+  rep 3: next -> click_close conf 0.6 [click_close=0.7 click_index=0.06 click_rebirth=0 click_hit=0.24] | suggests -> "CLOSE PANEL TO CONTINUE" 0.96 conf 0.95 | lost 0.19
+== F newbie, banner lines removed
+  rep 1: next -> click_index conf 0.33 [click_rebirth=0.09 click_index=0.5 click_close=0.11 click_hit=0.3] | suggests -> "SAVE UP" 0.98 conf 0.98 | lost 0.27
+  rep 2: next -> click_index conf 0.38 [click_close=0.09 click_index=0.54 click_hit=0.29 click_rebirth=0.08] | suggests -> "SAVE UP" 0.98 conf 0.98 | lost 0.26
+  rep 3: next -> click_index conf 0.34 [click_rebirth=0.1 click_close=0.11 click_hit=0.28 click_index=0.51] | suggests -> "SAVE UP" 0.99 conf 0.98 | lost 0.24

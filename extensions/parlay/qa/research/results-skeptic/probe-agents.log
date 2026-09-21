@@ -1,0 +1,16 @@
+Sun Sep 20 21:54:27 CDT 2026
+D4 ui end state, all five questions + explore-only choice rep 1: {"stuck":0.3,"noEffect":0.13,"looksWrong":0.1,"done":0.87,"deadButton":0.21,"next":"explore@1"} usage {"input_tokens":1465,"output_tokens":113}
+D4 ui end state, all five questions + explore-only choice rep 2: {"stuck":0.28,"noEffect":0.11,"looksWrong":0.09,"done":0.86,"deadButton":0.19,"next":"explore@1"} usage {"input_tokens":1465,"output_tokens":113}
+D4 ui end state, all five questions + explore-only choice rep 3: {"stuck":0.31,"noEffect":0.11,"looksWrong":0.1,"done":0.87,"deadButton":0.16,"next":"explore@1"} usage {"input_tokens":1465,"output_tokens":113}
+BR1 breaker: spam ×5 on a coin prompt, Coins 0→5 (legit) rep 1: {"stuck":0.09,"noEffect":0.04,"looksWrong":0.1,"done":0.06,"exploit":0.12} usage {"input_tokens":1132,"output_tokens":90}
+BR1 breaker: spam ×5 on a coin prompt, Coins 0→5 (legit) rep 2: {"stuck":0.1,"noEffect":0.03,"looksWrong":0.09,"done":0.06,"exploit":0.15} usage {"input_tokens":1132,"output_tokens":90}
+BR1 breaker: spam ×5 on a coin prompt, Coins 0→5 (legit) rep 3: {"stuck":0.1,"noEffect":0.04,"looksWrong":0.11,"done":0.06,"exploit":0.17} usage {"input_tokens":1132,"output_tokens":90}
+BR2 breaker: a walk, Coins 5→105 without a cause rep 1: {"stuck":0.06,"noEffect":0.08,"looksWrong":0.13,"done":0.07,"exploit":0.7} usage {"input_tokens":1147,"output_tokens":90}
+BR2 breaker: a walk, Coins 5→105 without a cause rep 2: {"stuck":0.06,"noEffect":0.08,"looksWrong":0.14,"done":0.08,"exploit":0.68} usage {"input_tokens":1147,"output_tokens":90}
+BR2 breaker: a walk, Coins 5→105 without a cause rep 3: {"stuck":0.06,"noEffect":0.08,"looksWrong":0.13,"done":0.07,"exploit":0.67} usage {"input_tokens":1147,"output_tokens":90}
+NB1 newbie: real HUD, banner says CLOSE PANEL TO CONTINUE rep 1: {"stuck":0.41,"noEffect":0.14,"looksWrong":0.1,"done":0.04,"lost":0.2} usage {"input_tokens":1312,"output_tokens":89}
+NB1 newbie: real HUD, banner says CLOSE PANEL TO CONTINUE rep 2: {"stuck":0.48,"noEffect":0.14,"looksWrong":0.11,"done":0.04,"lost":0.18} usage {"input_tokens":1312,"output_tokens":89}
+NB1 newbie: real HUD, banner says CLOSE PANEL TO CONTINUE rep 3: {"stuck":0.38,"noEffect":0.18,"looksWrong":0.1,"done":0.03,"lost":0.18} usage {"input_tokens":1312,"output_tokens":89}
+NB2 newbie: empty baseplate, three aimless walks rep 1: {"stuck":0.36,"noEffect":0.12,"looksWrong":0.07,"done":0.18,"lost":0.92} usage {"input_tokens":1041,"output_tokens":89}
+NB2 newbie: empty baseplate, three aimless walks rep 2: {"stuck":0.42,"noEffect":0.13,"looksWrong":0.08,"done":0.2,"lost":0.93} usage {"input_tokens":1041,"output_tokens":89}
+NB2 newbie: empty baseplate, three aimless walks rep 3: {"stuck":0.38,"noEffect":0.13,"looksWrong":0.07,"done":0.18,"lost":0.92} usage {"input_tokens":1041,"output_tokens":89}

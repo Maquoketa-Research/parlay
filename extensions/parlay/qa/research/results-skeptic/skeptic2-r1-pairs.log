@@ -1,0 +1,9 @@
+Sun Sep 20 21:54:22 CDT 2026
+C0 no lastClicked, today's question (the run as recorded): deadButton 0.93 / 0.93 / 0.92
+C1 interactable=false + lock labels, today's question: deadButton 0.94 / 0.94 / 0.94
+C2 interactable=false + lock labels, variant question: deadButton 0.09 / 0.11 / 0.12
+C3 interactable=true + plain labels, variant question: deadButton 0.69 / 0.67 / 0.58
+C4 interactable=false + plain labels, variant question (field alone): deadButton 0.44 / 0.39 / 0.38
+C5 interactable=true + lock labels, variant question (labels alone): deadButton 0.13 / 0.16 / 0.12
+C6 interactable=false + plain labels, field-only question: deadButton 0.07 / 0.08 / 0.07
+C7 interactable=true + plain labels, field-only question: deadButton 0.91 / 0.91 / 0.91

@@ -1,0 +1,70 @@
+{
+ "model": "jev-latest",
+ "state": {
+  "player": {
+   "position": [
+    211,
+    109,
+    189
+   ],
+   "health": 100,
+   "state": "Running"
+  },
+  "leaderstats": {
+   "Best Distance": 0,
+   "Coins": 0
+  },
+  "buttonsOnScreen": [
+   "ShopBtn",
+   "IndexBtn",
+   "RebirthBtn",
+   "Skip",
+   "RobuxButton",
+   "CloseButton",
+   "Travel",
+   "Travel",
+   "Travel",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit",
+   "Hit"
+  ],
+  "interactablesNearby": [],
+  "tried": {
+   "buttons": "0 of 15",
+   "interactables": "0 of 0"
+  },
+  "untried": {
+   "buttons": 15,
+   "interactables": 0
+  },
+  "stepsSinceAnythingNew": 0,
+  "textOnScreen": [
+   "Coins 0",
+   "Best Distance 0",
+   "Shop",
+   "Worlds",
+   "Tier 1",
+   "Tier 2",
+   "Tier 3",
+   "Skip tutorial",
+   "Walk to the toilet"
+  ],
+  "lastActions": [],
+  "lastConsoleLines": [],
+  "stepsWithoutChange": 0
+ },
+ "questions": {
+  "next": {
+   "type": "choice",
+   "instructions": "You are play-testing a Roblox game as the UI tester: Press every button and open every menu; walk only to look for more interface. Pick the next action. Prefer what has not been tried; when the last actions changed nothing, move somewhere else.",
+   "criteria": {
+    "click_0": "Click the \"ShopBtn\" ImageButton in Rail",
+    "click_1": "Click the \"IndexBtn\" ImageButton in Rail",
+    "explore": "Walk somewhere else to look for more interface"
+   }
+  }
+ }
+}

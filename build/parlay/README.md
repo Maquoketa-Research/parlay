@@ -298,10 +298,12 @@ Three things the script leaves to a person, because they are remote access and a
 `extensions/parlay/qa/play.mjs` (Node 24, no dependencies; it ships inside the extension) drives Studio through
 Roblox's own Studio MCP server (`%LOCALAPPDATA%\Roblox\mcp.bat`): finds or opens the place, starts Play, and each
 step probes the Server (`probe.server.luau`: player, health, position, leaderstats, nearest interactables) and
-the Client (`probe.client.luau`: visible GUI buttons), picks an action, acts through `user_mouse_input` /
+the Client (`probe.client.luau`: visible GUI buttons with whether a click can land on each: `interactable`,
+`active`, `inWindow`; the visible text labels), picks an action, acts through `user_mouse_input` /
 `user_keyboard_input` / `execute_luau`, diffs `get_console_output`, and screenshots every 10 steps and on each
 new error. Errors are grouped by fingerprint (numbers and ids stripped) with the five actions before first
-sight; five steps with no movement, no console line and no GUI change is a stuck event. Play is stopped on the
+sight; five steps with no movement, no console line whose fingerprint is new this run, and no GUI change is a
+stuck event (a game that repeats the same line every step still registers stuck). Play is stopped on the
 way out, Ctrl+C included. The report lands in `.build/qa/<timestamp>/` as `report.json`, `report.md`,
 screenshots and `aqua-ingest.json` (the batch `AquaChatRelay` would post; it is sent to `/api/ingest/roblox`
 when `--aqua-url`/`--aqua-key` or `PARLAY_AQUA_URL`/`PARLAY_AQUA_KEY` are set).
@@ -322,33 +324,74 @@ The default is scripted (unclicked button, else nearest unvisited interactable, 
 `npm run check`) plays the mock server (`PARLAY_QA_MCP=mock`) end to end, including a mock TypeSafe.
 
 **The Jev policy** (`qa/policy-jev.mjs`, TypeSafe's `POST /v1/systemone` over fetch, no SDK) sends one request
-per step: a small structured state (player, up to ten interactables with class and distance, the buttons on
-screen, the last five actions with outcomes, the last five console lines, stuck) with a `choice` over the actions
-the code enumerates (`click_<i>` per unvisited visible button, `interact_<i>` per unvisited nearby interactable,
-`walk_W/A/S/D`, `explore`; only walks when stuck) and three `noul` flags: the player appears stuck, the last
-action had no effect, something looks wrong for a player. The choice maps back to the runner's action, the flags
-ride on it as `action.jev`, and a step where "looks wrong" is 0.7 or more without a console error becomes a
-*suspect* (screenshot, its own report section, no effect on the exit code). Numbers and safety rules stay in
-code; Jev is literal and text-only. Any failure falls back to the scripted policy, logged once (401/422 for the
-rest of the run; 429/529 retried twice). The key: `PARLAY_TYPESAFE_API_KEY` (the Quality Assurance view passes the key from
-SecretStorage this way), else the file `~/.parlay/typesafe-api-key` (one line), else `TYPESAFE_API_KEY`.
+per step: a small structured state (player, leaderstats, up to ten interactables with class and distance, the
+buttons and text on screen, untried counts as integers, the last five actions with outcomes, what the last action
+changed, the last five console lines, steps without change; never the runner's own verdicts, which read back as
+Jev's) with a `choice` over the actions the code enumerates and two shared `noul` flags, something looks wrong
+for a player and the session is done, plus the agent's own questions (below). The choice maps back to the
+runner's action, the flags ride on it as `action.jev = { flags, notes, chosen }` (probabilities and confidence
+stay in `jev.jsonl`), and a step where "looks wrong" is 0.7 or more without a console error becomes a *suspect*
+(screenshot, its own report section, no effect on the exit code). The options: `click_<i>` per untried visible
+button, with same-text siblings behind one handler (`Tier1.Hit`, `Tier2.Hit`, …) folded into one line, `Click
+"Hit" in Tier2 (3 of 19 alike untried)`, that names the next untried member and stays on offer until every member
+is clicked (Jev cannot tell clones apart, and a dead sibling still gets its own click); `interact_<i>` per untried
+nearby interactable; `reopen_<i>` when nothing untried is visible but a closed menu still hides untried buttons
+(the opener is clicked again, `action.reopen`, twice at most before its targets land in
+`report.gui.unreachable`); `walk_W/A/S/D` and `explore` only when nothing untried or reachable is left, or when
+stuck. Numbers, comparisons and safety rules stay in code; Jev is literal and text-only. Any failure falls back to
+the scripted policy, logged once (401, 422 and a 400 "Unknown model" for the rest of the run; 429/529 retried
+twice). The key: `PARLAY_TYPESAFE_API_KEY` (the Quality Assurance view passes the key from SecretStorage this
+way), else the file `~/.parlay/typesafe-api-key` (one line), else `TYPESAFE_API_KEY`. The model:
+`PARLAY_QA_JEV_MODEL` (default the `jev-latest` alias; pin `jev-1.13.0` for a proof).
+
+**The button filter** (`qa/shared.mjs filterButtons`, applied once in `play.mjs` right after the client probe):
+the probe records and never drops; the runner drops `interactable: false` buttons (a locked shop tile) unless the
+agent asks for disabled ones, and off-window buttons (centre outside a scrolling or clipping ancestor, or the
+viewport) for everyone. Everything downstream, the untried counts, the delta, the stuck signature and Jev's
+offer, sees the one kept list; what was dropped is `report.gui.hidden`.
 
 **Agents** (`qa/agents.mjs`): the personalities Jev plays as, picked in the Quality Assurance tab or with
 `--agent`. Each is a table entry, nothing more: what is on offer (buttons, interactables, walks; whether visited
-targets stay on offer; the Breaker's five-times prompt spam and edge runs), its own yes/no questions, and when it
-may call the session done. Explorer tries everything once; UI tester clicks only and notes every click that
-changed nothing (`dead-button`); Breaker repeats and spams and notes stats that changed without a cause
-(`exploit`); Newbie plays what the screen suggests and notes three steps running where a first-time player would
-not know what to do (`confusing`). A confident answer (0.7 or more, after the agent's rule) becomes a **note** in
-`report.notes` and `report.md` with a screenshot, the console and the actions before it. There is no timer: every
-step also asks "this session is complete", and three answers at 0.8 or more after eight steps end the run
-(`report.doneBy` = `jev`; `cap` is the 20 minute safety cap, `stopped` the Stop button). The scripted policy still
-plays its five minutes as the Explorer.
+targets stay on offer; disabled buttons; reopening menus; the Breaker's five-times prompt spam and edge runs),
+its own yes/no questions as notes or as recorded flags, and when it may call the session done. Explorer tries
+everything once; UI tester clicks only and notes every click that changed nothing (`dead-button`, judged with the
+clicked button's `interactable` named in the criteria, so a locked tile is not a dead button; a reopen click is
+never one); Breaker repeats and spams, keeps disabled buttons on offer marked "(disabled)", and its `exploit`
+question is a recorded flag only: the `exploit` **note** comes from a code gate (`shared.mjs exploitGate`): a stat
+went negative, a target gave more than three times the median of its earlier uses, or a stat moved by more than
+the larger of 10 and the recent walk drift after a walk, once per stat and target; Newbie plays what the screen
+suggests, notes three steps running where a first-time player would not know what to do (`confusing`), and is
+asked a log-only `suggests` choice over the text on screen (recorded, never acted on). A confident answer (0.7 or
+more, after the agent's rule) becomes a **note** in `report.notes` and `report.md` with a screenshot and console
+captured before the next action, and the actions before it. There is no timer: every step also asks "this session
+is complete", and three answers at 0.8 or more after eight steps end the run (`report.doneBy` = `jev`); code has
+a backstop on the same facts, each agent's `exhausted()` over untried buttons, untried interactables, hidden
+reopenable buttons and steps since anything new (`exhausted`; `cap` is the 20 minute safety cap, `stopped` the
+Stop button). The scripted policy still plays its five minutes as the Explorer.
 
-**A task for the agent**: the tab's Task field (or `--brief`) is a one-line instruction such as "do the tutorial,
-then buy a sword and enter the arena". It goes into Jev's instructions and state and into the done question
-("the task has been completed and, after it, …"), so any agent can be pointed at a flow; the Explorer with a
-task is the playthrough.
+**A task for the agent**: the tab's Task field (or `--brief`) is a one-line instruction such as "press Hit in
+Tier 1 of the Shop, then open Settings". It goes into Jev's instructions and state and into the done question
+("the task named in `task` has been completed and, after it, …"), so any agent can be pointed at a flow; the
+Explorer with a task is the playthrough. Name buttons and panels as they appear on screen, not intent: Jev
+matches words. When no word of the brief (three letters or more, function words aside) ever appears in a button
+text, parent or label during the run, the report gets a `task-unseen` note saying so.
+
+**Recording and the bench.** Every Jev step writes one line to `<run>/jev.jsonl`: `step, agent, cached, model,
+usage, ms, state, raw, questions, answers, offered, chosen`, where `raw` is the whole `decide()` input before the
+filter (the unfiltered probe included), so a step replays offline from `raw` plus `report.actions`.
+`stepsLog.jsonl` lines carry `facts`, `exhausted`, `seen` and `hidden` beside the old keys, and `report.code =
+{ version, promptHash }` (sha256 over the runner, policy, agents, helpers and both probes) attributes a run to
+the code that made it. `node qa/bench.mjs score <run>...` prints the metrics of `docs/jev-research.md` 4.3 from
+`report.json` (plus `jev.jsonl`, `stepsLog.jsonl`, `triage.json` and `labels.json` when present); `bench noise
+<run>` re-asks frozen bodies to measure the spread of Jev's answers; `bench replay <run> --candidate
+qa/variants/<name>.mjs` rebuilds each step from `raw` and asks the current and the candidate prompt side by side
+(a variant exports any of `compact`, `questions`, `options`, `filter`; `variants/trim.mjs` is the example).
+`qa/research/` holds the probe scripts, request bodies and logs behind every P# claim in the research doc (its
+README maps each id to a file and line). `qa-check.mjs` covers all of this against the mock server and a mock
+TypeSafe: the filter, grouping, reopen (`PARLAY_QA_MOCK_MENU=1` gives the mock a menu that closes), the exploit
+gate's seven-row battery, the state-key allowlist, a chatty mock (`PARLAY_QA_MOCK_CHATTY=1`, one repeated line
+per read, must still exhaust), and a replay of every recorded line through the exported `compact`, `options` and
+`questions`.
 
 **Claude's bug list** (`src/qaTriage.ts`): when a session ends with findings, Claude reads it headless
 (`claude -p`, Read/Grep/Glob only, in the tested place's Script Sync folder, three minutes at most) and turns each
