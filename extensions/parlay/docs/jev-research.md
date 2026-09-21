@@ -646,3 +646,36 @@ cross-run memory, a score question replacing looksWrong, a second task question,
 | Report `code.commit` via `git rev-parse` | The installed extension has no `.git`; use package.json version + promptHash. |
 | `probes.jsonl` as a separate runner file | Same information, one more file; put `raw` on the jev.jsonl line (4.1) and `facts`/`seen`/`hidden` on stepsLog. |
 | A "Fountain with no cooldown" as the planted exploit | Unobservable: each press grants the same +10, so neither the code gate nor Jev can tell it from a working prompt. Replaced by a broken debounce (+100 inside 0.5 s), which the gate's rule (b) catches (4.6). |
+
+---
+
+## 8. First after: R6 (2026-09-21T03-58-28), the design of section 3 live on the same game
+
+Same game (Play With Your Poop, place 124502189011089), same agent (ui), same brief (none), one session each side,
+so this is T2 directional evidence, not a claim about run-to-run variance. Recorded with `promptHash
+157b9e647ccab350…`, model pinned `jev-1.13.0`, from the CLI (no triage). `node qa/bench.mjs score <R2> <R6>`.
+
+| Measure | R2 (before, 8ec8b46) | R6 (after, 8167e67) |
+|---|---|---|
+| Steps / wall / ended by | 34 / 72.6 s / exhausted at 34 | 14 / 61.9 s / exhausted at 14 (exhaust at 12, lateness 2) |
+| Dead-button notes | 20 (19 fine, 1 look) | 0 |
+| Buttons dropped by the filter (interactable=false or off-window) | not recorded (18 of 20 notes were on them, per triage) | 28, listed in `gui.hidden` |
+| Options per step (mean) | 9.8 | 1.6 |
+| Margin p₁−p₂, median over multi-option steps | 0.27 (n=30) | 0.55 (n=4) |
+| Steps with margin < 0.05 | 6 / 30 | 0 / 4 |
+| deadButton ≥ 0.7 after a click | 20 / 26 | 0 / 7 (all seven under 0.3) |
+| Clicks on `Tier#.Hit` | 20 | 0 (never offered) |
+| Jev's `done`, maximum | 0.08 | 0.68 |
+| Calls / input tokens / cost | not recorded | 14 / 17,574 / $0.00074 |
+
+Coverage is not comparable across the two rows: R6's `gui.seen` counts filtered buttons (6 / 6 clicked), R2's counted
+everything visible (26 / 34). The Robux "look" of R2 did not recur: with the delta present (the Passes panel's text
+appeared), deadButton stayed under 0.3 on that click, which agrees with the triage's reading of `App.luau:378`.
+
+**E1, noise floor on R6's own states** (`bench noise --states 12 --repeats 6 --model jev-1.13.0`, 72 calls, $0.004):
+`next` per-label sd 0.01 with 0 top-label flips in 72; `looksWrong` sd 0.00; `done` sd 0.01, 0 crossings of 0.8;
+`deadButton` sd 0.02, 0 crossings of 0.7. Lower than the synthetic-state probes of 1.2 (P1), so on real recorded
+states the acceptance band for any per-step Δ is about ±0.02, and a top-label change is a real effect, not noise.
+
+Open: recall. Zero notes on a game whose shop buttons are locked at 0 coins is the right answer only if nothing
+there is broken; the planted place (4.6, E12) is what turns "0 notes" into "0 misses".
