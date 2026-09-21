@@ -261,20 +261,32 @@ on `https://develop.roblox.com/v2/assets/13772394625/versions?limit=100`, same o
 
 ```js
 (async () => {
-  const id = 13772394625, rows = [];
-  for (let cursor = "", page = 0; ; page++) {
-    const r = await fetch(`https://develop.roblox.com/v2/assets/${id}/versions?limit=100&sortOrder=Desc${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { credentials: "include" });
-    if (!r.ok) throw new Error(`page ${page}: HTTP ${r.status}`);
+  const id = 13772394625, rows = [], seen = new Set();
+  let cursor = "", page = 0;
+  while (true) {
+    const url = `https://develop.roblox.com/v2/assets/${id}/versions?limit=100&sortOrder=Desc${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const r = await fetch(url, { credentials: "include" });
+    if (r.status === 429) { console.log(`page ${page + 1}: rate limited, waiting 30 s`); await new Promise((f) => setTimeout(f, 30000)); continue; }
+    if (!r.ok) throw new Error(`page ${page + 1}: HTTP ${r.status}`);
     const b = await r.json();
-    rows.push(...b.data);
-    console.log(`page ${page + 1}: ${rows.length} versions`);
+    let fresh = 0;
+    for (const v of b.data) if (!seen.has(v.assetVersionNumber)) { seen.add(v.assetVersionNumber); rows.push(v); fresh++; }
+    page++;
+    if (page % 10 === 0) console.log(`page ${page}: ${rows.length} versions, ${rows.filter((v) => v.isPublished).length} published, oldest so far ${rows[rows.length - 1].created}`);
+    if (!fresh) { console.warn("a page brought nothing new; the cursor is stuck, stopping"); break; }
     if (!b.nextPageCursor) break;
+    cursor = b.nextPageCursor;
   }
+  console.log(`done: ${rows.length} versions, ${rows.filter((v) => v.isPublished).length} published`);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify({ placeId: id, fetchedAt: new Date().toISOString(), data: rows })], { type: "application/json" }));
   a.download = "bladeball-versions.json"; a.click();
 })();
 ```
+
+(The first draft of this snippet never assigned `cursor = b.nextPageCursor`, so it re-fetched page one forever and
+the count climbed past 250,000 before the developer noticed. The version above advances the cursor, de-duplicates by
+version number, stops when a page brings nothing new, and waits out HTTP 429.)
 
 Volume: the Version History panel shows ~1,800 published versions and ~6,300 unpublished autosaves (developer,
 2026-09-21). Only published versions are opened. At 1-2 minutes per version on this PC, all 1,800 is 30-60 hours
