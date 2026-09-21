@@ -23,12 +23,13 @@ if (!a.place || !a.universe || !(a.versions || a["versions-file"] || (a.from && 
 	process.exit(64);
 }
 // --versions-file: one number per line, or a JSON dump of the version table (develop.roblox.com v2 `data[]` with
-// assetVersionNumber/isPublished, or `versions[]` with n/published); only published versions are taken from JSON
+// assetVersionNumber, or `versions[]` with n). Rows that carry a published flag are kept only when it is true;
+// the develop v2 dump carries no flag and lists published versions only (Blade Ball: 1,826 rows, numbers up to 6,361).
 const fromFile = (f) => {
 	const t = fs.readFileSync(f, "utf8");
 	if (!t.trimStart().startsWith("{")) return t.split(/\s+/).filter(Boolean).map(Number);
 	const j = JSON.parse(t);
-	return (j.data ?? j.versions ?? []).filter((v) => (v.isPublished ?? v.published) === true).map((v) => Number(v.assetVersionNumber ?? v.n)).sort((x, y) => x - y);
+	return (j.data ?? j.versions ?? []).filter((v) => (v.isPublished ?? v.published ?? true) === true).map((v) => Number(v.assetVersionNumber ?? v.n)).sort((x, y) => x - y);
 };
 const versions = a.versions ? a.versions.split(",").map(Number) : a["versions-file"] ? fromFile(a["versions-file"]) : Array.from({ length: Math.floor((+a.to - +a.from) / (+a.step || 1)) + 1 }, (_, i) => +a.from + i * (+a.step || 1));
 const OUT = a.out ?? path.join(os.homedir(), "Documents", "Parlay", "data", "versions", a.place);
