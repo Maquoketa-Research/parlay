@@ -18,11 +18,19 @@ import { spawn } from "node:child_process";
 import { connect } from "./chrrxs.mjs";
 
 const a = Object.fromEntries(process.argv.slice(2).map((s, i, all) => s.startsWith("--") ? [s.slice(2), all[i + 1] ?? ""] : null).filter(Boolean));
-if (!a.place || !a.universe || !(a.versions || (a.from && a.to))) {
-	console.error("usage: revision-extract --place ID --universe ID (--versions 1,2,3 | --from A --to B [--step S]) [--out DIR] [--chunk BYTES]");
+if (!a.place || !a.universe || !(a.versions || a["versions-file"] || (a.from && a.to))) {
+	console.error("usage: revision-extract --place ID --universe ID (--versions 1,2,3 | --versions-file FILE | --from A --to B [--step S]) [--out DIR] [--chunk BYTES]");
 	process.exit(64);
 }
-const versions = a.versions ? a.versions.split(",").map(Number) : Array.from({ length: Math.floor((+a.to - +a.from) / (+a.step || 1)) + 1 }, (_, i) => +a.from + i * (+a.step || 1));
+// --versions-file: one number per line, or a JSON dump of the version table (develop.roblox.com v2 `data[]` with
+// assetVersionNumber/isPublished, or `versions[]` with n/published); only published versions are taken from JSON
+const fromFile = (f) => {
+	const t = fs.readFileSync(f, "utf8");
+	if (!t.trimStart().startsWith("{")) return t.split(/\s+/).filter(Boolean).map(Number);
+	const j = JSON.parse(t);
+	return (j.data ?? j.versions ?? []).filter((v) => (v.isPublished ?? v.published) === true).map((v) => Number(v.assetVersionNumber ?? v.n)).sort((x, y) => x - y);
+};
+const versions = a.versions ? a.versions.split(",").map(Number) : a["versions-file"] ? fromFile(a["versions-file"]) : Array.from({ length: Math.floor((+a.to - +a.from) / (+a.step || 1)) + 1 }, (_, i) => +a.from + i * (+a.step || 1));
 const OUT = a.out ?? path.join(os.homedir(), "Documents", "Parlay", "data", "versions", a.place);
 const EXE = a.exe ?? path.join(process.env.LOCALAPPDATA, "Roblox", "Versions", "version-55808de4b1914919", "RobloxStudioBeta.exe");
 let CHUNK = +a.chunk || 120000;
