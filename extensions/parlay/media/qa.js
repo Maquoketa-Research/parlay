@@ -18,7 +18,7 @@
 	};
 	const main = document.querySelector("main");
 	const agentName = (id) => $("agent").querySelector(`[data-v="${id}"] b`)?.textContent ?? id;
-	const ended = (by) => by === "jev" ? "the agent called it done" : by === "stopped" ? "stopped by you" : by === "cap" ? "hit the time cap" : "";
+	const ended = (by) => by === "jev" ? "the agent called it done" : by === "exhausted" ? "nothing left to try" : by === "stopped" ? "stopped by you" : by === "cap" ? "hit the time cap" : "";
 
 	const form = { agent: "explorer", policy: "jev" };
 	let hasKey = false, running = false, timer, live = { at: 0 }, current = "";

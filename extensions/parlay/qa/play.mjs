@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { AGENTS } from "./agents.mjs";
 import { connect as connectChrrxs } from "./chrrxs.mjs";
 import { connect, SeatTaken } from "./mcp.mjs";
 
@@ -231,6 +232,7 @@ export async function main(argv = process.argv.slice(2)) {
 		}
 		let lastConsole = (await call("get_console_output")).text;   // the whole log so far; new lines are whatever grows past it
 		let lastError = null, lastPos = "", lastGui = "", streak = 0, recent = [], warnedProbe = 0, doneStreak = 0;
+		const seenPaths = new Set(); let sinceNew = 0, lastNewLines = 0;   // for the agents' "nothing left": every button and interactable ever seen, steps since one (or a console line) was new
 		const deadline = Date.now() + minutes * 60000, history = report.actions;
 		for (let step = 1; step <= maxSteps && Date.now() < deadline && !stopAsked(); step++) {
 			report.steps = step;
@@ -240,7 +242,12 @@ export async function main(argv = process.argv.slice(2)) {
 			report.player ??= server.player && { name: server.player.name, userId: server.player.userId };
 			for (const b of client.buttons ?? []) report.gui.seen[b.path] ??= b.text;
 			if (!server.player && !warnedProbe++) log(`the server probe returned no player (${JSON.stringify(server).slice(0, 160)}); movement and stuck detection are off until it does`);
-			const action = await decide({ server, client, stuck: streak >= 5, still: streak, console: recent, agent: a.agent }, history);
+			const paths = [...(client.buttons ?? []).map((b) => b.path), ...(server.interactables ?? []).slice(0, 10).map((t) => t.path)];
+			const unseen = paths.filter((p) => !seenPaths.has(p)); unseen.forEach((p) => seenPaths.add(p));
+			sinceNew = unseen.length || lastNewLines ? 0 : sinceNew + 1;
+			const triedPaths = new Set(history.map((h) => h.action?.path).filter(Boolean));
+			const facts = { untriedButtons: (client.buttons ?? []).filter((b) => !triedPaths.has(b.path)).length, untriedInteractables: (server.interactables ?? []).slice(0, 10).filter((t) => !triedPaths.has(t.path)).length, sinceNew };
+			const action = await decide({ server, client, stuck: streak >= 5, still: streak, sinceNew, console: recent, agent: a.agent }, history);
 			const entry = { step, t: new Date().toISOString(), action, position: server.player?.position, health: server.player?.health, leaderstats: server.leaderstats };
 			entry.result = await act(call, action, client.viewport, mcp.pixels).catch((e) => `failed: ${e.message}`);
 			if (action.kind === "click" && !report.gui.clicked.includes(action.path)) report.gui.clicked.push(action.path);
@@ -250,6 +257,7 @@ export async function main(argv = process.argv.slice(2)) {
 			const fresh = now.startsWith(lastConsole) ? now.slice(lastConsole.length) : now;
 			lastConsole = now;
 			const newLines = fresh.split(/\r?\n/).filter((l) => l.trim());
+			lastNewLines = newLines.length;
 			recent = newLines.slice(-5);
 			let newGroups = 0, errorLines = 0;
 			for (const line of newLines) {
@@ -276,7 +284,8 @@ export async function main(argv = process.argv.slice(2)) {
 			if (streak === 5) report.stuck.push({ step, position: server.player?.position, state: server.player?.state, actions: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
 			// suspect: Jev confident that something looks wrong, with no console error to pin it on (the 0.7 is code, not Jev's)
 			const wrong = action.jev?.flags?.looksWrong ?? 0, suspect = wrong >= 0.7 && !errorLines && streak < 5;
-			const notes = action.jev?.notes ?? [], done = action.jev?.flags?.done ?? 0;   // the agent's own findings, and its "nothing left to try"
+			// the agent's own findings, and "nothing left to try": Jev's answer, or the agent's rule on the facts (Jev hedges on an empty place)
+			const notes = action.jev?.notes ?? [], exhausted = !!action.jev && !!AGENTS[a.agent]?.exhausted?.(facts), done = exhausted ? 1 : action.jev?.flags?.done ?? 0;
 			let file;
 			if (newGroups || suspect || notes.length || step % 10 === 0) file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : suspect ? `suspect-step-${step}` : notes.length ? `note-${notes[0].kind}-step-${step}` : `step-${step}`);
 			if (newGroups) for (const e of report.errors.slice(-newGroups)) e.screenshot = file;
@@ -286,7 +295,7 @@ export async function main(argv = process.argv.slice(2)) {
 			log(`step ${step}: ${describe(action)} → ${entry.result}; +${newLines.length} lines; ${report.errors.length} error groups${streak >= 5 ? "; stuck" : ""}${action.jev ? `; jev wrong ${wrong.toFixed(2)}` : ""}${suspect ? "; suspect" : ""}${notes.length ? `; note: ${notes.map((n) => n.kind).join(", ")}` : ""}${action.jev ? `; done ${done.toFixed(2)}` : ""}`);
 			// the agent ends the session: three steps in a row at 0.8 or more, after a minimum of eight steps
 			doneStreak = done >= 0.8 ? doneStreak + 1 : 0;
-			if (doneStreak >= 3 && step >= 8) { report.doneBy = "jev"; log(`the ${report.agent} agent says this session is done (${done.toFixed(2)} three steps running); stopping Play`); break; }
+			if (doneStreak >= 3 && step >= 8) { report.doneBy = exhausted ? "exhausted" : "jev"; log(exhausted ? `nothing left for the ${report.agent} agent to try (${facts.untriedButtons} untried buttons, ${facts.untriedInteractables} untried interactables, ${sinceNew} steps since anything new); stopping Play` : `the ${report.agent} agent says this session is done (${done.toFixed(2)} three steps running); stopping Play`); break; }
 			if (pace) await sleep(pace);
 		}
 		report.doneBy ??= aborted ? "stopped" : "cap";

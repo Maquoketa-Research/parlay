@@ -5,24 +5,28 @@
 //   notes:   extra yes/no questions; 0.7 or more becomes a note in the report with a screenshot.
 //            after: only when the last action was of that kind; streak: only once, when that many steps in a row agree
 //   doneWhen: the "true" side of the done question; the runner ends the session after three steps at 0.8 or more
+//   exhausted: the code-side backstop on the same facts (untried counts, steps since anything new appeared): Jev
+//            hedges on an empty place ("every button clicked" with no buttons), so this ends it regardless
 export const AGENTS = {
 	explorer: {
 		name: "Explorer", blurb: "Wanders, presses every button, uses every prompt. Finds crashes and dead ends.",
 		goal: "Reach content the player has not seen yet and try everything once.",
 		offers: { buttons: true, interactables: true, walks: true },
 		notes: {},
-		doneWhen: "Every button on screen and every nearby interactable has been tried and the last several walks reached nothing new.",
+		doneWhen: "untried buttons and untried interactables are both 0 and stepsSinceAnythingNew is 5 or more: everything reachable has been tried and walking finds nothing new.",
+		exhausted: (f) => f.untriedButtons === 0 && f.untriedInteractables === 0 && f.sinceNew >= 8,
 	},
 	ui: {
 		name: "UI tester", blurb: "Only the interface: opens every menu, presses every button, checks each one did something.",
 		goal: "Press every button and open every menu; walk only to look for more interface.",
 		offers: { buttons: true, interactables: false, walks: "explore" },
+		exhausted: (f) => f.untriedButtons === 0 && f.sinceNew >= 8,
 		notes: {
 			deadButton: { kind: "dead-button", after: "click", instructions: "The last click changed nothing.",
 				criteria: { true: "The last action was a click and the buttons on screen, the leaderstats and the console are the same as before it.", false: "The last action was not a click, or something on screen, the stats or the console changed after it." },
 				text: (last) => `"${last?.text ?? "the button"}" did nothing when clicked` },
 		},
-		doneWhen: "Every button that has been on screen has been clicked at least once and no new button has appeared for several steps.",
+		doneWhen: "untried buttons is 0 and stepsSinceAnythingNew is 5 or more: every button seen has been clicked and no new interface has appeared.",
 	},
 	breaker: {
 		name: "Breaker", blurb: "Tries to cheat: spams prompts, runs at edges, buys with nothing. Watches for stats that change without cause.",
@@ -33,7 +37,8 @@ export const AGENTS = {
 				criteria: { true: "The leaderstats or health differ from the step before while the last actions were only walks, jumps or repeated uses that should not grant anything, or a stat went negative or jumped by far more than one use gives.", false: "Stats and health are unchanged, or changed by an action that is meant to change them." },
 				text: (last, s) => `stats changed without a cause after ${last ? last.kind : "nothing"}: ${JSON.stringify(s.server?.leaderstats ?? {})}` },
 		},
-		doneWhen: "Each prompt and button has been used repeatedly, the edges have been run at, and nothing suspicious has happened for several steps.",
+		doneWhen: "stepsSinceAnythingNew is 10 or more and the stats have not moved in a suspicious way: everything has been spammed and run at, and nothing gave.",
+		exhausted: (f) => f.sinceNew >= 15,   // it repeats targets on purpose, so only "nothing new for a long while" counts
 	},
 	newbie: {
 		name: "Newbie", blurb: "A first-time player with no help. Reports where they would not know what to do next.",
@@ -44,7 +49,8 @@ export const AGENTS = {
 				criteria: { true: "No button, prompt or console line says what to do, and the last actions were aimless walks that reached nothing.", false: "A button, a prompt, a nearby interactable or a message makes the next step obvious." },
 				text: () => "a first-time player would not know what to do here" },
 		},
-		doneWhen: "The player has found the game's first clear objective and started on it, or has run out of things the screen suggests.",
+		doneWhen: "The player has found the game's first clear objective and started on it, or stepsSinceAnythingNew is 5 or more with nothing on screen suggesting a next step.",
+		exhausted: (f) => f.untriedButtons === 0 && f.untriedInteractables === 0 && f.sinceNew >= 8,
 	},
 };
 export default AGENTS;

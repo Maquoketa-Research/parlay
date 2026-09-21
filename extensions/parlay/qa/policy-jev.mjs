@@ -66,6 +66,8 @@ function compact(state, history) {
 		buttonsOnScreen: buttons.map((b) => b.text),
 		interactablesNearby: near.map((t) => `${t.class} ${t.path.split(".").pop()} at ${Math.round(t.distance ?? 0)} studs`),
 		tried: { buttons: `${buttons.filter((b) => tried.has(b.path)).length} of ${buttons.length}`, interactables: `${near.filter((t) => tried.has(t.path)).length} of ${near.length}` },
+		untried: { buttons: buttons.filter((b) => !tried.has(b.path)).length, interactables: near.filter((t) => !tried.has(t.path)).length },
+		stepsSinceAnythingNew: Math.min(state.sinceNew ?? 0, 10),   // a new button, interactable or console line resets it; 10 means ten or more
 		lastActions: history.slice(-5).map((h) => `${describe(h.action)} → ${h.result ?? "?"}`),
 		lastConsoleLines: (state.console ?? []).slice(-5).map((l) => String(l).slice(0, 200)),
 		stepsWithoutChange: Math.min(state.still ?? 0, 5),   // the raw count, 5 meaning five or more; "stuck" is Jev's call, not ours to hand it
@@ -89,7 +91,7 @@ const questions = (opts, agent) => ({
 		false: "Walking, jumping, standing still, a plain or empty map, and steps that changed nothing are all normal; only the console or the states above count as broken." } },
 	done: { type: "noul", instructions: "This test session is complete; nothing useful is left to try.", criteria: {
 		true: agent.doneWhen,
-		false: "Untried buttons or interactables remain on screen, the last actions still changed something, or the player has just reached somewhere new." } },
+		false: "untried buttons or interactables are above 0, or stepsSinceAnythingNew is small because a new button, interactable or console line just appeared." } },
 	...Object.fromEntries(Object.entries(agent.notes).map(([id, n]) => [id, { type: "noul", instructions: n.instructions, criteria: n.criteria }])),
 });
 
