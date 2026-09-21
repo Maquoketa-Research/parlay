@@ -144,8 +144,11 @@ export async function decide(state, history) {
 	const body = { model: "jev-latest", state: compact(state, history), questions: questions(opts, agent, state.brief) };
 	const cacheKey = JSON.stringify(body);
 	try {
-		const answers = cacheKey === cache.key ? cache.answers : (await ask(key, body)).answers;
+		const cached = cacheKey === cache.key;
+		const answers = cached ? cache.answers : (await ask(key, body)).answers;
 		cache = { key: cacheKey, answers };
+		// the exchange, verbatim, so a run can be replayed offline against another prompt (PARLAY_QA_JEV_LOG, set by the runner)
+		if (process.env.PARLAY_QA_JEV_LOG) fs.appendFileSync(process.env.PARLAY_QA_JEV_LOG, JSON.stringify({ step: history.length + 1, agent: agent.name, cached, state: body.state, questions: body.questions, answers }) + "\n");
 		const pick = opts[answers?.next?.choice];
 		if (!pick) throw new Error(`answered "${answers?.next?.choice}", not one of the offered actions`);
 		const flag = (q) => Math.max(0, Math.min(1, Number(answers[q]?.noul ?? 0)));

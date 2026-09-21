@@ -180,6 +180,7 @@ export async function main(argv = process.argv.slice(2)) {
 	const minutes = a.minutes ? parseFloat(a.minutes) : a.policy === "jev" ? 20 : 5, maxSteps = parseInt(a.steps, 10), pace = parseInt(a["pace-ms"], 10);
 	const out = path.resolve(a.out ?? path.join(".build", "qa", new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)));
 	fs.mkdirSync(out, { recursive: true });
+	process.env.PARLAY_QA_JEV_LOG = path.join(out, "jev.jsonl");   // every Jev request and answer, for offline replay and before/after comparisons
 	const { decide } = await import(a.policy === "jev" ? "./policy-jev.mjs" : "./policy.mjs");
 	const PROBE_SERVER = luau("probe.server.luau"), PROBE_CLIENT = luau("probe.client.luau");
 	const report = { place: a.place, universe: a.universe || undefined, studio: null, placeVersion: undefined, policy: a.policy, agent: a.policy === "jev" ? a.agent : "explorer", brief: a.brief || undefined, doneBy: undefined, start: new Date().toISOString(), end: undefined, steps: 0,
