@@ -69,7 +69,9 @@ export async function connect({ timeoutMs = 30000 } = {}) {
 	if (!key) { if (child) kill(child); throw new Error(`Chrrxs token missing (${tokenFile} or ROBLOX_STUDIO_AUTH_TOKEN)`); }
 
 	async function invoke(name, args, ms = timeoutMs) {
-		const r = await fetch(`${url()}/mcp/${name}`, { method: "POST", headers: { "content-type": "application/json", "X-MCP-Auth": key }, body: JSON.stringify(args), signal: AbortSignal.timeout(ms) });
+		// a bridge this run did not start can vanish mid-run (another process's server closing): say so, not "fetch failed"
+		const r = await fetch(`${url()}/mcp/${name}`, { method: "POST", headers: { "content-type": "application/json", "X-MCP-Auth": key }, body: JSON.stringify(args), signal: AbortSignal.timeout(ms) })
+			.catch((e) => { throw new Error(`${name}: the Chrrxs bridge at ${url()} stopped answering (${e.cause?.code ?? e.name}); ${child ? "the server this run started died" : "it belonged to another process, which closed it"}`); });
 		const body = await r.json().catch(() => ({}));
 		if (r.status === 401) throw new Error(`${name}: Chrrxs rejected the token (${tokenFile})`);
 		if (!r.ok) throw new Error(`${name}: ${body.error ?? body.message ?? `HTTP ${r.status}`}`.slice(0, 500));

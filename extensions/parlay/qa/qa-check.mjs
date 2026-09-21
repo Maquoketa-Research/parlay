@@ -163,7 +163,7 @@ const jev = http.createServer((req, res) => {
 		const b = JSON.parse(body);
 		seen.push(b);
 		const offered = Object.keys(b.questions.next.criteria);
-		const choice = offered.includes("click_1") ? "click_1" : offered.includes("walk_S") ? "walk_S" : offered.includes("click_0") ? "click_0" : "explore";
+		const choice = ["click_1", "walk_S", "click_0", "interact_0", "interact_1", "explore"].find((k) => offered.includes(k)) ?? offered[0];
 		const noul = (p) => ({ type: "noul", noul: p });
 		res.setHeader("Content-Type", "application/json");
 		res.end(JSON.stringify({ model: "jev-1.13.0", answers: {
@@ -189,7 +189,7 @@ assert.deepEqual(seen[0].state.interactablesNearby, ["ProximityPrompt Prompt at 
 assert.equal(seen[0].state.stepsWithoutChange, 0);
 assert.deepEqual(seen[0].state.tried, { buttons: "0 of 2", interactables: "0 of 2" });
 assert.match(seen[0].questions.next.instructions, /as the Explorer/);
-assert.deepEqual(Object.keys(seen[0].questions.next.criteria).sort(), ["click_0", "click_1", "explore", "interact_0", "interact_1", "walk_A", "walk_D", "walk_S", "walk_W"]);
+assert.deepEqual(Object.keys(seen[0].questions.next.criteria).sort(), ["click_0", "click_1", "interact_0", "interact_1"]);
 assert.deepEqual(Object.keys(seen[0].questions).sort(), ["done", "looksWrong", "next", "noEffect", "stuck"]);
 assert.ok(Object.values(seen[0].questions).every((q) => q.type === "choice" || (q.type === "noul" && q.criteria.true && q.criteria.false)));
 // Jev's choice became the action, with its probabilities and flags on it
@@ -199,8 +199,10 @@ assert.equal(first.action.path, "LocalPlayer.PlayerGui.HUD.MenuButton", "click_1
 assert.equal(first.action.jev.probabilities.click_1, 0.6);
 assert.deepEqual(first.action.jev.flags, { stuck: 0.1, noEffect: 0.2, looksWrong: 0.1, done: 0.1 });
 assert.equal(first.action.jev.confidence, 0.8);
-assert.deepEqual([second.action.kind, second.action.key, second.action.jump], ["walk", "S", true]);
-assert.ok(jr.actions.slice(1).every((h) => h.action.kind === "walk" && h.action.key === "S"), "walk_S once click_1 is used up");
+assert.deepEqual([second.action.kind, second.action.text], ["click", "Buy"], "click_0 next: walks are not offered while buttons are untried");
+assert.deepEqual(jr.actions.slice(2, 4).map((h) => h.action.kind), ["interact", "interact"], "then the two untried interactables");
+assert.ok(jr.actions.slice(4).every((h) => h.action.kind === "walk" && h.action.key === "S"), "walk_S once nothing untried is left");
+assert.ok(!Object.keys(seen[0].questions.next.criteria).some((k) => k.startsWith("walk_") || k === "explore"), "no walks offered while buttons and interactables are untried");
 // once stuck, only walks are offered and the identical state is answered from the cache, not the mock
 const stuckReq = seen.find((b) => b.state.stepsWithoutChange >= 5);
 assert.ok(stuckReq && Object.keys(stuckReq.questions.next.criteria).every((k) => k === "explore" || k.startsWith("walk_")));
@@ -258,7 +260,7 @@ assert.equal(ur.notes[0].screenshot, "note-dead-button-step-2.png");
 assert.ok(fs.existsSync(path.join(ui.out, "note-dead-button-step-2.png")));
 assert.ok(fs.readFileSync(path.join(ui.out, "report.md"), "utf8").includes(`## Notes (${ur.notes.length})`));
 assert.match(ui.stdout, /the ui agent says this session is done/);
-assert.equal(jr.doneBy, "cap", "the Explorer run above ran to its step cap");
+assert.equal(jr.doneBy, "exhausted", "the Explorer above ran out of untried targets with nothing new appearing, and ended itself");
 
 jev.close();
 console.log(`qa-check: ok (${report.steps} mock steps, ${report.errors.length} error group ×${err.count}, ${report.stuck.length} stuck; jev: ${seen.length} requests, ${jr.suspects.length} suspects, 401 fallback; chrrxs: ${bridgeCalls.length} bridge calls, bad token; ui agent: ${ur.steps} steps, ${ur.notes.length} notes, done by ${ur.doneBy})`);

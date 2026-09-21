@@ -36,22 +36,27 @@ function apiKey() {
 
 // The actions on offer this step, shaped by the agent: option id → { action (the runner's shape), text (the
 // line Jev reads) }. Stuck (five steps changed nothing) offers movement only, whatever the agent, as policy.mjs does.
+// Walking is offered only once nothing untried is left (or the agent repeats targets on purpose): with a dozen
+// specific buttons against one "explore", Jev's probability mass spreads over the buttons and the single walk
+// wins the argmax, so a UI tester ended up wandering past thirteen untried buttons.
 function options(state, history, agent) {
 	const tried = new Set(history.map((h) => h.action?.path).filter(Boolean));
 	const o = agent.offers, out = {};
 	const fresh = (p) => o.repeat || !tried.has(p);
 	const again = (p) => tried.has(p) ? " again" : "";
 	if (!state.stuck) {
-		if (o.buttons) (state.client?.buttons ?? []).forEach((b, i) => { if (fresh(b.path)) out[`click_${i}`] = { action: { kind: "click", path: b.path, text: b.text, x: b.x, y: b.y }, text: `Click the "${b.text}" ${b.class ?? "button"} on screen${again(b.path)}` }; });
+		if (o.buttons) (state.client?.buttons ?? []).forEach((b, i) => { if (fresh(b.path)) out[`click_${i}`] = { action: { kind: "click", path: b.path, text: b.text, x: b.x, y: b.y }, text: `Click the "${b.text}" ${b.class ?? "button"}${b.parent ? ` in ${b.parent}` : ""}${again(b.path)}` }; });
 		if (o.interactables) (state.server?.interactables ?? []).slice(0, 10).forEach((t, i) => {
 			const name = t.text || t.path.split(".").pop(), base = { kind: "interact", path: t.path, class: t.class, position: t.position, distance: t.distance };
 			if (fresh(t.path)) out[`interact_${i}`] = { action: base, text: `Walk ${Math.round(t.distance ?? 0)} studs to the ${t.class} "${name}" and use it${again(t.path)}` };
 			if (o.spam) out[`spam_${i}`] = { action: { ...base, times: 5 }, text: `Walk to the ${t.class} "${name}" and use it five times as fast as possible` };
 		});
 	}
-	if (o.walks === true || state.stuck) for (const [key, dir] of Object.entries(WALK)) out[`walk_${key}`] = { action: { kind: "walk", key, ms: 800, jump: true }, text: `Walk ${dir} for a second and jump` };
+	const untried = Object.keys(out).some((k) => !k.startsWith("spam_"));
+	const roam = state.stuck || !untried || o.repeat;
+	if (roam && (o.walks === true || state.stuck)) for (const [key, dir] of Object.entries(WALK)) out[`walk_${key}`] = { action: { kind: "walk", key, ms: 800, jump: true }, text: `Walk ${dir} for a second and jump` };
 	if (o.spam) out.edge = { action: { kind: "walk", key: randomKey(), ms: 4000, jump: true }, text: "Run far in one direction, jumping, to hit a wall or fall off an edge" };
-	out.explore = { action: { kind: "walk", key: randomKey(), ms: 1500, jump: true }, text: o.walks === "explore" ? "Walk somewhere else to look for more interface" : "Wander in a random direction for longer, jumping, to reach somewhere new" };
+	if (roam) out.explore = { action: { kind: "walk", key: randomKey(), ms: 1500, jump: true }, text: o.walks === "explore" ? "Walk somewhere else to look for more interface" : "Wander in a random direction for longer, jumping, to reach somewhere new" };
 	return out;
 }
 
@@ -67,7 +72,7 @@ function compact(state, history) {
 		interactablesNearby: near.map((t) => `${t.class} ${t.path.split(".").pop()} at ${Math.round(t.distance ?? 0)} studs`),
 		tried: { buttons: `${buttons.filter((b) => tried.has(b.path)).length} of ${buttons.length}`, interactables: `${near.filter((t) => tried.has(t.path)).length} of ${near.length}` },
 		untried: { buttons: buttons.filter((b) => !tried.has(b.path)).length, interactables: near.filter((t) => !tried.has(t.path)).length },
-		stepsSinceAnythingNew: Math.min(state.sinceNew ?? 0, 10),   // a new button, interactable or console line resets it; 10 means ten or more
+		stepsSinceAnythingNew: Math.min(state.sinceNew ?? 0, 5),   // a new button, interactable or console line resets it; 5 means five or more (so quiet steps look alike and the cache answers them)
 		lastActions: history.slice(-5).map((h) => `${describe(h.action)} → ${h.result ?? "?"}`),
 		lastConsoleLines: (state.console ?? []).slice(-5).map((l) => String(l).slice(0, 200)),
 		stepsWithoutChange: Math.min(state.still ?? 0, 5),   // the raw count, 5 meaning five or more; "stuck" is Jev's call, not ours to hand it

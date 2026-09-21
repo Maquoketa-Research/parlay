@@ -35,7 +35,8 @@ if gui then
 		if (g:IsA("TextButton") or g:IsA("ImageButton")) and visible(g) and g.AbsoluteSize.X > 0 and g.AbsoluteSize.Y > 0 then
 			out.buttons[#out.buttons + 1] = {
 				path = pathOf(g),
-				text = g:IsA("TextButton") and g.Text or g.Name,
+				text = (g:IsA("TextButton") and g.Text ~= "" and g.Text) or g.Name,   -- an icon button with empty Text reads by its name
+				parent = g.Parent and g.Parent.Name or "",
 				class = g.ClassName,
 				x = math.floor(g.AbsolutePosition.X + g.AbsoluteSize.X / 2),
 				y = math.floor(g.AbsolutePosition.Y + g.AbsoluteSize.Y / 2),

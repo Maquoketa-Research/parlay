@@ -37,7 +37,7 @@ export const AGENTS = {
 				criteria: { true: "The leaderstats or health differ from the step before while the last actions were only walks, jumps or repeated uses that should not grant anything, or a stat went negative or jumped by far more than one use gives.", false: "Stats and health are unchanged, or changed by an action that is meant to change them." },
 				text: (last, s) => `stats changed without a cause after ${last ? last.kind : "nothing"}: ${JSON.stringify(s.server?.leaderstats ?? {})}` },
 		},
-		doneWhen: "stepsSinceAnythingNew is 10 or more and the stats have not moved in a suspicious way: everything has been spammed and run at, and nothing gave.",
+		doneWhen: "stepsSinceAnythingNew is 5 or more, every prompt and button has been used again and again per lastActions, and the stats have not moved in a suspicious way: everything has been spammed and run at, and nothing gave.",
 		exhausted: (f) => f.sinceNew >= 15,   // it repeats targets on purpose, so only "nothing new for a long while" counts
 	},
 	newbie: {
