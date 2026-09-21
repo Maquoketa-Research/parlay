@@ -33,7 +33,15 @@ const fromFile = (f) => {
 };
 const versions = a.versions ? a.versions.split(",").map(Number) : a["versions-file"] ? fromFile(a["versions-file"]) : Array.from({ length: Math.floor((+a.to - +a.from) / (+a.step || 1)) + 1 }, (_, i) => +a.from + i * (+a.step || 1));
 const OUT = a.out ?? path.join(os.homedir(), "Documents", "Parlay", "data", "versions", a.place);
-const EXE = a.exe ?? path.join(process.env.LOCALAPPDATA, "Roblox", "Versions", "version-55808de4b1914919", "RobloxStudioBeta.exe");
+// Studio's exe: --exe, else the newest RobloxStudioBeta.exe under %LOCALAPPDATA%\Roblox\Versions
+const studioExe = () => {
+	const root = path.join(process.env.LOCALAPPDATA ?? "", "Roblox", "Versions");
+	const found = fs.existsSync(root) ? fs.readdirSync(root).map((d) => path.join(root, d, "RobloxStudioBeta.exe")).filter((p) => fs.existsSync(p)) : [];
+	found.sort((x, y) => fs.statSync(y).mtimeMs - fs.statSync(x).mtimeMs);
+	if (!found.length) { console.error(`no RobloxStudioBeta.exe under ${root}; pass --exe`); process.exit(66); }
+	return found[0];
+};
+const EXE = a.exe ?? studioExe();
 let CHUNK = +a.chunk || 120000;
 fs.mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
