@@ -158,11 +158,14 @@
 		if (m.state === "none") { el.innerHTML = `<div class="actions"><button class="btn" ${msg({ type: "retriage" })}>Ask Claude for the bug list</button></div>`; return; }
 		if (m.state === "error") { el.innerHTML = `<div class="hint">${ICON.fail}<span>Claude could not triage this run: ${esc(m.error)}</span><button class="btn alt" ${msg({ type: "retriage" })}>Retry</button></div>`; return; }
 		const groups = [["bug", "Bugs"], ["look", "Needs a look"]];
-		const card = (f) => `<div class="bug ${f.verdict}"><div class="t">${esc(f.title)}</div><div class="w">${esc(f.why)}</div>`
+		// one card per key and verdict: eighteen tier buttons on one handler are one card with a count
+		const merged = [];
+		for (const f of m.findings) { const same = merged.find((g) => g.key === f.key && g.verdict === f.verdict); if (same) same.count++; else merged.push({ ...f, count: 1 }); }
+		const card = (f) => `<div class="bug ${f.verdict}"><div class="t">${esc(f.title)}${f.count > 1 ? ` <span class="tag">×${f.count}</span>` : ""}</div><div class="w">${esc(f.why)}</div>`
 			+ (f.file ? `<span class="loc" ${msg({ type: "openTriaged", id: f.id })}>${esc(f.file)}${f.line ? `:${f.line}` : ""}</span>` : "")
 			+ `<div class="actions"><button class="btn" ${msg({ type: "fixTriaged", id: f.id })}>Fix with Claude</button>${f.file ? `<button class="btn alt" ${msg({ type: "openTriaged", id: f.id })}>Open</button>` : ""}<button class="btn alt" ${msg({ type: "ignore", key: f.key })}>Ignore</button></div></div>`;
-		const fine = m.findings.filter((f) => f.verdict === "fine");
-		el.innerHTML = groups.map(([v, title]) => { const list = m.findings.filter((f) => f.verdict === v); return list.length ? `<h3>${title} (${list.length})</h3>${list.map(card).join("")}` : ""; }).join("")
+		const fine = merged.filter((f) => f.verdict === "fine");
+		el.innerHTML = groups.map(([v, title]) => { const list = merged.filter((f) => f.verdict === v); return list.length ? `<h3>${title} (${list.length})</h3>${list.map(card).join("")}` : ""; }).join("")
 			+ (fine.length ? `<details class="fine-group"><summary>Probably fine (${fine.length})</summary>${fine.map(card).join("")}</details>` : "")
 			+ (m.hidden ? `<div class="note">${plural(m.hidden, "finding")} hidden by Ignore.</div>` : "")
 			+ (!m.findings.length && !m.hidden ? `<div class="hint">${ICON.ok}<span>Claude read the evidence and found nothing worth a card.</span></div>` : "");

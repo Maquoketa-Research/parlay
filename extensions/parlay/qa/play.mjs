@@ -279,7 +279,8 @@ export async function main(argv = process.argv.slice(2)) {
 			// stuck: nothing moved, nothing logged, nothing on screen changed, five steps running; one event per streak
 			const pos = server.player?.position ? JSON.stringify(server.player.position.map(Math.round)) : null;
 			const gui = (client.buttons ?? []).map((b) => b.path).sort().join("|");
-			streak = pos !== null && pos === lastPos && gui === lastGui && newLines.length === 0 ? streak + 1 : 0;
+			// only steps that tried to move count: a UI tester clicking in place is not stuck, so click steps leave the streak alone
+			streak = action.kind === "click" ? streak : pos !== null && pos === lastPos && gui === lastGui && newLines.length === 0 ? streak + 1 : 0;
 			lastPos = pos; lastGui = gui;
 			if (streak === 5) report.stuck.push({ step, position: server.player?.position, state: server.player?.state, actions: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
 			// suspect: Jev confident that something looks wrong, with no console error to pin it on (the 0.7 is code, not Jev's)

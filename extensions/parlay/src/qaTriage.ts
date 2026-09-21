@@ -3,7 +3,7 @@
 // Read, Grep and Glob inside the workspace and nothing else, so fixing stays one click away (Fix with Claude).
 // Output: <run>/triage.json, also returned. Ignored findings (the Ignore button) are keyed so the same bug does
 // not come back next run: an error by its message with numbers stripped, a note by its kind and target.
-import { ChildProcess, spawn } from "child_process";
+import { ChildProcess, execFile, spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { exe } from "./agents";
@@ -16,23 +16,29 @@ export interface TriageFile { at: string; ws: string; findings: Triaged[]; error
 const describe = (a: any) => a?.kind === "click" ? `click "${a.text ?? ""}" (${a.path})` : a?.kind === "interact" ? `${a.class} ${a.path}` : `walk ${a?.key ?? "?"}`;
 const trail = (h: any[]) => (h ?? []).map((x) => `${x.step}: ${describe(x.action)}${x.result ? ` → ${x.result}` : ""}`).join("; ");
 
-// stable across runs for errors and notes; suspects and stuck spots belong to their run
+// stable across runs for errors and notes; suspects and stuck spots belong to their run. Numbers are stripped
+// from the target too: Tier1.Hit … Tier19.Hit are one row of one handler, one finding, one Ignore.
 export function keyOf(report: any, id: string): string {
 	const [kind, i] = id.split("-"), n = Number(i);
 	if (kind === "error") return `error:${String(report.errors?.[n]?.message ?? "").replace(/\d+/g, "#")}`;
-	if (kind === "note") { const x = report.notes?.[n]; return `note:${x?.kind}:${x?.actionsBefore?.at(-1)?.action?.path ?? x?.text}`; }
+	if (kind === "note") { const x = report.notes?.[n]; return `note:${x?.kind}:${String(x?.actionsBefore?.at(-1)?.action?.path ?? x?.text ?? "").replace(/\d+/g, "#")}`; }
 	return `${id}@${report.start}`;
 }
 
+// Notes about the same target are one line with every id, so twenty clicks on one dead button cost one look.
 function prompt(report: any): string {
 	const lines: string[] = [];
 	report.errors?.forEach((e: any, i: number) => lines.push(`- id error-${i}: console error ×${e.count} on the ${e.side}: ${e.message}${e.trace?.length ? `\n  stack: ${e.trace.slice(0, 6).join(" | ")}` : ""}\n  before: ${trail(e.actionsBefore)}`));
-	report.notes?.forEach((n: any, i: number) => lines.push(`- id note-${i}: ${n.kind} (Jev ${Math.round(n.probability * 100)}%): ${n.text}\n  the action it concerns: ${describe(n.actionsBefore?.at(-1)?.action)}\n  before: ${trail(n.actionsBefore)}${n.console?.length ? `\n  console then: ${n.console.join(" | ")}` : ""}`));
+	const groups = new Map<string, { ids: string[]; n: any }>();
+	report.notes?.forEach((n: any, i: number) => { const k = keyOf(report, `note-${i}`); const g = groups.get(k); if (g) g.ids.push(`note-${i}`); else groups.set(k, { ids: [`note-${i}`], n }); });
+	for (const { ids, n } of groups.values()) lines.push(`- id${ids.length > 1 ? "s" : ""} ${ids.join(", ")}: ${n.kind} (Jev ${Math.round(n.probability * 100)}%${ids.length > 1 ? `, ${ids.length} times` : ""}): ${n.text}\n  the action it concerns: ${describe(n.actionsBefore?.at(-1)?.action)}\n  before: ${trail(n.actionsBefore)}${n.console?.length ? `\n  console then: ${n.console.join(" | ")}` : ""}`);
 	report.suspects?.forEach((s: any, i: number) => lines.push(`- id suspect-${i}: Jev put "something is broken for a player" at ${Math.round(s.probability * 100)}% at step ${s.step}, no console error\n  before: ${trail(s.actionsBefore)}${s.console?.length ? `\n  console then: ${s.console.join(" | ")}` : ""}`));
 	report.stuck?.forEach((s: any, i: number) => lines.push(`- id stuck-${i}: the player was stuck from step ${s.step} (${s.state ?? "?"} at ${JSON.stringify(s.position)})\n  actions: ${trail(s.actions)}`));
 	return `A QA agent (${report.agent ?? "explorer"}) just played this Roblox place${report.brief ? ` with the task "${report.brief}"` : ""} for ${report.steps} steps. This folder holds the game's scripts (a Script Sync mirror: ServerScriptService, ReplicatedStorage, StarterGui, StarterPlayer and so on). Triage its findings.
 
 For each finding decide: "bug" (a defect a player would hit), "look" (plausible, could not be confirmed from the code), or "fine" (expected behaviour, or noise from the test itself). Use Grep and Read to find the script that owns each button, prompt or error: search the button's name (for example CloseButton, or the frame it sits in) under StarterGui and StarterPlayer, and the script names in error messages. A "dead-button" note means the buttons on screen, the stats and the console did not change after the click: a button with no Activated or MouseButton1Click connection anywhere is a bug; one whose handler closes an already closed frame is fine.
+
+Budget: about two minutes in total. One Grep per distinct button or script name, at most one Read per finding, and no reading of files that cannot own the finding. Findings that share a cause get the same verdict and a why that says so. When a line lists several ids, answer once per id with the same verdict and why.
 
 Reply with ONLY a JSON object, no prose before or after:
 {"findings":[{"id":"error-0","title":"short plain-English title, no ids","verdict":"bug|look|fine","why":"one sentence","file":"path relative to this folder, when found","line":1}]}
@@ -41,18 +47,22 @@ Findings:
 ${lines.join("\n")}`;
 }
 
-// claude -p with the prompt on stdin and the JSON envelope on stdout; three minutes at most
+// claude -p with the prompt on stdin and the JSON envelope on stdout. Medium effort: the user's session may run
+// at the highest, which is thinking time this classification does not need. Five minutes at most, then the
+// process tree goes (claude.exe is a launcher; kill() alone leaves its child running).
 export function triage(out: string, report: any, ws: string): Promise<TriageFile> {
 	return new Promise((resolve) => {
 		const at = new Date().toISOString();
-		const finish = (r: Omit<TriageFile, "ws">) => { const full = { ...r, ws }; try { fs.writeFileSync(path.join(out, "triage.json"), JSON.stringify(full, null, "\t")); } catch { /* the run folder is gone */ } resolve(full); };
+		let done = false;
+		const finish = (r: Omit<TriageFile, "ws">) => { if (done) return; done = true; const full = { ...r, ws }; try { fs.writeFileSync(path.join(out, "triage.json"), JSON.stringify(full, null, "\t")); } catch { /* the run folder is gone */ } resolve(full); };
 		let child: ChildProcess;
-		try { child = spawn(exe("claude"), ["-p", "--output-format", "json", "--allowedTools", "Read", "Grep", "Glob"], { cwd: ws, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }); }
+		try { child = spawn(exe("claude"), ["-p", "--output-format", "json", "--allowedTools", "Read", "Grep", "Glob", "--effort", "medium"], { cwd: ws, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }); }
 		catch (e) { return finish({ at, findings: [], error: `could not start claude: ${(e as Error).message}` }); }
 		let stdout = "", stderr = "";
 		child.stdout!.on("data", (d) => { stdout += d; });
 		child.stderr!.on("data", (d) => { stderr += d; });
-		const timer = setTimeout(() => { child.kill(); finish({ at, findings: [], error: "Claude took more than three minutes" }); }, 180_000);
+		const kill = () => { if (child.pid && process.platform === "win32") execFile("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {}); else child.kill(); };
+		const timer = setTimeout(() => { finish({ at, findings: [], error: "Claude took more than five minutes; Retry runs it again" }); kill(); }, 300_000);
 		child.on("error", (e) => { clearTimeout(timer); finish({ at, findings: [], error: e.message }); });
 		child.on("exit", (code) => {
 			clearTimeout(timer);
