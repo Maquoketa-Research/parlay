@@ -73,7 +73,9 @@ function compact(state, history) {
 		tried: { buttons: `${buttons.filter((b) => tried.has(b.path)).length} of ${buttons.length}`, interactables: `${near.filter((t) => tried.has(t.path)).length} of ${near.length}` },
 		untried: { buttons: buttons.filter((b) => !tried.has(b.path)).length, interactables: near.filter((t) => !tried.has(t.path)).length },
 		stepsSinceAnythingNew: Math.min(state.sinceNew ?? 0, 5),   // a new button, interactable or console line resets it; 5 means five or more (so quiet steps look alike and the cache answers them)
+		textOnScreen: (state.client?.text ?? []).slice(0, 20),
 		lastActions: history.slice(-5).map((h) => `${describe(h.action)} → ${h.result ?? "?"}`),
+		sinceLastAction: state.delta,   // what the last action changed: buttons and text that appeared or vanished, stats, health, console lines
 		task: state.brief || undefined,
 		lastConsoleLines: (state.console ?? []).slice(-5).map((l) => String(l).slice(0, 200)),
 		stepsWithoutChange: Math.min(state.still ?? 0, 5),   // the raw count, 5 meaning five or more; "stuck" is Jev's call, not ours to hand it
@@ -90,8 +92,8 @@ const questions = (opts, agent, brief) => ({
 		true: "The last actions changed nothing: same position, same buttons on screen, no new console lines; or the humanoid state is a fall, seat or ragdoll the player cannot leave.",
 		false: "The player moves, the screen or the console changes, or new content is still being reached." } },
 	noEffect: { type: "noul", instructions: "The last action did not have its intended effect.", criteria: {
-		true: "The last action's outcome says failed, timeout or gave up, or nothing changed after a click, a prompt or a walk.",
-		false: "The last action arrived, clicked or walked as intended, or there is no last action yet." } },
+		true: "The last action's outcome says failed, timeout or gave up, or sinceLastAction shows nothing at all after a click or a prompt.",
+		false: "The last action arrived, clicked or walked as intended and sinceLastAction shows something, or there is no last action yet." } },
 	looksWrong: { type: "noul", instructions: "Something is broken for a player, beyond the player merely not moving.", criteria: {
 		true: "A console line reports an error, a nil or missing object or an infinite yield; a button or prompt did nothing when used; health or stats changed for no reason; the player fell through the floor, or the humanoid state is Dead or Ragdoll without a cause.",
 		false: "Walking, jumping, standing still, a plain or empty map, and steps that changed nothing are all normal; only the console or the states above count as broken." } },

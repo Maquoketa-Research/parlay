@@ -23,7 +23,7 @@ export const AGENTS = {
 		exhausted: (f) => f.untriedButtons === 0 && f.sinceNew >= 8,
 		notes: {
 			deadButton: { kind: "dead-button", after: "click", instructions: "The last click changed nothing.",
-				criteria: { true: "The last action was a click and the buttons on screen, the leaderstats and the console are the same as before it.", false: "The last action was not a click, or something on screen, the stats or the console changed after it." },
+				criteria: { true: "The last action was a click and sinceLastAction shows nothing: no buttons or text added or removed, stats and health unchanged, no console lines.", false: "The last action was not a click, or sinceLastAction shows a button or text that appeared or vanished, a stat or health change, or console lines." },
 				text: (last) => `"${last?.text ?? "the button"}" did nothing when clicked` },
 		},
 		doneWhen: "untried buttons is 0 and stepsSinceAnythingNew is 5 or more: every button seen has been clicked and no new interface has appeared.",
@@ -34,7 +34,7 @@ export const AGENTS = {
 		offers: { buttons: true, interactables: true, walks: true, repeat: true, spam: true },
 		notes: {
 			exploit: { kind: "exploit", instructions: "Health, money or a stat changed without an action that should change it.",
-				criteria: { true: "The leaderstats or health differ from the step before while the last actions were only walks, jumps or repeated uses that should not grant anything, or a stat went negative or jumped by far more than one use gives.", false: "Stats and health are unchanged, or changed by an action that is meant to change them." },
+				criteria: { true: "sinceLastAction shows statsChanged or healthChanged while the last action was a walk, a jump or a repeated use that should not grant anything, or a stat went negative or jumped by far more than one use gives.", false: "sinceLastAction shows no stat or health change, or the change came from an action that is meant to cause it." },
 				text: (last, s) => `stats changed without a cause after ${last ? last.kind : "nothing"}: ${JSON.stringify(s.server?.leaderstats ?? {})}` },
 		},
 		doneWhen: "stepsSinceAnythingNew is 5 or more, every prompt and button has been used again and again per lastActions, and the stats have not moved in a suspicious way: everything has been spammed and run at, and nothing gave.",

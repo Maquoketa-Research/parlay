@@ -233,6 +233,7 @@ export async function main(argv = process.argv.slice(2)) {
 		let lastConsole = (await call("get_console_output")).text;   // the whole log so far; new lines are whatever grows past it
 		let lastError = null, lastPos = "", lastGui = "", streak = 0, recent = [], warnedProbe = 0, doneStreak = 0;
 		const seenPaths = new Set(); let sinceNew = 0, lastNewLines = 0;   // for the agents' "nothing left": every button and interactable ever seen, steps since one (or a console line) was new
+		let prev = null;   // last step's snapshot, for the delta the policy judges the last action by
 		const deadline = Date.now() + minutes * 60000, history = report.actions;
 		for (let step = 1; step <= maxSteps && Date.now() < deadline && !stopAsked(); step++) {
 			report.steps = step;
@@ -247,7 +248,11 @@ export async function main(argv = process.argv.slice(2)) {
 			sinceNew = unseen.length || lastNewLines ? 0 : sinceNew + 1;
 			const triedPaths = new Set(history.map((h) => h.action?.path).filter(Boolean));
 			const facts = { untriedButtons: (client.buttons ?? []).filter((b) => !triedPaths.has(b.path)).length, untriedInteractables: (server.interactables ?? []).slice(0, 10).filter((t) => !triedPaths.has(t.path)).length, sinceNew };
-			const action = await decide({ server, client, stuck: streak >= 5, still: streak, sinceNew, console: recent, agent: a.agent, brief: a.brief }, history);
+			const snap = { buttons: (client.buttons ?? []).map((b) => b.text || b.path.split(".").pop()), text: client.text ?? [], stats: JSON.stringify(server.leaderstats ?? null), health: server.player?.health };
+			const diff = (now, was) => now.filter((x) => !was.includes(x)).slice(0, 8);
+			const delta = prev ? { buttonsAdded: diff(snap.buttons, prev.buttons), buttonsRemoved: diff(prev.buttons, snap.buttons), textAdded: diff(snap.text, prev.text), textRemoved: diff(prev.text, snap.text), statsChanged: snap.stats !== prev.stats, healthChanged: snap.health !== prev.health, consoleLines: lastNewLines } : undefined;
+			prev = snap;
+			const action = await decide({ server, client, stuck: streak >= 5, still: streak, sinceNew, delta, console: recent, agent: a.agent, brief: a.brief }, history);
 			const entry = { step, t: new Date().toISOString(), action, position: server.player?.position, health: server.player?.health, leaderstats: server.leaderstats };
 			entry.result = await act(call, action, client.viewport, mcp.pixels).catch((e) => `failed: ${e.message}`);
 			if (action.kind === "click" && !report.gui.clicked.includes(action.path)) report.gui.clicked.push(action.path);

@@ -1,14 +1,15 @@
 -- PARLAY_QA_PROBE client
 -- Runs in the Client DataModel through execute_luau once per step and returns one JSON string: the viewport
--- size and every visible TextButton/ImageButton in PlayerGui, with its text and the LocalPlayer-relative path
--- user_mouse_input takes as instance_path (LocalPlayer.PlayerGui.Frame.Button).
+-- size, every visible TextButton/ImageButton in PlayerGui (text, parent frame, the LocalPlayer-relative path
+-- user_mouse_input takes as instance_path, and its centre in viewport pixels for bridges that click by pixel), and
+-- the visible text labels, so a panel title or a message counts as something on screen that can change.
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 local gui = player and player:FindFirstChild("PlayerGui")
 local camera = workspace.CurrentCamera
-local out = { viewport = camera and { camera.ViewportSize.X, camera.ViewportSize.Y } or nil, buttons = {} }
+local out = { viewport = camera and { camera.ViewportSize.X, camera.ViewportSize.Y } or nil, buttons = {}, text = {} }
 
 local function pathOf(inst)
 	local parts = {}
@@ -31,6 +32,7 @@ local function visible(g)
 end
 
 if gui then
+	local seenText = {}
 	for _, g in gui:GetDescendants() do
 		if (g:IsA("TextButton") or g:IsA("ImageButton")) and visible(g) and g.AbsoluteSize.X > 0 and g.AbsoluteSize.Y > 0 then
 			out.buttons[#out.buttons + 1] = {
@@ -41,6 +43,12 @@ if gui then
 				x = math.floor(g.AbsolutePosition.X + g.AbsoluteSize.X / 2),
 				y = math.floor(g.AbsolutePosition.Y + g.AbsoluteSize.Y / 2),
 			}
+		elseif g:IsA("TextLabel") and #out.text < 20 and g.Text ~= "" and visible(g) and g.AbsoluteSize.X > 0 then
+			local t = string.sub(g.Text, 1, 60)
+			if not seenText[t] then
+				seenText[t] = true
+				out.text[#out.text + 1] = t
+			end
 		end
 	end
 end
