@@ -14,8 +14,10 @@ import * as path from "path";
 import { aquaUrl } from "./aqua";
 import { resolveFile, reveal } from "./aquaIssues";
 import { esc, firstLoc, pathText } from "./aquaText";
+import { claudeInstalled } from "./agents";
 import { log } from "./log";
-import { listStudios } from "./studio";
+import { triage, TriageFile } from "./qaTriage";
+import { listStudios, syncFolderFor } from "./studio";
 
 export const TYPESAFE_KEY = "parlay.typesafeApiKey";
 export const AQUA_INGEST_KEY = "parlay.aquaIngestKey";
@@ -27,8 +29,9 @@ interface Hist { step: number; action: Action; result?: string }
 interface Finding { message: string; side: string; count: number; firstStep: number; lastStep: number; trace: string[]; screenshot?: string; actionsBefore: Hist[] }
 interface Suspect { step: number; probability: number; screenshot?: string; console: string[]; actionsBefore: Hist[] }
 interface Note { step: number; kind: string; text: string; probability: number; screenshot?: string; console: string[]; actionsBefore: Hist[] }
-interface Report { place: string; studio?: { name: string }; policy?: string; agent?: string; doneBy?: string; start: string; end?: string; steps: number; errors: Finding[]; stuck: { step: number; state?: string }[]; suspects?: Suspect[]; notes?: Note[]; exitCode: number; failure?: string; aqua?: string }
-interface Form { place: string; agent: string; policy: "" | "scripted" | "jev" }
+interface Report { place: string; studio?: { name: string }; policy?: string; agent?: string; brief?: string; doneBy?: string; start: string; end?: string; steps: number; errors: Finding[]; stuck: { step: number; state?: string }[]; suspects?: Suspect[]; notes?: Note[]; exitCode: number; failure?: string; aqua?: string }
+interface Form { place: string; agent: string; brief?: string; policy: "" | "scripted" | "jev" }
+const IGNORED = "qaIgnored";   // globalState: triage keys the Ignore button hid, so the same bug stays hidden next run
 // the personalities of qa/agents.mjs, as the picker shows them (the runner validates the id)
 const AGENTS: Record<string, [string, string]> = {
 	explorer: ["Explorer", "Wanders, presses every button, uses every prompt. Finds crashes and dead ends."],
@@ -52,6 +55,8 @@ class QaView implements vscode.WebviewViewProvider {
 	private studios: { name: string; placeId: string }[] = [];
 	private tail?: NodeJS.Timeout;
 	private live?: { place: string; agent: string; policy: string; at: number };   // the run in progress, for the view's clock
+	private triaged?: TriageFile;   // Claude's bug list for the run on show
+	private ws() { return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir(); }
 
 	constructor(private readonly ctx: vscode.ExtensionContext, private readonly fix: (line: string) => Promise<void>) {}
 
@@ -75,7 +80,11 @@ class QaView implements vscode.WebviewViewProvider {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private async onMessage(m: any) {
 		switch (m?.type) {
-			case "run": { const form: Form = { place: String(m.place ?? "").trim(), agent: AGENTS[m.agent] ? m.agent : "explorer", policy: m.policy === "jev" ? "jev" : "scripted" }; await this.ctx.globalState.update("qaForm", form); await this.run(form); break; }
+			case "run": { const form: Form = { place: String(m.place ?? "").trim(), agent: AGENTS[m.agent] ? m.agent : "explorer", brief: String(m.brief ?? "").trim().slice(0, 300), policy: m.policy === "jev" ? "jev" : "scripted" }; await this.ctx.globalState.update("qaForm", form); await this.run(form); break; }
+			case "retriage": if (this.out && this.report) void this.runTriage(this.out, this.report); break;
+			case "ignore": { const keys = new Set(this.ctx.globalState.get<string[]>(IGNORED, [])); keys.add(String(m.key)); await this.ctx.globalState.update(IGNORED, [...keys]); this.postTriage(); break; }
+			case "openTriaged": { const f = this.triaged?.findings.find((x) => x.id === m.id); if (f?.file) await reveal(vscode.Uri.file(path.isAbsolute(f.file) ? f.file : path.join(this.triaged?.ws ?? this.ws(), f.file)), f.line ?? 1); break; }
+			case "fixTriaged": await this.fixTriaged(String(m.id)); break;
 			case "stop": this.stop(); break;
 			case "refresh": await this.init(true); break;
 			case "setKey": await vscode.commands.executeCommand("parlay.typesafe.setKey"); break;
@@ -122,7 +131,7 @@ class QaView implements vscode.WebviewViewProvider {
 		const out = path.join(this.dir(), new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19));
 		fs.mkdirSync(out, { recursive: true });
 		// no --minutes: with Jev the agent says when it is done (the runner caps at 20 min), scripted plays its 5
-		const args = [path.join(this.ctx.extensionPath, "qa", "play.mjs"), "--place", form.place, "--policy", policy, "--agent", agent, "--out", out, "--stop-file", path.join(out, "stop")];
+		const args = [path.join(this.ctx.extensionPath, "qa", "play.mjs"), "--place", form.place, "--policy", policy, "--agent", agent, ...(form.brief ? ["--brief", form.brief] : []), "--out", out, "--stop-file", path.join(out, "stop")];
 		const env = { ...process.env, ELECTRON_RUN_AS_NODE: "1", PARLAY_AQUA_URL: aquaUrl(), PARLAY_AQUA_KEY: (await this.ctx.secrets.get(AQUA_INGEST_KEY)) ?? "", PARLAY_TYPESAFE_API_KEY: key ?? "" };
 		log.info(`QA: run started: place ${form.place}, ${policy} policy, ${agent} agent, ${out}`);
 		const child = spawn(process.execPath, args, { env, cwd: os.homedir(), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -205,8 +214,47 @@ class QaView implements vscode.WebviewViewProvider {
 			stuck: report.stuck.map((s) => `step ${s.step}: ${s.state ?? "?"}`),
 		};
 		this.post({ type: "done", final, name: path.basename(out), code: code ?? report?.exitCode, failure: startFailure ?? report?.failure, findings,
-			report: report && { place: placeName(report), steps: report.steps, aqua: report.aqua, policy: report.policy ?? "scripted", agent: report.agent ?? "explorer", doneBy: report.doneBy, duration: report.end ? Math.max(0, (Date.parse(report.end) - Date.parse(report.start)) / 1000) : 0 },
+			report: report && { place: placeName(report), steps: report.steps, aqua: report.aqua, policy: report.policy ?? "scripted", agent: report.agent ?? "explorer", brief: report.brief, doneBy: report.doneBy, duration: report.end ? Math.max(0, (Date.parse(report.end) - Date.parse(report.start)) / 1000) : 0 },
 			md: render(md), runs: this.runs() });
+		// Claude's bug list: the one already written for this run, else a fresh pass when the run just ended with findings
+		this.triaged = undefined;
+		try { this.triaged = JSON.parse(fs.readFileSync(path.join(out, "triage.json"), "utf8")); } catch { /* none yet */ }
+		const anything = !!report && (report.errors.length + (report.notes?.length ?? 0) + (report.suspects?.length ?? 0) + report.stuck.length) > 0;
+		if (this.triaged) this.postTriage();
+		else if (final && anything && report) void this.runTriage(out, report);
+		else this.post({ type: "triage", state: anything ? (claudeInstalled() ? "none" : "noclaude") : "nothing" });
+	}
+
+	// ---- Claude's bug list (qaTriage.ts) -------------------------------------------------------------------------
+	private async runTriage(out: string, report: Report) {
+		if (!claudeInstalled()) { this.post({ type: "triage", state: "noclaude" }); return; }
+		this.post({ type: "triage", state: "running" });
+		// the tested place's own Script Sync folder when it has one (the run may not be the workspace open here)
+		const synced = report.place ? await syncFolderFor(report.place).catch(() => undefined) : undefined;
+		const ws = synced && fs.existsSync(synced) ? synced : this.ws();
+		log.info(`QA triage: Claude reading ${path.basename(out)} in ${ws}`);
+		const t = await triage(out, report, ws);
+		if (this.out !== out) return;   // another run was shown meanwhile
+		this.triaged = t;
+		this.postTriage();
+	}
+	private postTriage() {
+		const t = this.triaged;
+		if (!t) return;
+		const ignored = new Set(this.ctx.globalState.get<string[]>(IGNORED, []));
+		this.post({ type: "triage", state: t.error ? "error" : "done", error: t.error, findings: t.findings.filter((f) => !ignored.has(f.key)), hidden: t.findings.filter((f) => ignored.has(f.key)).length });
+	}
+	// Fix: an error goes the existing way (its script and line from the message); anything Claude located goes to
+	// /parlay-fix at that line; the rest is handed over as a sentence for the agent to track down.
+	private async fixTriaged(id: string) {
+		const f = this.triaged?.findings.find((x) => x.id === id);
+		if (!f) return;
+		if (id.startsWith("error-")) { await this.fixWithClaude(Number(id.slice(6))); return; }
+		const why = clean(`${f.title}. ${f.why}`).slice(0, 500);
+		// relative to the open workspace when Claude read that one, else the absolute path into the place's sync folder
+		const file = f.file && this.triaged?.ws && this.triaged.ws !== this.ws() ? path.join(this.triaged.ws, f.file) : f.file;
+		if (file) await this.fix(`/parlay-fix ${file}:${f.line ?? 1}-${f.line ?? 1} QA finding: ${why}`);
+		else await this.fix(`QA finding to fix: ${why} Find the script responsible in this workspace and fix it.`);
 	}
 
 	// Previous runs, newest first: the folder (a timestamp) and the headline counts.
@@ -281,6 +329,7 @@ function html(csp: string, media: (file: string) => string): string {
 <div id="empty" class="note" hidden>No open Studio place found. Open one in Studio and refresh, or enter a place id and the runner opens it.</div></div>
 <div class="field"><label>Player</label><div class="seg" id="policy"><button data-v="jev">Jev<small>by TypeSafe</small></button><button data-v="scripted">Scripted<small>walk, click, interact</small></button></div></div>
 <div class="field"><label>What to test</label><div class="tiles" id="agent">${Object.entries(AGENTS).map(([id, [name, blurb]]) => `<button class="tile" data-v="${id}"><b>${name}</b><small>${blurb}</small></button>`).join("")}</div></div>
+<div class="field"><label for="brief">Task <span class="dim">(optional)</span></label><input id="brief" type="text" maxlength="300" placeholder="e.g. do the tutorial, then buy a sword and enter the arena"></div>
 <button id="run" class="primary"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>Play test</button>
 <p class="note" id="keynote"></p>
 <p class="note">Plays until the agent has seen enough (20 minute cap). Takes Studio's MCP seat while it plays and stops Play on its way out.</p>
@@ -292,7 +341,9 @@ function html(csp: string, media: (file: string) => string): string {
 <div class="status" id="status"></div>
 <button id="stop" class="primary stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop after this step</button>
 </div></section>
-<section id="result" hidden><h2>Result</h2><div class="card"><div class="verdict" id="verdict"></div><div class="counts" id="rcounts"></div></div><div id="findings"></div>
+<section id="result" hidden><h2>Result</h2><div class="card"><div class="verdict" id="verdict"></div><div class="counts" id="rcounts"></div></div>
+<div class="bugs" id="bugs"></div>
+<details class="evidence" id="evidence"><summary>Evidence <span id="evcount"></span></summary><div id="findings"></div></details>
 <details class="report"><summary>Full report</summary><div class="md" id="md"></div><div class="actions"><button class="btn alt" id="open">Open report.md</button></div></details></section>
 <section id="feed" hidden><h2>Steps <span id="feedcount"></span></h2><div id="steps"></div></section>
 <section><h2>Previous runs</h2><div id="runs"></div></section>

@@ -345,6 +345,19 @@ step also asks "this session is complete", and three answers at 0.8 or more afte
 (`report.doneBy` = `jev`; `cap` is the 20 minute safety cap, `stopped` the Stop button). The scripted policy still
 plays its five minutes as the Explorer.
 
+**A task for the agent**: the tab's Task field (or `--brief`) is a one-line instruction such as "do the tutorial,
+then buy a sword and enter the arena". It goes into Jev's instructions and state and into the done question
+("the task has been completed and, after it, …"), so any agent can be pointed at a flow; the Explorer with a
+task is the playthrough.
+
+**Claude's bug list** (`src/qaTriage.ts`): when a session ends with findings, Claude reads it headless
+(`claude -p`, Read/Grep/Glob only, in the tested place's Script Sync folder, three minutes at most) and turns each
+finding into a card: a plain title, a verdict (bug, needs a look, probably fine) with one sentence of why, and
+the script and line when it found them. Written to `<run>/triage.json`; the raw evidence stays under a fold.
+Fix with Claude sends the case to the agent terminal (`/parlay-fix` at the line when known); Ignore remembers
+the finding's key (an error by its message with numbers stripped, a note by its kind and target) so it stays
+hidden in later runs. Nothing is edited without a click.
+
 **When the built-in seat is taken.** Roblox's Studio MCP admits one client per machine, so a Claude session with
 the Studio MCP attached blocks the runner. The runner then switches to the Chrrxs bridge (`qa/chrrxs.mjs`:
 [Chrrxs/robloxstudio-mcp](https://github.com/Chrrxs/robloxstudio-mcp), a Studio plugin plus a local server whose

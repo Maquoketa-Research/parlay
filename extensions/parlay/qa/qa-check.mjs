@@ -245,7 +245,7 @@ fs.rmSync(tmp, { recursive: true, force: true });
 // ---- the UI tester agent ---------------------------------------------------------------------------------------
 // Offered clicks and explore only, notes every click the mock calls dead, and ends the session itself: done 0.9
 // once both buttons are tried, so three agreeing steps after the minimum of eight end it well before the 30-step cap.
-const ui = await run({ ...jevEnv, PARLAY_TYPESAFE_API_KEY: "good" }, "--policy", "jev", "--agent", "ui");
+const ui = await run({ ...jevEnv, PARLAY_TYPESAFE_API_KEY: "good" }, "--policy", "jev", "--agent", "ui", "--brief", "open the shop and buy something");
 const ur = ui.report();
 assert.equal(ur.agent, "ui");
 assert.equal(ur.doneBy, "jev", `ended by ${ur.doneBy}: ${ui.stdout.slice(-300)}`);
@@ -254,6 +254,10 @@ const uiReq = seen.find((b) => b.questions.deadButton);
 assert.ok(uiReq, "the UI tester asks its dead-button question");
 assert.deepEqual(Object.keys(uiReq.questions).sort(), ["deadButton", "done", "looksWrong", "next", "noEffect", "stuck"]);
 assert.ok(Object.keys(uiReq.questions.next.criteria).every((k) => k.startsWith("click_") || k === "explore"), "clicks and explore only");
+assert.match(uiReq.questions.next.instructions, /Your task from the developer: open the shop and buy something\./, "the brief reaches Jev");
+assert.equal(uiReq.state.task, "open the shop and buy something");
+assert.match(uiReq.questions.done.criteria.true, /^The task "open the shop and buy something" has been completed/);
+assert.equal(ur.brief, "open the shop and buy something");
 assert.deepEqual(ur.actions.slice(0, 2).map((h) => [h.action.kind, h.action.text]), [["click", "Menu"], ["click", "Buy"]]);
 assert.ok(ur.notes.length >= 2 && ur.notes.every((n) => n.kind === "dead-button" && /did nothing when clicked/.test(n.text) && n.probability === 0.9), JSON.stringify(ur.notes));
 assert.equal(ur.notes[0].screenshot, "note-dead-button-step-2.png");

@@ -136,7 +136,7 @@ function markdown(r) {
 	const name = r.studio?.name.replace(/\s*\(placeId:.*\)$/, "");
 	const lines = [`# QA play: place ${r.place}${name ? ` (${name})` : ""}`, "",
 		`${r.start} → ${r.end ?? "?"}; ${r.steps} steps; ${r.actions.length} actions; ${r.console.lines} new console lines (${r.console.warnings} warnings); exit ${r.exitCode}`
-		+ (r.placeVersion ? `; place version ${r.placeVersion}` : "") + (r.agent ? `; agent ${r.agent}` : "") + (r.doneBy ? `; ended by ${r.doneBy}` : ""),
+		+ (r.placeVersion ? `; place version ${r.placeVersion}` : "") + (r.agent ? `; agent ${r.agent}` : "") + (r.doneBy ? `; ended by ${r.doneBy}` : "") + (r.brief ? `; task: ${r.brief}` : ""),
 		r.failure ? `\n**Runner failure:** ${r.failure}` : null,
 		"", `## Errors (${r.errors.length})`];
 	for (const e of r.errors) {
@@ -171,7 +171,7 @@ function markdown(r) {
 // ---- the run ------------------------------------------------------------------------------------------------
 export async function main(argv = process.argv.slice(2)) {
 	const { values: a } = parseArgs({ args: argv, options: {
-		place: { type: "string", default: "" }, universe: { type: "string", default: "" }, minutes: { type: "string", default: "" }, agent: { type: "string", default: process.env.PARLAY_QA_AGENT || "explorer" },
+		place: { type: "string", default: "" }, universe: { type: "string", default: "" }, minutes: { type: "string", default: "" }, agent: { type: "string", default: process.env.PARLAY_QA_AGENT || "explorer" }, brief: { type: "string", default: "" },
 		steps: { type: "string", default: "400" }, "pace-ms": { type: "string", default: "500" }, out: { type: "string" },
 		"aqua-url": { type: "string", default: process.env.PARLAY_AQUA_URL ?? "" }, "aqua-key": { type: "string", default: process.env.PARLAY_AQUA_KEY ?? "" },
 		policy: { type: "string", default: process.env.PARLAY_QA_POLICY === "jev" ? "jev" : "scripted" }, "stop-file": { type: "string", default: "" },
@@ -182,7 +182,7 @@ export async function main(argv = process.argv.slice(2)) {
 	fs.mkdirSync(out, { recursive: true });
 	const { decide } = await import(a.policy === "jev" ? "./policy-jev.mjs" : "./policy.mjs");
 	const PROBE_SERVER = luau("probe.server.luau"), PROBE_CLIENT = luau("probe.client.luau");
-	const report = { place: a.place, universe: a.universe || undefined, studio: null, placeVersion: undefined, policy: a.policy, agent: a.policy === "jev" ? a.agent : "explorer", doneBy: undefined, start: new Date().toISOString(), end: undefined, steps: 0,
+	const report = { place: a.place, universe: a.universe || undefined, studio: null, placeVersion: undefined, policy: a.policy, agent: a.policy === "jev" ? a.agent : "explorer", brief: a.brief || undefined, doneBy: undefined, start: new Date().toISOString(), end: undefined, steps: 0,
 		actions: [], errors: [], stuck: [], suspects: [], notes: [], gui: { seen: {}, clicked: [] }, console: { lines: 0, warnings: 0 }, aqua: undefined, failure: undefined, exitCode: 1 };
 	let aborted = false;
 	process.on("SIGINT", () => { if (aborted) process.exit(1); aborted = true; log("Ctrl+C: stopping Play after this step (again to quit now)"); });
@@ -247,7 +247,7 @@ export async function main(argv = process.argv.slice(2)) {
 			sinceNew = unseen.length || lastNewLines ? 0 : sinceNew + 1;
 			const triedPaths = new Set(history.map((h) => h.action?.path).filter(Boolean));
 			const facts = { untriedButtons: (client.buttons ?? []).filter((b) => !triedPaths.has(b.path)).length, untriedInteractables: (server.interactables ?? []).slice(0, 10).filter((t) => !triedPaths.has(t.path)).length, sinceNew };
-			const action = await decide({ server, client, stuck: streak >= 5, still: streak, sinceNew, console: recent, agent: a.agent }, history);
+			const action = await decide({ server, client, stuck: streak >= 5, still: streak, sinceNew, console: recent, agent: a.agent, brief: a.brief }, history);
 			const entry = { step, t: new Date().toISOString(), action, position: server.player?.position, health: server.player?.health, leaderstats: server.leaderstats };
 			entry.result = await act(call, action, client.viewport, mcp.pixels).catch((e) => `failed: ${e.message}`);
 			if (action.kind === "click" && !report.gui.clicked.includes(action.path)) report.gui.clicked.push(action.path);
@@ -290,7 +290,7 @@ export async function main(argv = process.argv.slice(2)) {
 			if (newGroups || suspect || notes.length || step % 10 === 0) file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : suspect ? `suspect-step-${step}` : notes.length ? `note-${notes[0].kind}-step-${step}` : `step-${step}`);
 			if (newGroups) for (const e of report.errors.slice(-newGroups)) e.screenshot = file;
 			if (suspect) report.suspects.push({ step, probability: wrong, screenshot: file, console: recent, actionsBefore: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
-			for (const n of notes) report.notes.push({ step, kind: n.kind, text: n.text, probability: n.probability, screenshot: file, console: recent, actionsBefore: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
+			for (const n of notes) report.notes.push({ step, kind: n.kind, text: n.text, probability: n.probability, screenshot: file, console: recent, actionsBefore: history.slice(-6, -1).map(({ step, action, result }) => ({ step, action, result })) });
 			stepsLog({ step, action, outcome: entry.result, newLines, errorGroups: report.errors.length, stuck: streak >= 5, suspect, done, notes: notes.map((n) => n.kind), screenshot: file });
 			log(`step ${step}: ${describe(action)} → ${entry.result}; +${newLines.length} lines; ${report.errors.length} error groups${streak >= 5 ? "; stuck" : ""}${action.jev ? `; jev wrong ${wrong.toFixed(2)}` : ""}${suspect ? "; suspect" : ""}${notes.length ? `; note: ${notes.map((n) => n.kind).join(", ")}` : ""}${action.jev ? `; done ${done.toFixed(2)}` : ""}`);
 			// the agent ends the session: three steps in a row at 0.8 or more, after a minimum of eight steps

@@ -74,15 +74,16 @@ function compact(state, history) {
 		untried: { buttons: buttons.filter((b) => !tried.has(b.path)).length, interactables: near.filter((t) => !tried.has(t.path)).length },
 		stepsSinceAnythingNew: Math.min(state.sinceNew ?? 0, 5),   // a new button, interactable or console line resets it; 5 means five or more (so quiet steps look alike and the cache answers them)
 		lastActions: history.slice(-5).map((h) => `${describe(h.action)} → ${h.result ?? "?"}`),
+		task: state.brief || undefined,
 		lastConsoleLines: (state.console ?? []).slice(-5).map((l) => String(l).slice(0, 200)),
 		stepsWithoutChange: Math.min(state.still ?? 0, 5),   // the raw count, 5 meaning five or more; "stuck" is Jev's call, not ours to hand it
 	};
 }
 
-const questions = (opts, agent) => ({
+const questions = (opts, agent, brief) => ({
 	next: {
 		type: "choice",
-		instructions: `You are play-testing a Roblox game as the ${agent.name}: ${agent.goal} Pick the next action. Prefer what has not been tried; when the last actions changed nothing, move somewhere else.`,
+		instructions: `You are play-testing a Roblox game as the ${agent.name}: ${agent.goal}${brief ? ` Your task from the developer: ${brief}. Work toward it step by step, then keep testing.` : ""} Pick the next action. Prefer what has not been tried; when the last actions changed nothing, move somewhere else.`,
 		criteria: Object.fromEntries(Object.entries(opts).map(([id, o]) => [id, o.text])),
 	},
 	stuck: { type: "noul", instructions: "The player appears stuck.", criteria: {
@@ -95,7 +96,7 @@ const questions = (opts, agent) => ({
 		true: "A console line reports an error, a nil or missing object or an infinite yield; a button or prompt did nothing when used; health or stats changed for no reason; the player fell through the floor, or the humanoid state is Dead or Ragdoll without a cause.",
 		false: "Walking, jumping, standing still, a plain or empty map, and steps that changed nothing are all normal; only the console or the states above count as broken." } },
 	done: { type: "noul", instructions: "This test session is complete; nothing useful is left to try.", criteria: {
-		true: agent.doneWhen,
+		true: brief ? `The task "${brief}" has been completed and, after it, ${agent.doneWhen}` : agent.doneWhen,
 		false: "untried buttons or interactables are above 0, or stepsSinceAnythingNew is small because a new button, interactable or console line just appeared." } },
 	...Object.fromEntries(Object.entries(agent.notes).map(([id, n]) => [id, { type: "noul", instructions: n.instructions, criteria: n.criteria }])),
 });
@@ -138,7 +139,7 @@ export async function decide(state, history) {
 	}
 	const agent = AGENTS[state.agent] ?? AGENTS.explorer;
 	const opts = options(state, history, agent);
-	const body = { model: "jev-latest", state: compact(state, history), questions: questions(opts, agent) };
+	const body = { model: "jev-latest", state: compact(state, history), questions: questions(opts, agent, state.brief) };
 	const cacheKey = JSON.stringify(body);
 	try {
 		const answers = cacheKey === cache.key ? cache.answers : (await ask(key, body)).answers;

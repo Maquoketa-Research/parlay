@@ -190,7 +190,7 @@ async function listStudiosViaMcp(): Promise<Studio[]> {
 // synced instances and their files) plus a _lastUsedDir. Whatever paths are in there, their common directory
 // is the sync folder.
 
-async function syncFolderFor(placeId: string): Promise<string | undefined> {
+export async function syncFolderFor(placeId: string): Promise<string | undefined> {
 	if (process.platform !== "win32" || !placeId) return undefined;
 	const record = await syncRecordName(placeId);
 	if (!record) return undefined;

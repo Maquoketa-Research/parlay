@@ -1,5 +1,5 @@
-// The Quality Assurance page (src/qa.ts html()): setup, the live run, the result with its findings, previous runs.
-// Everything it shows comes from the extension as messages; every click goes back as one.
+// The Quality Assurance page (src/qa.ts html()): setup, the live run, the result (Claude's bug list over the raw
+// evidence), previous runs. Everything it shows comes from the extension as messages; every click goes back as one.
 (() => {
 	const vs = acquireVsCodeApi();
 	const $ = (id) => document.getElementById(id);
@@ -21,7 +21,7 @@
 	const ended = (by) => by === "jev" ? "the agent called it done" : by === "exhausted" ? "nothing left to try" : by === "stopped" ? "stopped by you" : by === "cap" ? "hit the time cap" : "";
 
 	const form = { agent: "explorer", policy: "jev" };
-	let hasKey = false, running = false, timer, live = { at: 0 }, current = "";
+	let hasKey = false, running = false, timer, live = { at: 0 }, current = "", lastResult = null;
 	const counts = { steps: 0, err: 0, notes: 0, sus: 0, stuck: 0 };
 	let wasStuck = false;
 
@@ -30,9 +30,9 @@
 		for (const b of $("agent").children) b.setAttribute("aria-pressed", String(b.dataset.v === form.agent));
 		for (const b of $("policy").children) b.setAttribute("aria-pressed", String(b.dataset.v === form.policy));
 		$("keynote").innerHTML = form.policy === "jev"
-			? (hasKey ? `Jev by TypeSafe plays as the ${esc(agentName(form.agent))}, picks every move, and says when it has seen enough.` : `Jev needs a TypeSafe key. <a id="setkey">Set one</a> (typesafe.ai), or play scripted.`)
+			? (hasKey ? `Jev by TypeSafe plays as the ${esc(agentName(form.agent))}, picks every move, and says when it has seen enough. Claude then reads the session and lists the bugs.` : `Jev needs a TypeSafe key. <a id="setkey">Set one</a> (typesafe.ai), or play scripted.`)
 			: "A fixed script explores for five minutes: walks, clicks and interacts. Errors and stuck spots still count; no personality, nothing judges the screen.";
-		$("agent").hidden = form.policy !== "jev";
+		$("agent").hidden = $("brief").parentElement.hidden = form.policy !== "jev";
 		$("placeId").hidden = $("place").value !== "__id";
 		$("run").disabled = running || (form.policy === "jev" && !hasKey) || !/^\d+$/.test(placeValue());
 	}
@@ -63,7 +63,7 @@
 	};
 	$("place").onchange = () => { paint(); if (!$("placeId").hidden) $("placeId").focus(); };
 	$("placeId").oninput = paint;
-	$("run").onclick = () => { if (!running) vs.postMessage({ type: "run", place: placeValue(), agent: form.agent, policy: form.policy }); };
+	$("run").onclick = () => { if (!running) vs.postMessage({ type: "run", place: placeValue(), agent: form.agent, brief: $("brief").value.trim(), policy: form.policy }); };
 	$("stop").onclick = () => { $("stop").disabled = true; vs.postMessage({ type: "stop" }); };
 	$("refresh").onclick = () => vs.postMessage({ type: "refresh" });
 	$("open").onclick = () => vs.postMessage({ type: "md" });
@@ -86,6 +86,7 @@
 			$("empty").hidden = !!opts.length;
 			form.agent = $("agent").querySelector(`[data-v="${m.form.agent}"]`) ? m.form.agent : "explorer";
 			form.policy = m.form.policy === "scripted" || !hasKey ? "scripted" : "jev";
+			$("brief").value = m.form.brief ?? "";
 			if (m.live) start(m.live); else if (!m.running) finish();
 			paint(); runs(m.runs);
 		} else if (m.type === "started") {
@@ -108,9 +109,12 @@
 			if (nearBottom) main.scrollTop = main.scrollHeight;
 		} else if (m.type === "done") {
 			if (m.final) finish();
-			current = m.name;
+			current = m.name; lastResult = m;
 			result(m); runs(m.runs);
+			$("bugs").innerHTML = "";
 			if (!m.final) $("result").scrollIntoView({ block: "start" });
+		} else if (m.type === "triage") {
+			bugs(m);
 		}
 	});
 
@@ -127,8 +131,10 @@
 			: ["green", ICON.ok, `Clean run in ${r.place}`, `${who} found no errors, nothing suspect, and never got stuck.`];
 		$("verdict").className = `verdict ${cls}`;
 		$("verdict").innerHTML = `${icon}<div><b>${esc(head)}</b><span>${esc(sub)}</span></div>`;
-		$("rcounts").innerHTML = r ? [`<span class="chip">${plural(r.steps, "step")}</span>`, `<span class="chip">${clock(r.duration)}</span>`, `<span class="chip">${esc(who)}</span>`, ended(r.doneBy) ? `<span class="chip">${esc(ended(r.doneBy))}</span>` : "",
+		$("rcounts").innerHTML = r ? [`<span class="chip">${plural(r.steps, "step")}</span>`, `<span class="chip">${clock(r.duration)}</span>`, `<span class="chip">${esc(who)}</span>`, r.brief ? `<span class="chip" title="${esc(r.brief)}">task: ${esc(r.brief.slice(0, 40))}${r.brief.length > 40 ? "…" : ""}</span>` : "", ended(r.doneBy) ? `<span class="chip">${esc(ended(r.doneBy))}</span>` : "",
 			`<span class="chip${r.aqua === "ok" ? " green" : ""}" title="${esc(r.aqua ?? "")}">${r.aqua === "ok" ? "sent to Aqua" : r.aqua ? "Aqua: " + esc(r.aqua) : "not sent to Aqua"}</span>`].join("") : "";
+		$("evcount").textContent = `(${errs + notes + sus + stuck})`;
+		$("evidence").open = false;
 		$("findings").innerHTML = [
 			...f.errors.map((e, i) => `<div class="finding"><div class="t">${e.count > 1 ? `${e.count}× ` : ""}${esc(e.message)}</div><div class="m">${esc(e.side)} · steps ${esc(e.steps)}</div>`
 				+ (e.trace.length ? `<details><summary>Stack</summary><pre>${esc(e.trace.join("\n"))}</pre></details>` : "") + before(e.before) + shot(e.screenshot)
@@ -141,6 +147,31 @@
 		].join("");
 		$("md").innerHTML = m.md;
 		$("result").hidden = false;
+	}
+
+	// Claude's bug list: bugs first, then what needs a look, then what it judged fine (folded)
+	function bugs(m) {
+		const el = $("bugs");
+		if (m.state === "running") { el.innerHTML = `<div class="status"><i></i><span>Claude is reading the session and the scripts…</span></div>`; return; }
+		if (m.state === "nothing") { el.innerHTML = ""; return; }
+		if (m.state === "noclaude") { el.innerHTML = `<div class="hint">${ICON.eye}<span>Install Claude Code and Claude will turn these findings into a bug list.</span></div>`; return; }
+		if (m.state === "none") { el.innerHTML = `<div class="actions"><button class="btn" ${msg({ type: "retriage" })}>Ask Claude for the bug list</button></div>`; return; }
+		if (m.state === "error") { el.innerHTML = `<div class="hint">${ICON.fail}<span>Claude could not triage this run: ${esc(m.error)}</span><button class="btn alt" ${msg({ type: "retriage" })}>Retry</button></div>`; return; }
+		const groups = [["bug", "Bugs"], ["look", "Needs a look"]];
+		const card = (f) => `<div class="bug ${f.verdict}"><div class="t">${esc(f.title)}</div><div class="w">${esc(f.why)}</div>`
+			+ (f.file ? `<span class="loc" ${msg({ type: "openTriaged", id: f.id })}>${esc(f.file)}${f.line ? `:${f.line}` : ""}</span>` : "")
+			+ `<div class="actions"><button class="btn" ${msg({ type: "fixTriaged", id: f.id })}>Fix with Claude</button>${f.file ? `<button class="btn alt" ${msg({ type: "openTriaged", id: f.id })}>Open</button>` : ""}<button class="btn alt" ${msg({ type: "ignore", key: f.key })}>Ignore</button></div></div>`;
+		const fine = m.findings.filter((f) => f.verdict === "fine");
+		el.innerHTML = groups.map(([v, title]) => { const list = m.findings.filter((f) => f.verdict === v); return list.length ? `<h3>${title} (${list.length})</h3>${list.map(card).join("")}` : ""; }).join("")
+			+ (fine.length ? `<details class="fine-group"><summary>Probably fine (${fine.length})</summary>${fine.map(card).join("")}</details>` : "")
+			+ (m.hidden ? `<div class="note">${plural(m.hidden, "finding")} hidden by Ignore.</div>` : "")
+			+ (!m.findings.length && !m.hidden ? `<div class="hint">${ICON.ok}<span>Claude read the evidence and found nothing worth a card.</span></div>` : "");
+		// the headline follows Claude once it has spoken
+		const bugCount = m.findings.filter((f) => f.verdict === "bug").length, lookCount = m.findings.filter((f) => f.verdict === "look").length;
+		if (lastResult?.report && (bugCount || lookCount)) {
+			$("verdict").className = `verdict ${bugCount ? "red" : "amber"}`;
+			$("verdict").innerHTML = `${bugCount ? ICON.bad : ICON.eye}<div><b>${bugCount ? plural(bugCount, "bug") : "No confirmed bugs"}${lookCount ? `, ${lookCount} to look at` : ""} in ${esc(lastResult.report.place)}</b><span>Claude read the session and the scripts. Fix sends each case to your Claude terminal.</span></div>`;
+		}
 	}
 
 	function runs(list) {
