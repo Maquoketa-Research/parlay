@@ -76,7 +76,7 @@ assert.match(r.stdout, /Play stopped/);
 
 const stepsLog = fs.readFileSync(path.join(out, "stepsLog.jsonl"), "utf8").trimEnd().split("\n").map((l) => JSON.parse(l));
 assert.equal(stepsLog.length, report.steps, "one stepsLog line per step");
-assert.deepEqual(Object.keys(stepsLog[0]).sort(), ["action", "errorGroups", "newLines", "outcome", "screenshot", "step", "stuck", "suspect"]);
+assert.deepEqual(Object.keys(stepsLog[0]).sort(), ["action", "done", "errorGroups", "newLines", "notes", "outcome", "screenshot", "step", "stuck", "suspect"]);
 assert.equal(stepsLog[0].errorGroups, 1);
 assert.equal(stepsLog[9].screenshot, "step-10.png");
 
@@ -163,12 +163,14 @@ const jev = http.createServer((req, res) => {
 		const b = JSON.parse(body);
 		seen.push(b);
 		const offered = Object.keys(b.questions.next.criteria);
-		const choice = offered.includes("click_1") ? "click_1" : "walk_S";
+		const choice = offered.includes("click_1") ? "click_1" : offered.includes("walk_S") ? "walk_S" : offered.includes("click_0") ? "click_0" : "explore";
 		const noul = (p) => ({ type: "noul", noul: p });
 		res.setHeader("Content-Type", "application/json");
 		res.end(JSON.stringify({ model: "jev-1.13.0", answers: {
 			next: { type: "choice", choice, confidence: 0.8, probabilities: Object.fromEntries(offered.map((k) => [k, k === choice ? 0.6 : 0.4 / (offered.length - 1)])) },
 			stuck: noul((b.state.stepsWithoutChange ?? 0) >= 5 ? 0.9 : 0.1), noEffect: noul(0.2), looksWrong: noul([2, 5].includes(b.state.stepsWithoutChange) ? 0.9 : 0.1),
+			done: noul(b.questions.deadButton && b.state.tried?.buttons === "2 of 2" ? 0.9 : 0.1),
+			...(b.questions.deadButton ? { deadButton: noul(/^click/.test(b.state.lastActions?.at(-1) ?? "") ? 0.9 : 0.1) } : {}),
 		}, usage: { input_tokens: 443, output_tokens: 61 } }));
 	});
 });
@@ -185,15 +187,17 @@ assert.equal(seen[0].model, "jev-latest");
 assert.deepEqual(seen[0].state.buttonsOnScreen, ["Buy", "Menu"]);
 assert.deepEqual(seen[0].state.interactablesNearby, ["ProximityPrompt Prompt at 8 studs", "ClickDetector ClickDetector at 16 studs"]);
 assert.equal(seen[0].state.stepsWithoutChange, 0);
+assert.deepEqual(seen[0].state.tried, { buttons: "0 of 2", interactables: "0 of 2" });
+assert.match(seen[0].questions.next.instructions, /as the Explorer/);
 assert.deepEqual(Object.keys(seen[0].questions.next.criteria).sort(), ["click_0", "click_1", "explore", "interact_0", "interact_1", "walk_A", "walk_D", "walk_S", "walk_W"]);
-assert.deepEqual(Object.keys(seen[0].questions).sort(), ["looksWrong", "next", "noEffect", "stuck"]);
+assert.deepEqual(Object.keys(seen[0].questions).sort(), ["done", "looksWrong", "next", "noEffect", "stuck"]);
 assert.ok(Object.values(seen[0].questions).every((q) => q.type === "choice" || (q.type === "noul" && q.criteria.true && q.criteria.false)));
 // Jev's choice became the action, with its probabilities and flags on it
 const [first, second] = jr.actions;
 assert.equal(first.action.kind, "click");
 assert.equal(first.action.path, "LocalPlayer.PlayerGui.HUD.MenuButton", "click_1 is the second button");
 assert.equal(first.action.jev.probabilities.click_1, 0.6);
-assert.deepEqual(first.action.jev.flags, { stuck: 0.1, noEffect: 0.2, looksWrong: 0.1 });
+assert.deepEqual(first.action.jev.flags, { stuck: 0.1, noEffect: 0.2, looksWrong: 0.1, done: 0.1 });
 assert.equal(first.action.jev.confidence, 0.8);
 assert.deepEqual([second.action.kind, second.action.key, second.action.jump], ["walk", "S", true]);
 assert.ok(jr.actions.slice(1).every((h) => h.action.kind === "walk" && h.action.key === "S"), "walk_S once click_1 is used up");
@@ -225,7 +229,6 @@ assert.ok(br.actions.every((h) => !h.action.jev));
 assert.equal(br.suspects.length, 0);
 assert.equal((bad.stdout.match(/jev: HTTP 401/g) ?? []).length, 1, `logged once:\n${bad.stdout}`);
 assert.match(bad.stdout, /scripted policy for the rest of the run/);
-jev.close();
 
 // --stop-file: the QA view's Stop; present before the run starts, so the loop ends before its first step
 const stopFile = path.join(tmp, "stop");
@@ -237,4 +240,25 @@ assert.match(stopped.stdout, /stop file seen/);
 assert.match(stopped.stdout, /Play stopped/);
 
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log(`qa-check: ok (${report.steps} mock steps, ${report.errors.length} error group ×${err.count}, ${report.stuck.length} stuck; jev: ${seen.length} requests, ${jr.suspects.length} suspects, 401 fallback; chrrxs: ${bridgeCalls.length} bridge calls, bad token)`);
+// ---- the UI tester agent ---------------------------------------------------------------------------------------
+// Offered clicks and explore only, notes every click the mock calls dead, and ends the session itself: done 0.9
+// once both buttons are tried, so three agreeing steps after the minimum of eight end it well before the 30-step cap.
+const ui = await run({ ...jevEnv, PARLAY_TYPESAFE_API_KEY: "good" }, "--policy", "jev", "--agent", "ui");
+const ur = ui.report();
+assert.equal(ur.agent, "ui");
+assert.equal(ur.doneBy, "jev", `ended by ${ur.doneBy}: ${ui.stdout.slice(-300)}`);
+assert.ok(ur.steps >= 8 && ur.steps < 30, `${ur.steps} steps`);
+const uiReq = seen.find((b) => b.questions.deadButton);
+assert.ok(uiReq, "the UI tester asks its dead-button question");
+assert.deepEqual(Object.keys(uiReq.questions).sort(), ["deadButton", "done", "looksWrong", "next", "noEffect", "stuck"]);
+assert.ok(Object.keys(uiReq.questions.next.criteria).every((k) => k.startsWith("click_") || k === "explore"), "clicks and explore only");
+assert.deepEqual(ur.actions.slice(0, 2).map((h) => [h.action.kind, h.action.text]), [["click", "Menu"], ["click", "Buy"]]);
+assert.ok(ur.notes.length >= 2 && ur.notes.every((n) => n.kind === "dead-button" && /did nothing when clicked/.test(n.text) && n.probability === 0.9), JSON.stringify(ur.notes));
+assert.equal(ur.notes[0].screenshot, "note-dead-button-step-2.png");
+assert.ok(fs.existsSync(path.join(ui.out, "note-dead-button-step-2.png")));
+assert.ok(fs.readFileSync(path.join(ui.out, "report.md"), "utf8").includes(`## Notes (${ur.notes.length})`));
+assert.match(ui.stdout, /the ui agent says this session is done/);
+assert.equal(jr.doneBy, "cap", "the Explorer run above ran to its step cap");
+
+jev.close();
+console.log(`qa-check: ok (${report.steps} mock steps, ${report.errors.length} error group ×${err.count}, ${report.stuck.length} stuck; jev: ${seen.length} requests, ${jr.suspects.length} suspects, 401 fallback; chrrxs: ${bridgeCalls.length} bridge calls, bad token; ui agent: ${ur.steps} steps, ${ur.notes.length} notes, done by ${ur.doneBy})`);

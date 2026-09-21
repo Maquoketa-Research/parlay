@@ -333,6 +333,18 @@ code; Jev is literal and text-only. Any failure falls back to the scripted polic
 rest of the run; 429/529 retried twice). The key: `PARLAY_TYPESAFE_API_KEY` (the Quality Assurance view passes the key from
 SecretStorage this way), else the file `~/.parlay/typesafe-api-key` (one line), else `TYPESAFE_API_KEY`.
 
+**Agents** (`qa/agents.mjs`): the personalities Jev plays as, picked in the Quality Assurance tab or with
+`--agent`. Each is a table entry, nothing more: what is on offer (buttons, interactables, walks; whether visited
+targets stay on offer; the Breaker's five-times prompt spam and edge runs), its own yes/no questions, and when it
+may call the session done. Explorer tries everything once; UI tester clicks only and notes every click that
+changed nothing (`dead-button`); Breaker repeats and spams and notes stats that changed without a cause
+(`exploit`); Newbie plays what the screen suggests and notes three steps running where a first-time player would
+not know what to do (`confusing`). A confident answer (0.7 or more, after the agent's rule) becomes a **note** in
+`report.notes` and `report.md` with a screenshot, the console and the actions before it. There is no timer: every
+step also asks "this session is complete", and three answers at 0.8 or more after eight steps end the run
+(`report.doneBy` = `jev`; `cap` is the 20 minute safety cap, `stopped` the Stop button). The scripted policy still
+plays its five minutes as the Explorer.
+
 **When the built-in seat is taken.** Roblox's Studio MCP admits one client per machine, so a Claude session with
 the Studio MCP attached blocks the runner. The runner then switches to the Chrrxs bridge (`qa/chrrxs.mjs`:
 [Chrrxs/robloxstudio-mcp](https://github.com/Chrrxs/robloxstudio-mcp), a Studio plugin plus a local server whose

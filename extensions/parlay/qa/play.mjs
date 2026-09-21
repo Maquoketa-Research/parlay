@@ -89,8 +89,10 @@ async function act(call, action, viewport = [1280, 720], pixels = false) {
 	}
 	if (action.kind === "interact") {
 		const moved = (await call("execute_luau", { ...client, code: MOVE_TO.replace("$POS", action.position.join(", ")) })).text.trim();
-		if (action.class === "ProximityPrompt") await call("user_keyboard_input", { ...client, actions: [{ action: "keyDown", key_code: "E" }, { action: "wait", wait_time_ms: 600 }, { action: "keyUp", key_code: "E" }] });
-		else if (action.class === "ClickDetector") await call("user_mouse_input", { ...client, actions: [{ action: "mouseButtonClick", x: Math.round(viewport[0] / 2), y: Math.round(viewport[1] / 2) }] });
+		for (let i = 0; i < (action.times ?? 1); i++) {
+			if (action.class === "ProximityPrompt") await call("user_keyboard_input", { ...client, actions: [{ action: "keyDown", key_code: "E" }, { action: "wait", wait_time_ms: 600 }, { action: "keyUp", key_code: "E" }] });
+			else if (action.class === "ClickDetector") await call("user_mouse_input", { ...client, actions: [{ action: "mouseButtonClick", x: Math.round(viewport[0] / 2), y: Math.round(viewport[1] / 2) }] });
+		}
 		return moved;   // a TouchTransmitter fires on arrival
 	}
 	const jump = action.jump ? [{ action: "keyPress", key_code: "Space" }] : [];
@@ -133,7 +135,7 @@ function markdown(r) {
 	const name = r.studio?.name.replace(/\s*\(placeId:.*\)$/, "");
 	const lines = [`# QA play: place ${r.place}${name ? ` (${name})` : ""}`, "",
 		`${r.start} → ${r.end ?? "?"}; ${r.steps} steps; ${r.actions.length} actions; ${r.console.lines} new console lines (${r.console.warnings} warnings); exit ${r.exitCode}`
-		+ (r.placeVersion ? `; place version ${r.placeVersion}` : ""),
+		+ (r.placeVersion ? `; place version ${r.placeVersion}` : "") + (r.agent ? `; agent ${r.agent}` : "") + (r.doneBy ? `; ended by ${r.doneBy}` : ""),
 		r.failure ? `\n**Runner failure:** ${r.failure}` : null,
 		"", `## Errors (${r.errors.length})`];
 	for (const e of r.errors) {
@@ -151,6 +153,14 @@ function markdown(r) {
 			lines.push("", "Before:", ...s.actionsBefore.map((h) => `- ${act(h)}`));
 		}
 	}
+	if (r.notes?.length) {
+		lines.push("", `## Notes (${r.notes.length})`, "", `What the ${r.agent} agent flagged (Jev at 0.7 or more). Not counted in the exit code.`);
+		for (const n of r.notes) {
+			lines.push("", `### step ${n.step}: ${n.kind}: ${n.text} (${Math.round(n.probability * 100)}%)${n.screenshot ? `; screenshot ${n.screenshot}` : ""}`);
+			if (n.console?.length) lines.push("", "```", ...n.console, "```");
+			lines.push("", "Before:", ...n.actionsBefore.map((h) => `- ${act(h)}`));
+		}
+	}
 	const seen = Object.entries(r.gui.seen);
 	lines.push("", `## GUI: ${seen.length} buttons seen, ${r.gui.clicked.length} clicked`, ...seen.map(([p, t]) => `- ${r.gui.clicked.includes(p) ? "[x]" : "[ ]"} ${t} (${p})`));
 	lines.push("", `## Aqua: ${r.aqua ?? "not attempted"}`, "");
@@ -160,18 +170,19 @@ function markdown(r) {
 // ---- the run ------------------------------------------------------------------------------------------------
 export async function main(argv = process.argv.slice(2)) {
 	const { values: a } = parseArgs({ args: argv, options: {
-		place: { type: "string", default: "" }, universe: { type: "string", default: "" }, minutes: { type: "string", default: "5" },
+		place: { type: "string", default: "" }, universe: { type: "string", default: "" }, minutes: { type: "string", default: "" }, agent: { type: "string", default: process.env.PARLAY_QA_AGENT || "explorer" },
 		steps: { type: "string", default: "400" }, "pace-ms": { type: "string", default: "500" }, out: { type: "string" },
 		"aqua-url": { type: "string", default: process.env.PARLAY_AQUA_URL ?? "" }, "aqua-key": { type: "string", default: process.env.PARLAY_AQUA_KEY ?? "" },
 		policy: { type: "string", default: process.env.PARLAY_QA_POLICY === "jev" ? "jev" : "scripted" }, "stop-file": { type: "string", default: "" },
 	} });
-	const minutes = parseFloat(a.minutes), maxSteps = parseInt(a.steps, 10), pace = parseInt(a["pace-ms"], 10);
+	// with Jev the agent says when it is done and the minutes are only a safety cap (20 by default); scripted plays 5
+	const minutes = a.minutes ? parseFloat(a.minutes) : a.policy === "jev" ? 20 : 5, maxSteps = parseInt(a.steps, 10), pace = parseInt(a["pace-ms"], 10);
 	const out = path.resolve(a.out ?? path.join(".build", "qa", new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)));
 	fs.mkdirSync(out, { recursive: true });
 	const { decide } = await import(a.policy === "jev" ? "./policy-jev.mjs" : "./policy.mjs");
 	const PROBE_SERVER = luau("probe.server.luau"), PROBE_CLIENT = luau("probe.client.luau");
-	const report = { place: a.place, universe: a.universe || undefined, studio: null, placeVersion: undefined, policy: a.policy, start: new Date().toISOString(), end: undefined, steps: 0,
-		actions: [], errors: [], stuck: [], suspects: [], gui: { seen: {}, clicked: [] }, console: { lines: 0, warnings: 0 }, aqua: undefined, failure: undefined, exitCode: 1 };
+	const report = { place: a.place, universe: a.universe || undefined, studio: null, placeVersion: undefined, policy: a.policy, agent: a.policy === "jev" ? a.agent : "explorer", doneBy: undefined, start: new Date().toISOString(), end: undefined, steps: 0,
+		actions: [], errors: [], stuck: [], suspects: [], notes: [], gui: { seen: {}, clicked: [] }, console: { lines: 0, warnings: 0 }, aqua: undefined, failure: undefined, exitCode: 1 };
 	let aborted = false;
 	process.on("SIGINT", () => { if (aborted) process.exit(1); aborted = true; log("Ctrl+C: stopping Play after this step (again to quit now)"); });
 	// the QA view's Stop: it creates this file, and the runner leaves the loop at the next step
@@ -219,7 +230,7 @@ export async function main(argv = process.argv.slice(2)) {
 			if (Date.now() - t0 > 60000) throw new Error(`Play did not start within 60 s: ${state.trim().replace(/\n/g, " | ")}`);
 		}
 		let lastConsole = (await call("get_console_output")).text;   // the whole log so far; new lines are whatever grows past it
-		let lastError = null, lastPos = "", lastGui = "", streak = 0, recent = [], warnedProbe = 0;   // recent: the last console lines, for the policy
+		let lastError = null, lastPos = "", lastGui = "", streak = 0, recent = [], warnedProbe = 0, doneStreak = 0;
 		const deadline = Date.now() + minutes * 60000, history = report.actions;
 		for (let step = 1; step <= maxSteps && Date.now() < deadline && !stopAsked(); step++) {
 			report.steps = step;
@@ -229,7 +240,7 @@ export async function main(argv = process.argv.slice(2)) {
 			report.player ??= server.player && { name: server.player.name, userId: server.player.userId };
 			for (const b of client.buttons ?? []) report.gui.seen[b.path] ??= b.text;
 			if (!server.player && !warnedProbe++) log(`the server probe returned no player (${JSON.stringify(server).slice(0, 160)}); movement and stuck detection are off until it does`);
-			const action = await decide({ server, client, stuck: streak >= 5, still: streak, console: recent }, history);
+			const action = await decide({ server, client, stuck: streak >= 5, still: streak, console: recent, agent: a.agent }, history);
 			const entry = { step, t: new Date().toISOString(), action, position: server.player?.position, health: server.player?.health, leaderstats: server.leaderstats };
 			entry.result = await act(call, action, client.viewport, mcp.pixels).catch((e) => `failed: ${e.message}`);
 			if (action.kind === "click" && !report.gui.clicked.includes(action.path)) report.gui.clicked.push(action.path);
@@ -265,14 +276,20 @@ export async function main(argv = process.argv.slice(2)) {
 			if (streak === 5) report.stuck.push({ step, position: server.player?.position, state: server.player?.state, actions: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
 			// suspect: Jev confident that something looks wrong, with no console error to pin it on (the 0.7 is code, not Jev's)
 			const wrong = action.jev?.flags?.looksWrong ?? 0, suspect = wrong >= 0.7 && !errorLines && streak < 5;
+			const notes = action.jev?.notes ?? [], done = action.jev?.flags?.done ?? 0;   // the agent's own findings, and its "nothing left to try"
 			let file;
-			if (newGroups || suspect || step % 10 === 0) file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : suspect ? `suspect-step-${step}` : `step-${step}`);
+			if (newGroups || suspect || notes.length || step % 10 === 0) file = await screenshot(call, out, newGroups ? `error-${report.errors.length}-step-${step}` : suspect ? `suspect-step-${step}` : notes.length ? `note-${notes[0].kind}-step-${step}` : `step-${step}`);
 			if (newGroups) for (const e of report.errors.slice(-newGroups)) e.screenshot = file;
 			if (suspect) report.suspects.push({ step, probability: wrong, screenshot: file, console: recent, actionsBefore: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
-			stepsLog({ step, action, outcome: entry.result, newLines, errorGroups: report.errors.length, stuck: streak >= 5, suspect, screenshot: file });
-			log(`step ${step}: ${describe(action)} → ${entry.result}; +${newLines.length} lines; ${report.errors.length} error groups${streak >= 5 ? "; stuck" : ""}${action.jev ? `; jev wrong ${wrong.toFixed(2)}` : ""}${suspect ? "; suspect" : ""}`);
+			for (const n of notes) report.notes.push({ step, kind: n.kind, text: n.text, probability: n.probability, screenshot: file, console: recent, actionsBefore: history.slice(-5).map(({ step, action, result }) => ({ step, action, result })) });
+			stepsLog({ step, action, outcome: entry.result, newLines, errorGroups: report.errors.length, stuck: streak >= 5, suspect, done, notes: notes.map((n) => n.kind), screenshot: file });
+			log(`step ${step}: ${describe(action)} → ${entry.result}; +${newLines.length} lines; ${report.errors.length} error groups${streak >= 5 ? "; stuck" : ""}${action.jev ? `; jev wrong ${wrong.toFixed(2)}` : ""}${suspect ? "; suspect" : ""}${notes.length ? `; note: ${notes.map((n) => n.kind).join(", ")}` : ""}${action.jev ? `; done ${done.toFixed(2)}` : ""}`);
+			// the agent ends the session: three steps in a row at 0.8 or more, after a minimum of eight steps
+			doneStreak = done >= 0.8 ? doneStreak + 1 : 0;
+			if (doneStreak >= 3 && step >= 8) { report.doneBy = "jev"; log(`the ${report.agent} agent says this session is done (${done.toFixed(2)} three steps running); stopping Play`); break; }
 			if (pace) await sleep(pace);
 		}
+		report.doneBy ??= aborted ? "stopped" : "cap";
 		report.exitCode = report.errors.length || report.stuck.length ? 2 : 0;
 	} catch (e) {
 		report.failure = e instanceof SeatTaken ? `Studio MCP seat taken: ${e.message}` : e.message;

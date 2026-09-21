@@ -23,6 +23,12 @@ select, input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid var(
 .seg button { flex: 1; min-width: 0; padding: 6px 4px; color: var(--muted); border-right: 1px solid var(--line); line-height: 1.3; } .seg button:last-child { border-right: 0; }
 .seg button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); } .seg button[aria-pressed=true] { color: var(--vscode-foreground); background: var(--vscode-toolbar-hoverBackground); font-weight: 600; }
 .seg button small { display: block; font-size: 10px; font-weight: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tile { text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--vscode-input-background); color: var(--muted); line-height: 1.3; }
+.tile b { display: block; font-size: 12px; font-weight: 600; color: var(--vscode-foreground); } .tile small { display: block; margin-top: 2px; font-size: 10px; }
+.tile:hover { background: var(--vscode-toolbar-hoverBackground); } .tile[aria-pressed=true] { border-color: var(--accent); background: var(--vscode-toolbar-hoverBackground); box-shadow: inset 0 0 0 1px var(--accent); }
+.chip.blue b { color: var(--accent); } .tag.blue { color: var(--accent); } .finding.blue { border-left-color: var(--accent); } .verdict.blue svg { color: var(--accent); }
+.live .bar + .barlabel { margin-top: -4px; font-size: 10px; color: var(--muted); text-align: right; }
 .primary { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px 12px; border-radius: 6px; font-weight: 600; background: var(--vscode-button-background); color: var(--vscode-button-foreground); } .primary:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
 .primary.stop { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); } .primary.stop:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); } .primary.stop svg rect { fill: currentColor; stroke: none; }
 .note { margin: 8px 0 0; font-size: 11px; color: var(--muted); } .note a { color: var(--accent); cursor: pointer; } .note a:hover { text-decoration: underline; }

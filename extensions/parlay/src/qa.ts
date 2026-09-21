@@ -26,15 +26,23 @@ interface Action { kind: string; path?: string; text?: string; class?: string; k
 interface Hist { step: number; action: Action; result?: string }
 interface Finding { message: string; side: string; count: number; firstStep: number; lastStep: number; trace: string[]; screenshot?: string; actionsBefore: Hist[] }
 interface Suspect { step: number; probability: number; screenshot?: string; console: string[]; actionsBefore: Hist[] }
-interface Report { place: string; studio?: { name: string }; policy?: string; start: string; end?: string; steps: number; errors: Finding[]; stuck: { step: number; state?: string }[]; suspects?: Suspect[]; exitCode: number; failure?: string; aqua?: string }
-interface Form { place: string; minutes: number; policy: "" | "scripted" | "jev" }
+interface Note { step: number; kind: string; text: string; probability: number; screenshot?: string; console: string[]; actionsBefore: Hist[] }
+interface Report { place: string; studio?: { name: string }; policy?: string; agent?: string; doneBy?: string; start: string; end?: string; steps: number; errors: Finding[]; stuck: { step: number; state?: string }[]; suspects?: Suspect[]; notes?: Note[]; exitCode: number; failure?: string; aqua?: string }
+interface Form { place: string; agent: string; policy: "" | "scripted" | "jev" }
+// the personalities of qa/agents.mjs, as the picker shows them (the runner validates the id)
+const AGENTS: Record<string, [string, string]> = {
+	explorer: ["Explorer", "Wanders, presses every button, uses every prompt. Finds crashes and dead ends."],
+	ui: ["UI tester", "Only the interface: opens every menu, presses every button, checks each one did something."],
+	breaker: ["Breaker", "Tries to cheat: spams prompts, runs at edges, buys with nothing. Watches for stats that change without cause."],
+	newbie: ["Newbie", "A first-time player with no help. Reports where they would not know what to do next."],
+};
 
 const describe = (a: Action) => a.kind === "click" ? `click ${a.text ?? ""}` : a.kind === "interact" ? `${a.class} ${a.path?.split(".").pop()}` : `walk ${a.key}`;
 const before = (h: Hist) => `${h.step}: ${describe(h.action)}${h.result ? ` → ${h.result}` : ""}`;
 const placeName = (r: Report) => r.studio?.name?.replace(/\s*\(placeId:.*\)$/, "") || `place ${r.place}`;
 const clean = (s: string) => s.replace(/["\r\n]/g, "'");
 const warn = (m: string) => { log.warn(`QA: ${m}`); void vscode.window.showWarningMessage(`Parlay QA: ${m}`); };
-const defaultForm = (): Form => ({ place: "", minutes: 5, policy: "" });
+const defaultForm = (): Form => ({ place: "", agent: "explorer", policy: "" });
 
 class QaView implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
@@ -43,7 +51,7 @@ class QaView implements vscode.WebviewViewProvider {
 	private report?: Report;       // its report once written: the findings' buttons work from it
 	private studios: { name: string; placeId: string }[] = [];
 	private tail?: NodeJS.Timeout;
-	private live?: { place: string; minutes: number; policy: string; at: number };   // the run in progress, for the view's clock
+	private live?: { place: string; agent: string; policy: string; at: number };   // the run in progress, for the view's clock
 
 	constructor(private readonly ctx: vscode.ExtensionContext, private readonly fix: (line: string) => Promise<void>) {}
 
@@ -67,7 +75,7 @@ class QaView implements vscode.WebviewViewProvider {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private async onMessage(m: any) {
 		switch (m?.type) {
-			case "run": { const form: Form = { place: String(m.place ?? "").trim(), minutes: Number(m.minutes) || 5, policy: m.policy === "jev" ? "jev" : "scripted" }; await this.ctx.globalState.update("qaForm", form); await this.run(form); break; }
+			case "run": { const form: Form = { place: String(m.place ?? "").trim(), agent: AGENTS[m.agent] ? m.agent : "explorer", policy: m.policy === "jev" ? "jev" : "scripted" }; await this.ctx.globalState.update("qaForm", form); await this.run(form); break; }
 			case "stop": this.stop(); break;
 			case "refresh": await this.init(true); break;
 			case "setKey": await vscode.commands.executeCommand("parlay.typesafe.setKey"); break;
@@ -110,16 +118,17 @@ class QaView implements vscode.WebviewViewProvider {
 		if (!/^\d+$/.test(form.place)) { warn("pick an open Studio place or type a place id."); return; }
 		const key = await this.ctx.secrets.get(TYPESAFE_KEY);
 		const policy = form.policy === "jev" && (key || fs.existsSync(TYPESAFE_KEY_FILE)) ? "jev" : "scripted";
-		const minutes = Math.min(Math.max(form.minutes || 5, 1), 240);
+		const agent = AGENTS[form.agent] ? form.agent : "explorer";
 		const out = path.join(this.dir(), new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19));
 		fs.mkdirSync(out, { recursive: true });
-		const args = [path.join(this.ctx.extensionPath, "qa", "play.mjs"), "--place", form.place, "--minutes", String(minutes), "--policy", policy, "--out", out, "--stop-file", path.join(out, "stop")];
+		// no --minutes: with Jev the agent says when it is done (the runner caps at 20 min), scripted plays its 5
+		const args = [path.join(this.ctx.extensionPath, "qa", "play.mjs"), "--place", form.place, "--policy", policy, "--agent", agent, "--out", out, "--stop-file", path.join(out, "stop")];
 		const env = { ...process.env, ELECTRON_RUN_AS_NODE: "1", PARLAY_AQUA_URL: aquaUrl(), PARLAY_AQUA_KEY: (await this.ctx.secrets.get(AQUA_INGEST_KEY)) ?? "", PARLAY_TYPESAFE_API_KEY: key ?? "" };
-		log.info(`QA: run started: place ${form.place}, ${minutes} min, ${policy} policy, ${out}`);
+		log.info(`QA: run started: place ${form.place}, ${policy} policy, ${agent} agent, ${out}`);
 		const child = spawn(process.execPath, args, { env, cwd: os.homedir(), windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
 		this.child = child; this.out = out; this.report = undefined;
 		void vscode.commands.executeCommand("setContext", "parlay.qa.running", true);
-		this.live = { place: this.studios.find((s) => s.placeId === form.place)?.name ?? `place ${form.place}`, minutes, policy, at: Date.now() };
+		this.live = { place: this.studios.find((s) => s.placeId === form.place)?.name ?? `place ${form.place}`, agent, policy, at: Date.now() };
 		this.post({ type: "started", ...this.live });
 		let buf = "";
 		const onData = (d: Buffer) => {
@@ -156,7 +165,7 @@ class QaView implements vscode.WebviewViewProvider {
 			for (const line of fresh.slice(0, nl).split("\n")) {
 				try {
 					const s = JSON.parse(line);
-					this.post({ type: "step", step: s.step, action: describe(s.action), jev: s.action.jev?.flags?.looksWrong, outcome: s.outcome, newLines: s.newLines ?? [], errorGroups: s.errorGroups, stuck: s.stuck, suspect: !!s.suspect, screenshot: this.shot(out, s.screenshot) });
+					this.post({ type: "step", step: s.step, action: describe(s.action), jev: s.action.jev?.flags?.looksWrong, done: s.action.jev ? s.done : undefined, notes: s.notes ?? [], outcome: s.outcome, newLines: s.newLines ?? [], errorGroups: s.errorGroups, stuck: s.stuck, suspect: !!s.suspect, screenshot: this.shot(out, s.screenshot) });
 				} catch { /* a line still being written */ }
 			}
 		};
@@ -192,10 +201,11 @@ class QaView implements vscode.WebviewViewProvider {
 		const findings = report && {
 			errors: report.errors.map((e) => ({ message: e.message, side: e.side, count: e.count, steps: `${e.firstStep}–${e.lastStep}`, trace: e.trace, loc: !!firstLoc(e.message, ...e.trace), screenshot: this.shot(out, e.screenshot), before: e.actionsBefore.map(before) })),
 			suspects: (report.suspects ?? []).map((s) => ({ step: s.step, percent: Math.round(s.probability * 100), screenshot: this.shot(out, s.screenshot), console: s.console ?? [], before: s.actionsBefore.map(before) })),
+			notes: (report.notes ?? []).map((n) => ({ step: n.step, kind: n.kind, text: n.text, percent: Math.round(n.probability * 100), screenshot: this.shot(out, n.screenshot), console: n.console ?? [], before: n.actionsBefore.map(before) })),
 			stuck: report.stuck.map((s) => `step ${s.step}: ${s.state ?? "?"}`),
 		};
 		this.post({ type: "done", final, name: path.basename(out), code: code ?? report?.exitCode, failure: startFailure ?? report?.failure, findings,
-			report: report && { place: placeName(report), steps: report.steps, aqua: report.aqua, policy: report.policy ?? "scripted", duration: report.end ? Math.max(0, (Date.parse(report.end) - Date.parse(report.start)) / 1000) : 0 },
+			report: report && { place: placeName(report), steps: report.steps, aqua: report.aqua, policy: report.policy ?? "scripted", agent: report.agent ?? "explorer", doneBy: report.doneBy, duration: report.end ? Math.max(0, (Date.parse(report.end) - Date.parse(report.start)) / 1000) : 0 },
 			md: render(md), runs: this.runs() });
 	}
 
@@ -206,7 +216,7 @@ class QaView implements vscode.WebviewViewProvider {
 		return names.flatMap((name) => {
 			try {
 				const r: Report = JSON.parse(fs.readFileSync(path.join(this.dir(), name, "report.json"), "utf8"));
-				return [{ name, place: placeName(r), start: r.start, steps: r.steps, errors: r.errors.length, stuck: r.stuck.length, suspects: r.suspects?.length ?? 0, exit: r.exitCode, policy: r.policy ?? "scripted" }];
+				return [{ name, place: placeName(r), start: r.start, steps: r.steps, errors: r.errors.length, stuck: r.stuck.length, suspects: r.suspects?.length ?? 0, notes: r.notes?.length ?? 0, exit: r.exitCode, policy: r.policy ?? "scripted", agent: r.agent ?? "explorer" }];
 			} catch { return []; }
 		});
 	}
@@ -269,16 +279,16 @@ function html(csp: string, media: (file: string) => string): string {
 <section id="setup"><div class="card">
 <div class="field"><label for="place">Place</label><select id="place"></select><input id="placeId" type="text" inputmode="numeric" placeholder="Place id, e.g. 90044978600719" hidden>
 <div id="empty" class="note" hidden>No open Studio place found. Open one in Studio and refresh, or enter a place id and the runner opens it.</div></div>
-<div class="field"><label>Duration</label><div class="seg" id="minutes"><button data-v="2">2 min</button><button data-v="5">5 min</button><button data-v="10">10 min</button><button data-v="20">20 min</button></div></div>
 <div class="field"><label>Player</label><div class="seg" id="policy"><button data-v="jev">Jev<small>by TypeSafe</small></button><button data-v="scripted">Scripted<small>walk, click, interact</small></button></div></div>
+<div class="field"><label>What to test</label><div class="tiles" id="agent">${Object.entries(AGENTS).map(([id, [name, blurb]]) => `<button class="tile" data-v="${id}"><b>${name}</b><small>${blurb}</small></button>`).join("")}</div></div>
 <button id="run" class="primary"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></svg>Play test</button>
 <p class="note" id="keynote"></p>
-<p class="note">Takes Studio's MCP seat while it plays and stops Play on its way out.</p>
+<p class="note">Plays until the agent has seen enough (20 minute cap). Takes Studio's MCP seat while it plays and stops Play on its way out.</p>
 </div></section>
 <section id="live" hidden><div class="card live">
 <div class="title"><b id="liveplace"></b><span id="clock"></span></div>
-<div class="bar"><i id="bar"></i></div>
-<div class="counts"><span class="chip">steps <b id="c-steps">0</b></span><span class="chip red">errors <b id="c-err">0</b></span><span class="chip purple">suspects <b id="c-sus">0</b></span><span class="chip amber">stuck <b id="c-stuck">0</b></span></div>
+<div class="bar" title="How sure the agent is that it has seen enough"><i id="bar"></i></div><div class="barlabel" id="donelabel"></div>
+<div class="counts"><span class="chip">steps <b id="c-steps">0</b></span><span class="chip red">errors <b id="c-err">0</b></span><span class="chip blue">notes <b id="c-notes">0</b></span><span class="chip purple">suspects <b id="c-sus">0</b></span><span class="chip amber">stuck <b id="c-stuck">0</b></span></div>
 <div class="status" id="status"></div>
 <button id="stop" class="primary stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stop after this step</button>
 </div></section>
